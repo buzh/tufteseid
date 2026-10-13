@@ -1,19 +1,11 @@
-// The bundle's QGIS project: every picture placed and stacked, the public
-// upstreams wired in, nothing for the reader to configure.
-//
-// Written against what QGIS 4.2 itself saves, element for element, rather
-// than from the format's documentation — `QGIS_VERSION` below is part of that
-// coupling and is not a minimum (`docs/architecture.md`).
+
 
 import type { Metric } from '../map/bbox';
 
 const QGIS_VERSION = '4.2.2-Belém do Pará';
 
-/** Rough mainland-plus-Svalbard bounds, so *Zoom to layer* on a service means
- *  something. Nothing renders off it. */
 const NORWAY_25833: Metric = [-200000, 6400000, 1400000, 9100000];
 
-/** How much ground the view opens with around the footprint. */
 const CANVAS_MARGIN = 0.15;
 
 const esc = (s: string): string =>
@@ -34,10 +26,6 @@ const SRS_25833 =
   '<geographicflag>false</geographicflag>' +
   '</spatialrefsys>';
 
-/**
- * QGIS writes a bare `styles` for one layer and an empty `styles=` per layer
- * beyond that; both forms are copied from its own output rather than derived.
- */
 const wmsSource = (url: string, layers: readonly string[]): string =>
   [
     'contextualWMSLegend=0',
@@ -51,19 +39,6 @@ const wmsSource = (url: string, layers: readonly string[]): string =>
     `url=${encodeURIComponent(url)}`,
   ].join('&');
 
-/**
- * The services a bundle wires up. These are the **public upstreams**, not this
- * installation's `/wms/…` paths: a bundle travels, and QGIS sits outside the
- * app's tile guard and circuit breaker. Change a host here and
- * `nginx/wms-cache.conf` holds the same one for the SPA's own path.
- *
- * `over` stands above the pictures — marks and names belong on top of the
- * ground; `under` is context around a footprint that is at most 500 m wide,
- * and within a stack the array order is the drawing order.
- *
- * Flyfoto is deliberately absent: it is reachable only through `nib-proxy`'s
- * injected token and is not open data (`docs/architecture.md`).
- */
 const SERVICES = [
   // The app's own reference overlay: roads and names on transparency, for
   // reading over a render. It draws no ground, so it is not a basemap and
@@ -159,7 +134,6 @@ const extentXml = ([minX, minY, maxX, maxY]: Metric): string =>
 type Layer = {
   id: string;
   name: string;
-  /** The `<datasource>` element and the tree's `source` attribute alike. */
   source: string;
   provider: 'gdal' | 'wms';
   extent: Metric;
@@ -214,14 +188,10 @@ const grown = ([minX, minY, maxX, maxY]: Metric): Metric => {
   return [minX - padX, minY - padY, maxX + padX, maxY + padY];
 };
 
-/** One picture as the project should carry it. */
 export type ProjectRaster = {
-  /** Layer name, and the file's own stem. */
   name: string;
-  /** Path relative to the project file, forward slashes. */
   path: string;
   bbox25833: Metric;
-  /** PNG carries an alpha band, JPEG does not. */
   alpha: boolean;
 };
 
@@ -236,12 +206,6 @@ const serviceLayers = (stack: 'over' | 'under'): Layer[] =>
     renderer: SERVICE_RENDERER,
   }));
 
-/**
- * `rasters` is the gallery's order, cover first, and that is the order they
- * stack in: the cover on top, each one unticked revealing the reading beneath
- * it. The whole point of the footprint is that they are all registered to one
- * another, so a stack is how they are meant to be read.
- */
 export const qgisProject = (
   title: string,
   rasters: readonly ProjectRaster[],

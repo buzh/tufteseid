@@ -1,29 +1,17 @@
-/* The reading window. It floats: `src/ui/useFloatingPanel.ts` moves and resizes
-   it, and the two layout classes are only where each shape starts from. Nothing
-   here or there gives the box a size — it shrink-wraps its content in both axes
-   and every rule below is a ceiling, so a reading with three pictures and no
-   prose gets a box that small. The wrapper is what the resize grip sits in the
-   corner of. */
+
 .reader {
   position: absolute;
   display: flex;
   flex-direction: column;
-  /* `max-content`, not `fit-content`: shrink-to-fit is bounded by the room
-     left of the edge the box hangs from, so a box dragged to the right would
-     reflow narrower under the hand holding it. */
+
   width: max-content;
 }
 
-/* Shrinks inside the ceiling rather than overflowing it; `Panel` scrolls its
-   own body from there. */
 .panel {
   flex: 1 1 auto;
   min-height: 0;
 }
 
-/* A bar, starting along the bottom. Centred by the auto margins between two
-   zero offsets, the one way to centre a box of unknown width. A bottom or top
-   dock is this shape too. */
 .wide {
   right: 0;
   bottom: var(--mantine-spacing-xs);
@@ -36,8 +24,6 @@
   margin-inline: auto;
 }
 
-/* A column, starting down the right — the corner the card it stands in for
-   uses (`spotControls/SpotBox.module.css`). A side dock is this shape too. */
 .tall {
   top: var(--mantine-spacing-xs);
   right: var(--mantine-spacing-xs);
@@ -48,17 +34,12 @@
   max-height: calc(100% - 2 * var(--mantine-spacing-xs));
 }
 
-/* The scale bar moves to the centre on a narrow window (`map/map.css`), where
-   the bar layout would otherwise cover it. */
 @media (max-width: 768px) {
   .wide {
     bottom: calc(44px * var(--ui-scale));
   }
 }
 
-/* Moved, resized or docked, so the inline style is the whole placement: the
-   corner it hangs from and the ceiling it stops at. Last, because it has to
-   beat both layouts and the query above at equal specificity. */
 .placed {
   inset: auto;
   margin-inline: 0;
@@ -83,7 +64,6 @@
   touch-action: none;
 }
 
-/* `pre-wrap` keeps the author's own paragraph breaks, as on the card. */
 .prose {
   max-height: 6.5em;
   margin: 0 0 var(--mantine-spacing-xs);
@@ -131,13 +111,10 @@
   height: 100%;
   border-radius: inherit;
   object-fit: cover;
-  /* Decoration inside a button: the press belongs to the button, and a video
-     thumbnail would otherwise answer it with the browser's own overlay. */
+
   pointer-events: none;
 }
 
-/* Which producer made it, legible over whatever the corner of the picture
-   happens to be. */
 .frameKind {
   position: absolute;
   right: calc(2px * var(--ui-scale));
@@ -146,8 +123,6 @@
   text-shadow: 0 0 3px var(--mantine-color-anthracite-9);
 }
 
-/* The right padding is the resize grip's corner: without it the slider's own
-   end would take presses meant for the grip. */
 .controls {
   display: flex;
   align-items: center;
@@ -170,8 +145,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Takes the slack in the footer row, and gives it back by ellipsis rather than
-   by pushing the box wider. */
 .caption {
   display: flex;
   flex: 1 1 auto;
@@ -205,15 +178,11 @@
   min-width: calc(5rem * var(--ui-scale));
 }
 
-/* Wider than the two fades because the bar is stepped by frame and a hand has
-   to be able to land on one. */
 .transport {
   flex: 0 1 calc(12rem * var(--ui-scale));
   min-width: calc(7rem * var(--ui-scale));
 }
 
-/* `SketchFade` brings its own insides; what the footer says is how much of the
-   row it gets — the same as the picture's fade, two things over one ground. */
 .sketch {
   flex: 0 1 calc(10rem * var(--ui-scale));
   min-width: calc(5rem * var(--ui-scale));
@@ -228,8 +197,6 @@
   flex: 1;
 }
 
-/* Down a column there is no width to put a row of thumbnails in, and no
-   shortage of height: the strip wraps and the panel body scrolls it. */
 .tall .strip {
   flex-wrap: wrap;
   overflow-x: visible;
@@ -245,8 +212,6 @@
   gap: calc(6px * var(--ui-scale));
 }
 
-/* Stacked, the caption reads as a heading over the controls rather than as
-   something wedged between them. */
 .tall .caption {
   order: -1;
 }
@@ -255,7 +220,6 @@
   justify-content: center;
 }
 
-/* Stacked, the row's flex basis would be read as a height. */
 .tall .transport,
 .tall .sketch,
 .tall .fade {

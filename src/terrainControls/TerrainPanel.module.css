@@ -1,5 +1,4 @@
-/* Positioned against the map's own rectangle, so it sits under the band
-   without knowing the band's height. */
+
 .panel {
   position: absolute;
   top: var(--mantine-spacing-xs);

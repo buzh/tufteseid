@@ -8,12 +8,10 @@ import { buildSpotBundle } from './spotBundle';
 export type SpotExport = {
   run: () => void;
   busy: boolean;
-  /** The last attempt failed, sticky until the next one. */
+
   failed: boolean;
 };
 
-/** One at a time: a bundle is every picture of the spot fetched, decoded and
- *  checksummed, and two at once only slow both. */
 export const useSpotExport = (
   spot: SpotRecord,
   rows: readonly EvidenceRecord[] | null,

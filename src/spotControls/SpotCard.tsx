@@ -1,6 +1,4 @@
-// Only ever the author's own, or an admin's: `spotReadingAtom` sends anybody
-// else straight to `EvidenceReader` and keeps them there, so nothing in here —
-// nor in `EvidenceGallery`, which only this box mounts — is behind `mayEdit`.
+
 
 import { ActionIcon, Alert, Button, Switch, Tooltip } from '@mantine/core';
 import { useAtomValue, useSetAtom } from 'jotai';
@@ -43,13 +41,8 @@ import { SpotRenders } from './SpotRenders';
 import { useFlyfotoRun, type FlyfotoRun as Run } from './useFlyfotoRun';
 import { useSpotDraft, type SpotDraftController } from './useSpotDraft';
 
-/** Open or closed, and the press that changes it: the renders list is the
- *  card's, because the box is wider while it stands. */
 type RendersFold = { open: boolean; toggle: () => void };
 
-/** `hold` is present exactly while a draft has the map, and is then the only
- *  current account of the rectangle and the drawing — the record lags it by a
- *  round trip. */
 const SpotUnits = ({
   spot,
   evidence,
@@ -68,21 +61,14 @@ const SpotUnits = ({
   const readTerrain = useSetAtom(readTerrainWindowAtom);
   const mayRender = useHasFeature('render');
   const framing = hold?.stage === 'footprint';
-  // The card is away behind the canvas for the whole of a draw stage, so this
-  // only keeps the fade from re-rendering on every settle of a pen nobody can
-  // see it from.
+
   const drawing = hold?.stage === 'sketch';
 
-  // A stage has the map: the rectangle being dragged is not the one the record
-  // carries and a draw session has the map frozen, so a picture kept now would
-  // not be of what the offer says.
   const offer = hold ? null : evidence.offer;
   const keepLabel = t(offer?.kept ? 'evidence.kept' : 'evidence.keep');
 
   const hasSketch = hold ? hold.hasSketch : sketchOf(spot.sketch) !== null;
 
-  // What is written, not what a draft is holding: the bundle is built out of
-  // the record and its rows, which a stage in progress has not committed yet.
   const bundle = useSpotExport(spot, evidence.items);
 
   const flyfotoHint = !spot.footprint
@@ -138,8 +124,7 @@ const SpotUnits = ({
             <ControlButton
               icon="elevation"
               aria-label={t('terrainControls.readFootprint')}
-              // Nothing to read over, and the card's repair write is on its way
-              // to giving the spot one.
+
               disabled={hold != null || !spot.footprint}
               onClick={() => spot.footprint && readTerrain(spot.footprint)}
             />
@@ -149,8 +134,7 @@ const SpotUnits = ({
               <ControlButton
                 icon="flight"
                 aria-label={t('acquire.flyfoto')}
-                // The walk takes the map, and the list of what to propose is
-                // read off the rows as it starts.
+
                 disabled={hold != null || !spot.footprint || !evidence.items}
                 onClick={run.start}
               />
@@ -163,23 +147,20 @@ const SpotUnits = ({
                 on={renders.open}
                 aria-label={t('renders.title')}
                 aria-expanded={renders.open}
-                // The sidecar renders over the footprint, which a draft is in
-                // the middle of moving.
+
                 disabled={hold != null}
                 onClick={renders.toggle}
               />
             </Tooltip>
           )}
-          {/* Last on the row: everything before it asks for a picture, and
-              this one takes the spot away. */}
+          {}
           <Tooltip
             label={exportLabel({ running: bundle.busy, failed: bundle.failed })}
           >
             <ControlButton
               icon={bundle.busy ? 'hourglass_top' : 'folder_zip'}
               aria-label={t('export.label')}
-              // The rows are what is bundled, and a draft is in the middle of
-              // moving the rectangle they are all registered to.
+
               disabled={bundle.busy || hold != null || !evidence.items}
               onClick={bundle.run}
             />
@@ -202,8 +183,6 @@ const SpotUnits = ({
   );
 };
 
-/** Mounted only while a card draft lives, so the controller opens and — more
- *  to the point — flushes with it, while the card around it stands. */
 const SpotUnitsHeld = ({
   draft,
   ...rest
@@ -223,7 +202,7 @@ export const SpotCard = ({ spot }: { spot: SpotRecord }) => {
   const setActive = useSetAtom(activeSpotAtom);
   const edit = useSetAtom(editSpotDraftAtom);
   const setReading = useSetAtom(spotReadingAtom);
-  // Only ever a card draft: an editor draft puts `SpotProperties` here instead.
+
   const draft = useAtomValue(spotDraftAtom);
 
   const evidence = useSpotEvidence(spot);
@@ -241,10 +220,6 @@ export const SpotCard = ({ spot }: { spot: SpotRecord }) => {
     [rendersOpen],
   );
 
-  // Rows saved before the rule that a spot always has a rectangle. Repaired
-  // here rather than by a migration: deriving the square from the drawing
-  // wants a projection PocketBase's JSVM has not got. Not while a draft is in
-  // hand, whose own writes are serialized and this one is not.
   const repairing = useRef(false);
   useEffect(() => {
     if (draft || spot.footprint || repairing.current) return;
@@ -268,15 +243,13 @@ export const SpotCard = ({ spot }: { spot: SpotRecord }) => {
       .finally(() => setBusy(false));
   };
 
-  // A run has the map, so the card becomes a bar along the bottom of it.
   if (run.phase !== 'off') {
     return <FlyfotoRun run={run} failed={evidence.failed} />;
   }
 
   return (
     <Panel
-      // The list stands down while a draft has the map, and the box narrows
-      // with it rather than holding the width of something not on screen.
+
       className={cx(styles.panel, rendersOpen && !draft && styles.panelWide)}
       icon="location_on"
       title={spot.name}
@@ -305,8 +278,7 @@ export const SpotCard = ({ spot }: { spot: SpotRecord }) => {
             <Button
               size="xs"
               variant="default"
-              // A reading is suspended for as long as any draft lives, so with
-              // the map in hand this would do nothing until it was let go.
+
               disabled={draft != null}
               leftSection={<Icon icon="menu_book" size={16} />}
               onClick={() => setReading(true)}

@@ -18,9 +18,9 @@ export const culturalHeritageConfig: ThemeLayerConfig = {
         en: 'Cultural heritage',
       },
       infoFormat: 'application/vnd.ogc.gml',
-      // MapServer DPI hint scaling symbols and line widths; default is 96.
+
       extraWmsParams: { map_resolution: 192 },
-      // ~300k heritage records nationally: a wall of pins below z12.
+
       minZoom: 12,
     },
   ],

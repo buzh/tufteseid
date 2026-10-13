@@ -1,5 +1,4 @@
-// The spot's kept pictures in the card: the one place their order is set and
-// the one place a picture is laid back on the map to trace over.
+
 
 import { Alert, Tooltip } from '@mantine/core';
 import { useAtom } from 'jotai';
@@ -39,10 +38,9 @@ import type { SpotEvidence } from './useSpotEvidence';
 type Drag = {
   id: string;
   from: number;
-  /** The slot the row is being shown in, which is also where it would land. */
+
   to: number;
-  /** Where the middle of every slot is, measured at the press. The rows are
-   *  one height, so previewing a move does not move the slots. */
+
   slots: number[];
 };
 
@@ -83,10 +81,7 @@ const EvidenceItem = ({
   const title = evidenceLabel(record);
   const file = evidenceFileUrl(record);
   const note = renderNote(record, state);
-  // A row kept before the gate, or rendered onto this spot by an admin, can
-  // outlive the feature that ordered it — and the sidecar would only answer
-  // 403 (`src/auth/features.ts`). A row whose service this installation no
-  // longer runs is the same story with a 502.
+
   const mayRender = useHasFeature('render');
   const mayRedo =
     evidenceRenderable(record) && (mayRender || !rendersOnServer(record.kind));
@@ -199,15 +194,11 @@ export const EvidenceGallery = ({
   const listRef = useRef<HTMLUListElement>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
 
-  // A row the author deleted, or whose render the queue is redoing, must not
-  // leave its picture on the map.
   useEffect(() => {
     if (!ground || items === null) return;
     if (!items.some((rec) => rec.id === ground.id && rec.file)) setGround(null);
   }, [ground, items, setGround]);
 
-  // The list goes when the spot is closed or the reading opens, and the picture
-  // is the list's: nothing else is left to take it off the map.
   useEffect(() => () => setGround(null), [setGround]);
 
   const startDrag =
@@ -226,8 +217,6 @@ export const EvidenceGallery = ({
       });
     };
 
-  // The slot whose middle is nearest, so the row changes places once the
-  // pointer is past halfway and the rule is the same going up as going down.
   const onDragMove = (event: ReactPointerEvent<HTMLElement>) => {
     if (!drag) return;
     let to = drag.to;
@@ -250,9 +239,6 @@ export const EvidenceGallery = ({
     setDrag(null);
   };
 
-  // The handle answers arrows too, for a reader with no pointer. Stopped before
-  // the bounds check, or OL's keyboard pan answers a press that runs off the
-  // end.
   const nudge =
     (id: string, index: number, total: number) =>
     (event: ReactKeyboardEvent<HTMLElement>) => {
@@ -285,9 +271,7 @@ export const EvidenceGallery = ({
         <Icon icon="photo_library" size={14} />
         <span>{t('evidence.label')}</span>
       </div>
-      {/* Heading stands in all three states so the card does not jump as the
-          list lands. A list that never landed is neither loading nor empty —
-          the alert below is the whole of what can be said. */}
+      {}
       {items === null ? (
         !evidence.failed && (
           <p className={styles.hint}>{t('evidence.loading')}</p>

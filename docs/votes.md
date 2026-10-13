@@ -1,13 +1,5 @@
 # Votes and stars
 
-Two tallies per spot, in PocketBase. There is no comment engine and no
-discussion thread: a spot carries numbers and nothing else a reader can write
-on somebody else's record.
-
-A **vote** says how good the spot is and runs both ways; a **star** says the
-reader wants it back and only runs one. They are counted apart and ranked
-apart — *Populære* is the vote score, *Favoritter* is the reader's own stars.
-
 Both are a base collection of one row per reader per spot with a view
 collection over it, and both views carry the two properties `spotScores`
 records below.
@@ -21,10 +13,6 @@ records below.
 | `owner` | relation → `users`, required, cascade |
 | `spot` | relation → `spots`, required, cascade |
 | `direction` | select, required, one of `up` / `down` |
-
-A select rather than a signed number because PocketBase cannot express "not
-zero" on a NumberField, and a zero vote is not an opinion. Retracting deletes
-the row.
 
 `idx_votes_owner_spot` is unique over `(owner, spot)` — one vote per account
 per spot, enforced by the database rather than by the client. `castVote()`

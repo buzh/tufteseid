@@ -5,10 +5,6 @@ import {
   setUrlParameter,
 } from '../../shared/utils/urlUtils';
 
-// The tables below are exhaustive rather than defaulted: a style a sublayer
-// does not publish is a ServiceException, i.e. a broken tile.
-
-// The three registers inside `/wms/ra/kulturminner2`.
 export const HERITAGE_DETAILS = [
   'lokaliteter',
   'enkeltminner',
@@ -17,8 +13,6 @@ export const HERITAGE_DETAILS = [
 
 export type HeritageDetail = (typeof HERITAGE_DETAILS)[number];
 
-// One axis: STYLES takes a single value per LAYERS entry. The first two draw
-// every record; the rest are `vernetype` subsets.
 export const HERITAGE_RENDERS = [
   'omriss',
   'flate',
@@ -37,12 +31,10 @@ export const HERITAGE_VERN_RENDERS = HERITAGE_RENDERS.slice(
 
 type Sublayer = {
   name: string;
-  // A missing entry drops the sublayer from the request.
+
   styles: Partial<Record<HeritageRender, string>>;
 };
 
-// Vern styles for the four sublayers carrying a `vernetype` column. Spelled
-// out, not derived: `Uavklart` is capitalized on Lokalitetsikoner alone.
 const VERN: Partial<Record<HeritageRender, string>> = {
   fredede: 'fredede',
   verneverdige: 'verneverdige',
@@ -51,22 +43,20 @@ const VERN: Partial<Record<HeritageRender, string>> = {
   uavklart: 'uavklart',
 };
 
-// Each detail expands to the polygon layer and its icon twin: polygons stop at
-// 1:25 000 (`MaxScaleDenominator`), icons carry to 1:450 000.
 const DETAIL_SUBLAYERS: Record<HeritageDetail, Sublayer[]> = {
   lokaliteter: [
     {
       name: 'Lokaliteter',
       styles: { omriss: '', flate: 'heldekkende', ...VERN },
     },
-    // No fill and no outline variant; note the `Uavklart` spelling.
+
     {
       name: 'Lokalitetsikoner',
       styles: { omriss: '', flate: '', ...VERN, uavklart: 'Uavklart' },
     },
   ],
   enkeltminner: [
-    // Inverted: the default style is the filled one, `grenser` the outline.
+
     {
       name: 'Enkeltminner',
       styles: { omriss: 'grenser', flate: 'inspire_common:DEFAULT', ...VERN },
@@ -74,7 +64,7 @@ const DETAIL_SUBLAYERS: Record<HeritageDetail, Sublayer[]> = {
     { name: 'Enkeltminneikoner', styles: { omriss: '', flate: '', ...VERN } },
   ],
   sikringssoner: [
-    // No `vernetype` column, so it drops out under any subset render.
+
     {
       name: 'Sikringssoner',
       styles: { omriss: 'inspire_common:DEFAULT', flate: 'heldekkende' },
@@ -82,7 +72,6 @@ const DETAIL_SUBLAYERS: Record<HeritageDetail, Sublayer[]> = {
   ],
 };
 
-// The WMS paints LAYERS in order, so the last name wins the pixel.
 const PAINT_ORDER: readonly string[] = [
   'Sikringssoner',
   'Lokaliteter',
@@ -91,8 +80,6 @@ const PAINT_ORDER: readonly string[] = [
   'Enkeltminneikoner',
 ];
 
-// LAYERS and STYLES are positional and of equal length. Null when the settings
-// select nothing.
 export const heritageSitesParams = (
   details: ReadonlySet<HeritageDetail>,
   render: HeritageRender,
@@ -116,7 +103,6 @@ export const heritageSitesParams = (
   };
 };
 
-// Absent is every detail and empty is none, so the two must not read alike.
 const readDetails = (): Set<HeritageDetail> => {
   const fromUrl = getUrlParameter('heritageDetails');
   if (fromUrl === null) return new Set(HERITAGE_DETAILS);
@@ -138,7 +124,7 @@ const readRender = (): HeritageRender => {
 export const MIN_HERITAGE_OPACITY = 0.2;
 
 const readOpacity = (): number => {
-  // Number(null) is 0 and finite, so an absent parameter would clamp to MIN.
+
   const raw = getUrlParameter('heritageOpacity');
   const value = raw === null ? NaN : Number(raw);
   if (!Number.isFinite(value)) return 1;
@@ -151,12 +137,8 @@ export const heritageRenderAtom = atom<HeritageRender>(readRender());
 
 export const heritageOpacityAtom = atom<number>(readOpacity());
 
-// A blind, separate from `activeThemeLayersAtom` so hiding keeps the ticked
-// sources. Not URL-persisted, so a shared link arrives visible.
 export const heritageHiddenAtom = atom(false);
 
-// Called from the layer effect rather than the setters, so a link describes
-// what is on the map.
 export const writeHeritageUrlParameters = (
   details: ReadonlySet<HeritageDetail>,
   render: HeritageRender,

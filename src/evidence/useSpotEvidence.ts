@@ -36,29 +36,24 @@ import { evidenceMatches, metaOf, type EvidenceSpec } from './spec';
 
 type KeepOffer = {
   spec: EvidenceSpec;
-  /** A row already covers this ground with these parameters. */
+
   kept: boolean;
 };
 
 export type SpotEvidence = {
-  /** Null until the list lands; an empty array means none. */
+
   items: EvidenceRecord[] | null;
   failed: boolean;
-  /** The view as it stands, or null where nothing on screen can be
-   *  re-rendered. */
+
   offer: KeepOffer | null;
   keep: (spec: EvidenceSpec) => void;
-  /** A row written from pixels already made, for a picker that renders before
-   *  it asks. False where nothing was written and the reader can press
-   *  again. */
+
   keepProduced: (spec: EvidenceSpec, produced: Produced) => Promise<boolean>;
   retry: (rec: EvidenceRecord) => void;
   remove: (id: string) => void;
-  /** Move a row to index `to`. The reading opens on the cover (`coverOf`), so
-   *  this also chooses a cover. */
+
   reorder: (id: string, to: number) => void;
-  /** A row with pixels has no state; otherwise a job this browser still holds
-   *  wins, and past that the sidecar's `meta.job` outranks the local queue. */
+
   stateOf: (rec: EvidenceRecord) => RenderState | undefined;
 };
 
@@ -74,8 +69,6 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
   const [items, setItems] = useState<EvidenceRecord[] | null>(null);
   const [failed, setFailed] = useState(false);
 
-  // Shared by the fetch, the realtime feed and a finished render, all of which
-  // land out of order.
   const byId = useRef(new Map<string, EvidenceRecord>());
 
   const publish = useCallback(
@@ -91,8 +84,6 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
     [publish],
   );
 
-  // No reset for a second spot: the card keys on the record's id, so this hook
-  // only ever sees one.
   const spotId = spot.id;
   useEffect(() => {
     let live = true;
@@ -108,7 +99,6 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
         setFailed(true);
       });
 
-    // The feed is per collection, so rows belonging to another spot arrive too.
     const unsubscribe = subscribeEvidence((action, rec) => {
       if (!live || rec.spot !== spotId) return;
       if (action === 'delete') byId.current.delete(rec.id);
@@ -158,8 +148,7 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
         rec,
         onRefused,
         bbox4326: footprint,
-        // Composed here: only the client knows the reader's language, and only
-        // a sun loop's band is typeset by the sidecar.
+
         legend:
           rec.kind === 'sunloop' ? sunLoopLegend(rec, spot, language) : null,
         onDone: upsert,
@@ -178,10 +167,7 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
       )
         .then((rec) => {
           upsert(rec);
-          // A refused handover leaves no `meta.job`, and a row with neither
-          // pixels nor job reads as a render still on its way for as long as
-          // it stands — jamming every order chip behind it. Nothing was kept,
-          // so the row goes with it.
+
           render(rec, () => {
             discard(rec.id);
             setFailed(true);
@@ -229,8 +215,7 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
           err,
           (err as { response?: { data?: unknown } })?.response?.data,
         );
-        // A row whose file never landed has nothing to retry — the pixels were
-        // the run's, and the run still holds them.
+
         if (created) discard(created.id);
         setFailed(true);
         return false;
@@ -249,8 +234,7 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
       if (before.length !== writes.length) return;
 
       setFailed(false);
-      // Written first so the row stays where the hand left it, not snapping
-      // back for the round trip.
+
       writes.forEach((write, i) => upsert({ ...before[i], sort: write.sort }));
       Promise.all(
         writes.map((write) => setEvidenceSort(write.id, write.sort)),
@@ -268,8 +252,7 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
       const was = byId.current.get(id);
       if (!was) return;
       setFailed(false);
-      // Dropped first: the realtime delete may never arrive for a row only this
-      // reader can see.
+
       byId.current.delete(id);
       publish();
       deleteEvidence(id).catch((err) => {

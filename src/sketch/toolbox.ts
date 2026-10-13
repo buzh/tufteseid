@@ -1,6 +1,4 @@
-// Excalidraw's toolbar and properties island have no prop behind them and
-// expose no actions, so the strip reads off `onChange`'s app state and writes
-// through `setActiveTool` and `updateScene`.
+
 
 import {
   CaptureUpdateAction,
@@ -16,9 +14,6 @@ import type {
 import { LINEAR_TOOLS, SHAPE_TOOLS } from './pen';
 import type { SceneElement } from './scene';
 
-/** The strip's own set: Excalidraw's `ToolType` is not a package export, and
- *  laser, frame and embeddable have no use on a map. The hand is first because
- *  the map's own dragging is frozen for the session. */
 const BOX_TOOLS = [
   'hand',
   'selection',
@@ -31,8 +26,6 @@ const BOX_TOOLS = [
 
 export type BoxTool = (typeof BOX_TOOLS)[number];
 
-/** Excalidraw's own `hasBackground`, which the package does not export: the
- *  types a fill means anything on. */
 export const fillable = (type: string) =>
   type === 'rectangle' ||
   type === 'diamond' ||
@@ -43,19 +36,15 @@ export const fillable = (type: string) =>
 export type SketchStyle = {
   colour: string;
   width: number;
-  /** Excalidraw keeps a background colour and a fill style separately; here a
-   *  fill is on or off and takes the stroke's own colour, hatched
-   *  (`SketchCanvas`). */
+
   filled: boolean;
 };
 
-/** Everything the strip draws itself from, lifted out of `onChange`. */
 export type Live = SketchStyle & {
-  /** null while Excalidraw is on a tool the strip does not show, which only a
-   *  keyboard shortcut can reach. */
+
   tool: BoxTool | null;
   locked: boolean;
-  /** Whether the fill button would do anything where the reader is. */
+
   fillable: boolean;
 };
 
@@ -68,8 +57,6 @@ type LiveState = Pick<
   | 'selectedElementIds'
 >;
 
-/** Selected elements plus the text bound inside them, as Excalidraw's own
- *  restyling carries a container's label along. Locked ones are left. */
 const restyled = (
   appState: LiveState,
   elements: readonly SceneElement[],
@@ -86,8 +73,6 @@ const restyled = (
   return ids;
 };
 
-/** The selection's style where there is one, otherwise the pen's. The last
- *  selected element wins, as Excalidraw's island did. */
 export const readLive = (
   appState: LiveState,
   elements: readonly SceneElement[],
@@ -95,7 +80,7 @@ export const readLive = (
   const selected = elements.filter(
     (element) => !element.isDeleted && appState.selectedElementIds[element.id],
   );
-  // Indexed rather than `at(-1)`: the build targets ES2020.
+
   const last: SceneElement | undefined = selected[selected.length - 1];
   const background =
     last?.backgroundColor ?? appState.currentItemBackgroundColor;
@@ -115,13 +100,10 @@ export const readLive = (
   };
 };
 
-/** Sets the pen and restyles the selection, the two halves of one press on
- *  Excalidraw's island. */
 export const applyStyle = (api: ExcalidrawImperativeAPI, next: SketchStyle) => {
   const appState = api.getAppState();
   const background = next.filled ? next.colour : 'transparent';
-  // Including deleted: `updateScene` takes the array as the whole scene, and
-  // dropping the tombstones would put the erased strokes beyond undo's reach.
+
   const elements = api.getSceneElementsIncludingDeleted();
   const targets = restyled(appState, elements);
 
@@ -145,29 +127,20 @@ export const applyStyle = (api: ExcalidrawImperativeAPI, next: SketchStyle) => {
                 })
               : element,
           ),
-    // One undo step of its own; left to Excalidraw the restyle would ride on
-    // whatever the reader drew next.
+
     captureUpdate: CaptureUpdateAction.IMMEDIATELY,
   });
 };
 
-/** A note is a rectangle with text bound inside it. Excalidraw has no tool
- *  that makes one — natively it is draw a box, then press Enter — so the strip
- *  builds the pair and hands it over. */
 const NOTE = {
   widthPx: 170,
   heightPx: 100,
-  /** Excalidraw's own yellow, filled solid rather than with the hatch every
-   *  other fill here uses: a note is written over the ground, not traced off
-   *  it. */
+
   background: '#ffec99',
-  /** Also the label's colour — `bindTextToContainer` falls back to the
-   *  container's stroke — which is what keeps the writing off the pen's own. */
+
   stroke: '#1e1e1e',
 } as const;
 
-/** Notes are dropped in the middle of the view, so without a shift the second
- *  one would land exactly on the first. */
 const CASCADE_PX = 22;
 const CASCADE_STEPS = 6;
 
@@ -186,7 +159,7 @@ export const addNote = (
     appState,
   );
   const shift = (nth % CASCADE_STEPS) * CASCADE_PX;
-  // Two elements back: the rectangle and the text bound to it.
+
   const made = convertToExcalidrawElements([
     {
       type: 'rectangle',
@@ -204,8 +177,6 @@ export const addNote = (
   const note = made[0];
   if (!note) return;
 
-  // Selection, so the note can be dragged off the middle straight away and a
-  // press made with the pen down does not leave the reader drawing.
   api.setActiveTool({ type: 'selection' });
   api.updateScene({
     elements: [...api.getSceneElementsIncludingDeleted(), ...made],
@@ -213,10 +184,6 @@ export const addNote = (
     captureUpdate: CaptureUpdateAction.IMMEDIATELY,
   });
 
-  // Enter on a selected container is how Excalidraw opens its label for
-  // editing and there is no API for it, so the press is synthesised — the same
-  // trick `SketchCanvas` plays on the wheel. After a frame: the selection
-  // above goes through `setState` and the handler reads it back.
   const container = host.querySelector('.excalidraw-container');
   requestAnimationFrame(() => {
     container?.dispatchEvent(

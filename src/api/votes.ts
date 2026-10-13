@@ -3,7 +3,6 @@ import { pb } from './pocketbase';
 const COLLECTION = 'votes';
 const SCORES = 'spotScores';
 
-/** Must match the `direction` select in `1700001700_spot_votes.js`. */
 export type VoteDirection = 'up' | 'down';
 
 export type VoteRecord = {
@@ -15,10 +14,8 @@ export type VoteRecord = {
   updated: string;
 };
 
-/** A row of the `spotScores` view. A spot nobody has voted on has no row at
- *  all rather than a row of zeroes. */
 export type SpotScore = {
-  /** The view's id *is* the spot id — it groups by `spot`. */
+
   id: string;
   spot: string;
   votes: number;
@@ -27,14 +24,10 @@ export type SpotScore = {
   score: number;
 };
 
-// PocketBase reports a unique-index violation as a 400 with a per-field entry.
-// Here it means this reader has already voted on this spot.
 const isAlreadyVoted = (err: unknown): boolean =>
   (err as { response?: { data?: Record<string, { code?: string }> } })?.response
     ?.data?.owner?.code === 'validation_not_unique';
 
-/** The reader's own votes. Empty when signed out. Filtered here rather than
- *  left to the list rule, which also lets an admin list everybody's. */
 export const listMyVotes = async (): Promise<VoteRecord[]> => {
   const owner = pb.authStore.record?.id;
   return owner
@@ -44,11 +37,9 @@ export const listMyVotes = async (): Promise<VoteRecord[]> => {
     : [];
 };
 
-/** Every spot that has been voted on, best first. Open to a guest. */
 export const listSpotScores = async (): Promise<SpotScore[]> =>
   await pb.collection(SCORES).getFullList<SpotScore>({ sort: '-score' });
 
-/** Null when the spot has no votes yet. */
 export const getSpotScore = async (
   spotId: string,
 ): Promise<SpotScore | null> => {
@@ -61,8 +52,6 @@ export const getSpotScore = async (
   }
 };
 
-/** Cast or change a vote. Creating is the common case, so it goes first and
- *  the unique-index 400 says the reader has voted here before. */
 export const castVote = async (
   spotId: string,
   ownerId: string,

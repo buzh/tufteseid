@@ -389,8 +389,6 @@ Contracts:
   root layer `Kulturminner` draws the clean version and is the check.
 - `LAYERS` and `STYLES` are positional and must stay the same length.
 - `heritageSitesParams` returns null when the settings select nothing (every
-  register off, or only Sikringssoner under a vern subset). Hide the layer rather
-  than send a request that can only come back empty.
 - Rendering is one axis: `STYLES` takes a single value per `LAYERS` entry and RA
   publishes no filled variant of any subset, so "filled *and* fredede only" is
   not a request that exists.

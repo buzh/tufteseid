@@ -1,5 +1,4 @@
-// Each compute* returns a Float32Array in the grid it was handed, NaN where the
-// DEM has no coverage.
+
 
 import type { Dem } from './dem';
 
@@ -10,8 +9,6 @@ type Grid = {
   metresPerPx: number;
 };
 
-// A list rather than a bare union so a stored row can be validated against it:
-// `evidence/spec.ts` reads a visualization back out of untyped JSON.
 export const VISUALIZATIONS = [
   'hillshade',
   'multiHillshade',
@@ -25,8 +22,6 @@ export const VISUALIZATIONS = [
 
 export type Visualization = (typeof VISUALIZATIONS)[number];
 
-// Three quadrants only, peaking at 315°: spanning the full circle at equal
-// weight cancels the directional term and collapses the blend to a slope map.
 export const MULTI_AZIMUTHS = [
   { azimuth: 225, weight: 3 },
   { azimuth: 270, weight: 4 },
@@ -36,15 +31,10 @@ export const MULTI_AZIMUTHS = [
   { azimuth: 90, weight: 2 },
 ];
 
-// The scan costs width × height × directions × steps.
 export const SVF_DIRECTIONS = 16;
 
-// Step budget per ray: extra reach is bought by decimating, not by walking
-// further.
 export const SVF_MAX_RADIUS_PX = 24;
 
-// Coarsest grid the scan decimates down to, so with the step budget the reach
-// is a flat 24 m on any grid at 1 m or finer.
 export const HORIZON_MIN_M_PER_PX = 1;
 
 const maxDecimation = (metresPerPx: number): number =>
@@ -59,12 +49,9 @@ export const horizonDecimation = (
     Math.max(1, Math.ceil(radiusMetres / (metresPerPx * SVF_MAX_RADIUS_PX))),
   );
 
-// Metres; integer decimation makes it grid-dependent — 21.6 m on a 0.3 m grid.
 export const horizonMaxRadiusMetres = (metresPerPx: number): number =>
   SVF_MAX_RADIUS_PX * metresPerPx * maxDecimation(metresPerPx);
 
-// Horn's 3×3 method, as in GDAL and Esri. Partial derivatives in metres per
-// metre; NaN anywhere in the neighbourhood poisons the cell.
 function gradients(grid: Grid): { dzdx: Float32Array; dzdy: Float32Array } {
   const { width: w, height: h, data, metresPerPx } = grid;
   const dzdx = new Float32Array(w * h).fill(NaN);
@@ -74,7 +61,7 @@ function gradients(grid: Grid): { dzdx: Float32Array; dzdy: Float32Array } {
   for (let y = 1; y < h - 1; y++) {
     for (let x = 1; x < w - 1; x++) {
       const i = y * w + x;
-      // Neighbourhood a b c / d e f / g h i, north at the top.
+
       const a = data[i - w - 1];
       const b = data[i - w];
       const c = data[i - w + 1];
@@ -102,7 +89,6 @@ function gradients(grid: Grid): { dzdx: Float32Array; dzdy: Float32Array } {
   return { dzdx, dzdy };
 }
 
-// Slope in radians.
 export function computeSlope(dem: Dem, zFactor = 1): Float32Array {
   const { dzdx, dzdy } = gradients(dem);
   return slopeFromGradients(dzdx, dzdy, zFactor);
@@ -121,8 +107,6 @@ function slopeFromGradients(
   return out;
 }
 
-// Illumination in 0..1. `azimuth` is compass degrees the light comes *from*
-// (315 = north-west); `altitude` is degrees above the horizon.
 export function computeHillshade(
   dem: Dem,
   azimuth: number,
@@ -158,7 +142,7 @@ function shadeFromGradients(
   zFactor: number,
 ): Float32Array {
   const zenith = ((90 - altitude) * Math.PI) / 180;
-  // Compass bearing → mathematical angle (counter-clockwise from east).
+
   const azMath = (((360 - azimuth + 90) % 360) * Math.PI) / 180;
   const cosZenith = Math.cos(zenith);
   const sinZenith = Math.sin(zenith);
@@ -185,8 +169,6 @@ function shadeFromGradients(
   return out;
 }
 
-// Hesse's local relief model: the DEM minus a smoothed copy, in signed metres.
-// `radiusMetres` must exceed the features hunted or the smoothing eats them.
 export function computeLrm(dem: Dem, radiusMetres: number): Float32Array {
   const radiusPx = Math.max(1, Math.round(radiusMetres / dem.metresPerPx));
   const smooth = boxBlurNaNAware(dem.data, dem.width, dem.height, radiusPx);
@@ -198,7 +180,6 @@ export function computeLrm(dem: Dem, radiusMetres: number): Float32Array {
   return out;
 }
 
-// Three box passes approximate a Gaussian; no-data cells contribute nothing.
 function boxBlurNaNAware(
   src: Float32Array,
   w: number,
@@ -260,16 +241,14 @@ function blurAxis(
 }
 
 export type HorizonFields = {
-  /** Proportion of the sky hemisphere visible, 0..1. */
+
   svf: Float32Array;
-  /** Yokoyama positive openness, degrees. Banks and mounds run high. */
+
   openPos: Float32Array;
-  /** Yokoyama negative openness, degrees. Runs high in a hollow. */
+
   openNeg: Float32Array;
 };
 
-// Sky-view factor (Zakšek, Oštir & Kokalj 2011) and Yokoyama's two opennesses:
-// one ray walk read three ways.
 export function computeHorizonFields(
   dem: Dem,
   radiusMetres: number,
@@ -288,8 +267,6 @@ export function computeHorizonFields(
   };
 }
 
-// Block mean, not a subsample: point-sampling a 0.25 m DTM hands the scan that
-// grid's interpolation noise as relief.
 function decimate(grid: Grid, factor: number): Grid {
   const w = Math.max(1, Math.ceil(grid.width / factor));
   const h = Math.max(1, Math.ceil(grid.height / factor));
@@ -319,8 +296,6 @@ function decimate(grid: Grid, factor: number): Grid {
   return { width: w, height: h, data, metresPerPx: grid.metresPerPx * factor };
 }
 
-// Bilinear back to the DEM's own grid. `mask` cuts the result to cells that
-// have an elevation, or the averaged grid bleeds into unmeasured ground.
 function upsample(
   field: Float32Array,
   src: Grid,
@@ -334,8 +309,7 @@ function upsample(
   const clampX = (v: number) => (v < 0 ? 0 : v >= sw ? sw - 1 : v);
 
   for (let y = 0; y < height; y++) {
-    // Pixel centres, not corners: half a coarse cell of offset shifts the whole
-    // field visibly at factor 4.
+
     const fy = (y + 0.5) / factor - 0.5;
     const yf = Math.floor(fy);
     const ty = fy - yf;
@@ -396,8 +370,7 @@ function scanHorizon(
     SVF_MAX_RADIUS_PX,
     Math.max(1, Math.round(radiusMetres / metresPerPx)),
   );
-  // RVT's `svf_noise` is a radius to *start* at, not a filter. Never past the
-  // outer radius, or a direction would have no steps.
+
   const innerPx = Math.min(
     radiusPx,
     Math.max(1, Math.round(innerMetres / metresPerPx)),
@@ -417,7 +390,7 @@ function scanHorizon(
       const dx = Math.round(ux * r);
       const dy = Math.round(uy * r);
       const off = dy * w + dx;
-      // Near the origin successive steps can round to the same cell.
+
       if (off === lastOff) continue;
       lastOff = off;
       steps.push({ off, dx, dy, dist: Math.hypot(dx, dy) * metresPerPx });
@@ -440,8 +413,7 @@ function scanHorizon(
       let zenith = 0;
       let nadir = 0;
       for (let d = 0; d < SVF_DIRECTIONS; d++) {
-        // Start at 0, not ±Infinity: a direction with no readable cell at all
-        // reads as a flat horizon instead of poisoning the cell.
+
         let maxTan = 0;
         let minTan = 0;
         let seen = false;
@@ -461,8 +433,7 @@ function scanHorizon(
           if (tan > maxTan) maxTan = tan;
           if (tan < minTan) minTan = tan;
         }
-        // 1 − sin(horizon angle), floored at level ground for sky-view only:
-        // openness must not floor, or every convexity flattens to one value.
+
         const above = maxTan > 0 ? maxTan : 0;
         sky += 1 - above / Math.hypot(1, above);
         zenith += 90 - Math.atan(maxTan) * toDeg;
@@ -476,22 +447,19 @@ function scanHorizon(
   return { svf, openPos, openNeg };
 }
 
-// Visualization for Archaeological Topography (Kokalj & Somrak 2019), as RVT's
-// `rvt/blend.py` defines it. The stretches are absolute, not this rectangle's
-// percentiles, which is what makes two VAT renders comparable.
 export type VatTerrain = 'general' | 'flat';
 
 export type VatPreset = {
-  /** Degrees above the horizon. */
+
   sunAltitude: number;
-  /** Degrees; the slope layer's stretch runs 0 to this, inverted. */
+
   slopeMax: number;
-  /** Degrees. */
+
   opennessMin: number;
   opennessMax: number;
-  /** The sky-view stretch runs this to 1. */
+
   svfMin: number;
-  /** Metres. RVT states these in pixels — 10 and 20 — against 0.5 m data. */
+
   radiusMetres: number;
   innerMetres: number;
 };
@@ -517,21 +485,13 @@ export const VAT_PRESETS: Record<VatTerrain, VatPreset> = {
   },
 };
 
-// RVT's combined VAT (`VAT_combined.py`): the general stack over the flat one
-// at half opacity, which over single-band data is their mean.
 export const VAT_GENERAL_OPACITY = 0.5;
 
-// Frozen, and 1× against the app's own z-factor 2 default: the stretches are
-// calibrated against an unexaggerated surface and a fixed sun.
 export const VAT_AZIMUTH = 315;
 export const VAT_Z_FACTOR = 1;
 
-// RVT's own calibration resolution, and the surface all four VAT layers are
-// computed on — mixing resolutions between layers breaks the stretches.
 export const VAT_SCAN_M_PER_PX = 0.5;
 
-// ~3 s for the two scans, and just clear of the largest rectangle the control
-// can frame (1.20 M cells at the scan resolution).
 const VAT_MAX_SCAN_CELLS = 1_250_000;
 
 export const vatDecimation = (
@@ -540,7 +500,7 @@ export const vatDecimation = (
   metresPerPx: number,
 ): number => {
   const finest = Math.max(1, Math.round(VAT_SCAN_M_PER_PX / metresPerPx));
-  // The cell size that puts this rectangle exactly on the budget.
+
   const affordable = Math.sqrt(
     (widthMetres * heightMetres) / VAT_MAX_SCAN_CELLS,
   );
@@ -553,10 +513,6 @@ export type VatStackLayer = {
   opacity: number;
 };
 
-// What `composeVat` blends, as data to describe a render with; the compositor
-// does not read it, so the two are kept in step by hand. Openness is 100 %
-// where RVT's `blender_VAT.json` says 50, because RVT's `blend_overlay` returns
-// the background array it wrote into and the caller's opacity mix is a no-op.
 export const VAT_STACK: readonly VatStackLayer[] = [
   { vis: 'hillshade', blend: 'normal', opacity: 100 },
   { vis: 'slope', blend: 'luminosity', opacity: 50 },
@@ -569,17 +525,11 @@ const norm = (v: number, lo: number, hi: number): number => {
   return t < 0 ? 0 : t > 1 ? 1 : t;
 };
 
-// rvt.blend_func.blend_overlay, which drives off the *background* rather than
-// the active layer.
 const overlay = (active: number, background: number): number =>
   background > 0.5
     ? 1 - (1 - 2 * (background - 0.5)) * (1 - active)
     : 2 * background * active;
 
-// Inputs in their own units — hillshade 0..1, slope radians, positive openness
-// degrees, sky-view 0..1 — and the result is 0..1, painted with no stretch.
-// Over single-band data a luminosity blend is the active layer and an opacity
-// is a linear mix, so only overlay keeps its own arithmetic.
 export function composeVat(
   hillshade: Float32Array,
   slopeRadians: Float32Array,
@@ -604,7 +554,6 @@ export function composeVat(
       continue;
     }
 
-    // Slope renders inverted: steep is dark.
     let p = 0.5 * (1 - norm(sl * toDeg, 0, preset.slopeMax)) + 0.5 * hs;
     const o = norm(op, preset.opennessMin, preset.opennessMax);
     p = overlay(o, p);
@@ -656,15 +605,13 @@ export function computeVat(dem: Dem): Float32Array {
   return upsample(combined, grid, dem.width, dem.height, factor, dem.data);
 }
 
-// Robust range for a stretch: min/max lets one spike flatten everything else
-// into a couple of grey levels.
 export function percentileRange(
   values: Float32Array,
   lowPct: number,
   highPct: number,
 ): [number, number] {
   const finite: number[] = [];
-  // Sampled: percentiles of a 1-in-N sample are indistinguishable here.
+
   const stride = Math.max(1, Math.floor(values.length / 200000));
   for (let i = 0; i < values.length; i += stride) {
     const v = values[i];
@@ -686,8 +633,6 @@ export function percentileRange(
 
 export type Ramp = 'grey' | 'greyInverted' | 'diverging';
 
-// No-data goes fully transparent, so a coverage edge reads as a hole rather
-// than as black ground.
 export function toImageData(
   values: Float32Array,
   width: number,
@@ -711,8 +656,7 @@ export function toImageData(
     t = t < 0 ? 0 : t > 1 ? 1 : t;
 
     if (ramp === 'diverging') {
-      // Neutral tone on zero, not on the midpoint of the range, so "no local
-      // relief" is the same colour across renders.
+
       const mid = (0 - lo) / span;
       const [r, g, b] = divergingColor(t, mid < 0 ? 0 : mid > 1 ? 1 : mid);
       px[o] = r;
@@ -729,8 +673,6 @@ export function toImageData(
   return img;
 }
 
-// Brown (below) → near-white (at zero) → blue-green (above): legible for the
-// red-green colour blind where the usual red/blue is not.
 function divergingColor(t: number, mid: number): [number, number, number] {
   if (t < mid) {
     const k = mid > 0 ? t / mid : 0;

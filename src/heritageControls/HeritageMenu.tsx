@@ -27,8 +27,6 @@ import type { HeritageControls } from './useHeritageControls';
 
 const SOURCES = themeLayerConfig.layers.map((l) => l.id as ThemeLayerName);
 
-// The atom holds opacity, as the WMS layers and `?heritageOpacity` do; the
-// slider is transparency, so the opacity floor is the track's ceiling.
 const MAX_TRANSPARENCY = Math.round(100 - MIN_HERITAGE_OPACITY * 100);
 
 export const HeritageMenu = ({ heritage }: { heritage: HeritageControls }) => {
@@ -51,7 +49,7 @@ export const HeritageMenu = ({ heritage }: { heritage: HeritageControls }) => {
   const names = SOURCES.filter((id) => sources.has(id)).map((id) =>
     themeLayerName(id, i18n.language),
   );
-  // The render is a property of kulturminner2 alone.
+
   const title = [
     !shown
       ? t('heritageControls.chipHiddenTitle')
@@ -86,11 +84,7 @@ export const HeritageMenu = ({ heritage }: { heritage: HeritageControls }) => {
         />
       </Popover.Target>
       <Popover.Dropdown>
-        {/* `auto` rather than `scroll`: the bar is the only sign that the vern
-            filters carry on below the fold, and `scroll` shows it only once a
-            scroll is already under way. The cap leaves room for the band and
-            the dropdown's own offset, so the menu grows into the screen it has
-            rather than stopping at a height chosen for the shortest one. */}
+        {}
         <ScrollArea.Autosize mah="calc(100vh - 7rem)" type="auto">
           <Stack gap="xs">
             <Text size="xs" c="dimmed">
@@ -105,8 +99,7 @@ export const HeritageMenu = ({ heritage }: { heritage: HeritageControls }) => {
                   checked={sources.has(id)}
                   onChange={() => toggleSource(id)}
                 />
-                {/* kulturminner2's three registers are sublayers of one
-                    request, so ticking one does not put the source on the map. */}
+                {}
                 {id === RESHAPEABLE_THEME_LAYER && sitesShown && (
                   <Stack gap={6} ml="lg">
                     {HERITAGE_DETAILS.map((detail) => (
@@ -126,14 +119,12 @@ export const HeritageMenu = ({ heritage }: { heritage: HeritageControls }) => {
             {sitesShown && (
               <>
                 <Divider />
-                {/* WMS takes a single STYLES value per LAYERS entry, so render
-                    and subset are seven radio rows rather than two axes. */}
+                {}
                 <Radio.Group
                   value={render}
                   onChange={(value) => setRender(value as HeritageRender)}
                   label={t('heritageControls.renderHead')}
-                  // The group's label is an `Input.Label`: md and semibold
-                  // unless it is told otherwise.
+
                   labelProps={{ size: 'xs', c: 'dimmed', fw: 400 }}
                 >
                   <Stack gap={6} mt={6}>

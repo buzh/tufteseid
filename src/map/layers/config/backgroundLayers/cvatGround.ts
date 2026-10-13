@@ -1,6 +1,4 @@
-// The cached ground: RVT's combined VAT, precomputed per LiDAR acquisition into
-// one MBTiles database each by `vat-cache/makevat.py` and served by the
-// `cvat-tiles` sidecar.
+
 
 import { buffer, extend } from 'ol/extent';
 import type { Geometry } from 'ol/geom';
@@ -18,34 +16,23 @@ import {
 } from './lidarProjects';
 import { XYZBackgroundLayer } from './types';
 
-// A manifest acquisition name is byte-identical to the `LidarProject.id` the
-// per-project WMS publishes, so the two join with no name mapping.
 export type CvatAcquisition = {
   project: LidarProject;
-  // This acquisition's namespace in the store: one database on the server, one
-  // path segment here. Overlapping flights cannot share a `<z>/<x>/<y>`.
+
   path: string;
-  // Levels written, absolute z on the app's own grid (`wmsTileGrid.ts`): z16 is
-  // 0.331 m/px, z12 5.289 m/px. Depth follows the DTM — z16 at 0.25 m, z15 at
-  // 0.5 m — and a half-built acquisition is a normal state of the store.
+
   minZoom: number;
   maxZoom: number;
-  // The store's own envelope in EPSG:25833, off the manifest's tile indices;
-  // null against a sidecar too old to publish one.
+
   extent25833: [number, number, number, number] | null;
 };
 
-// Written in lockstep with `activeLidarProjectHalves`. Null until Automatisk
-// has named a flight.
 export const activeCvatAcquisitionHalves = halved<CvatAcquisition | null>(null);
 
 const CVAT_MANIFEST_URL = '/cvat/manifest.json';
 
 const cvatTileUrl = (path: string) => `/cvat/${path}/{z}/{x}/{y}.webp`;
 
-// Inclusive tile indices on the app's own grid (`wmsTileGrid.ts`) at the
-// coarsest level held; an envelope, not a footprint. `cvat-tiles/server.mjs`
-// flips MBTiles' south-up row count to the app's, so `y0` is the northern edge.
 export type CvatBounds = {
   z: number;
   x0: number;
@@ -99,14 +86,10 @@ const parseStore = (body: unknown): CvatStore => {
   return store;
 };
 
-// One fetch per page load: the store only grows by a file landing on the
-// server, which a reload picks up.
 let storePromise: Promise<CvatStore> | null = null;
 
 export const fetchCvatStore = (): Promise<CvatStore> => {
-  // An empty store is what the rest of the cVAT surface already reads as
-  // "nothing cached", so this is the whole of the opt-in: no style chip, no
-  // hint layer, no footprint badge.
+
   if (!serviceOn('cvat')) return Promise.resolve({});
   storePromise ??= fetch(CVAT_MANIFEST_URL)
     .then((res) => (res.ok ? res.json() : null))
@@ -131,14 +114,12 @@ const boundsExtent25833 = (
   return [e[0], e[1], e[2], e[3]];
 };
 
-// A catalogue row synthesized from the store, for when the catalogue is down or
-// has dropped the flight. No WMS styles: only the service knows those.
 const placeFromStore = (
   id: string,
   extent25833: [number, number, number, number] | null,
 ): LidarProject | null => {
   if (!extent25833) return null;
-  // 8 stops per edge: the box bows under the transform.
+
   const lonLat = transformExtent(extent25833, 'EPSG:25833', 'EPSG:4326', 8);
   return {
     id,
@@ -150,11 +131,8 @@ const placeFromStore = (
   };
 };
 
-// The join runs on every footprint refresh, so warn once per acquisition.
 const warned = new Set<string>();
 
-// The catalogue wins where it has a row, since it carries the flight's WMS
-// styles; the manifest's envelope places the rest.
 export const resolveCvatAcquisitions = (
   store: CvatStore,
   projects: LidarProject[],
@@ -184,8 +162,6 @@ export const resolveCvatAcquisitions = (
     ];
   });
 
-// Not memoised, so a list built during a catalogue outage picks the catalogue
-// back up afterwards.
 export const fetchCvatAcquisitions = async (): Promise<CvatAcquisition[]> => {
   const [store, projects] = await Promise.all([
     fetchCvatStore(),
@@ -205,12 +181,8 @@ export const stylesForFlight = (
   cached: CvatAcquisition | null,
 ): string[] => (cached ? [CVAT_STYLE, ...project.styles] : project.styles);
 
-// The grid the store was written on, and so the CRS a boundary is tested in.
 const CVAT_CRS = 'EPSG:25833';
 
-// The acquisition's own boundary, which `extent25833` is only the box around:
-// a county flown in strips leaves most of that box unwritten, and the hint
-// layer carries one of these per acquisition (`docs/map-layers.md`).
 const footprints = new Map<string, Geometry[]>();
 const asked = new Set<string>();
 
@@ -221,21 +193,14 @@ const loadFootprint = (project: LidarProject): void => {
     ({ footprints: found, unanswered }) => {
       const geometries = found.get(project.id)?.geometries;
       if (geometries?.length) footprints.set(project.id, geometries);
-      // An outage rather than an answer: let the next tile ask again. A WFS
-      // that simply holds no row under this name is an answer, and stands.
+
       else if (unanswered) asked.delete(project.id);
     },
   );
 };
 
-// The delivery polygon and the raster's own edge need not agree to the metre,
-// and a hole in the ground is a worse answer than a 404.
 const FOOTPRINT_MARGIN_M = 500;
 
-// Consulted per tile. The fetch starts on the first tile a layer asks for, so
-// an acquisition the reader never looks at costs no WFS query, and a boundary
-// not yet known reads as covered — which is how this behaved before there was
-// one.
 const cvatCoverageMask =
   (project: LidarProject) =>
   (extent: [number, number, number, number]): boolean => {
@@ -255,12 +220,11 @@ export const buildCvatGroundConfig = (
   projection: CVAT_CRS,
   minZoom: acquisition.minZoom,
   maxZoom: acquisition.maxZoom,
-  // A miss is a SELECT against a bind-mounted database, so preloading is free.
+
   preload: 2,
-  // A hole the boundary does not account for still answers 404, and that
-  // transparency is what draws the edge of what was built.
+
   sparse: true,
-  // The store stops at z15 or z16 and the view goes to z20 (`types.ts`).
+
   interpolate: false,
   coverageExtent: acquisition.extent25833
     ? { extent: acquisition.extent25833, crs: CVAT_CRS }
@@ -268,12 +232,7 @@ export const buildCvatGroundConfig = (
   coverageMask: cvatCoverageMask(acquisition.project),
 });
 
-// The provenance plate the render menu shows. Transcribed from
-// `vat-cache/cvat.py` rather than read off the manifest: a downloaded figure
-// travels off this host.
 export const CVAT_RENDERER = 'RVT';
 export const CVAT_TEMPLATE = 'VAT_Combined';
 
-// RVT's `max_rad`, in RVT's own pixels and the same at every level, so the
-// visualization's reach in metres grows as you zoom out.
 export const CVAT_RADIUS_PX = { general: 10, flat: 20 } as const;

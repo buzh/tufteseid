@@ -1,7 +1,4 @@
-// Email and password against our own PocketBase, in three modes on one form:
-// signing in, making an account, and asking for a reset letter
-// (`docs/identity.md`). The invite code is asked for here because this is the
-// only place the closed beta can be paid (`docs/closed-beta.md`).
+
 
 import {
   Alert,
@@ -32,8 +29,6 @@ import {
 
 type Mode = 'signIn' | 'register' | 'reset';
 
-// Spelled out rather than composed from `mode`, so every key is one grep away
-// in `src/locales/nb/translation.json`.
 const COPY: Record<Mode, { title: string; blurb: string; submit: string }> = {
   signIn: { title: 'auth.title', blurb: 'auth.blurb', submit: 'auth.signIn' },
   register: {
@@ -48,10 +43,6 @@ const COPY: Record<Mode, { title: string; blurb: string; submit: string }> = {
   },
 };
 
-/** Which locale key says what went wrong. The closed beta's two refusals are
- *  named; past those only the field PocketBase refused is worth reporting,
- *  and a sign-in is told apart from a registration because the same 400
- *  means a wrong password on one and an address already taken on the other. */
 const messageFor = (err: unknown, mode: Mode): string => {
   const refusal = refusalOf(err);
   if (refusal === 'registrationClosed') return 'auth.beta.refusedClosed';
@@ -61,8 +52,7 @@ const messageFor = (err: unknown, mode: Mode): string => {
   const status = (err as { status?: number })?.status;
   if (status !== 400) return 'auth.failed';
   if (mode === 'signIn') return 'auth.wrongPassword';
-  // The reset route answers 204 for an address nobody holds, so its only 400
-  // is one the field itself would not take.
+
   if (mode === 'reset') return 'auth.emailInvalid';
 
   const fields = badFields(err);
@@ -78,8 +68,6 @@ export const AuthDialog = () => {
   const gate = useRegistrationGate(open);
   const capacity = useCapacity(open);
 
-  // A reader who followed an invitation link is making an account by
-  // definition, so the box opens on that half of the form.
   const [mode, setMode] = useState<Mode>(
     bootInviteCode ? 'register' : 'signIn',
   );
@@ -91,9 +79,6 @@ export const AuthDialog = () => {
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
 
-  // Dismissing is the reader saying they are done with the invitation link
-  // they arrived on, so the parameter goes: leaving it would put the box up
-  // again on the next reload.
   const close = () => {
     forgetInviteLink();
     setOpen(false);
@@ -134,18 +119,13 @@ export const AuthDialog = () => {
     }
   };
 
-  // The gate itself while it is shut, null otherwise — including on an
-  // installation that has none, where the box reads as it always did.
   const beta = gate?.closed ? gate : null;
 
-  // Only an installation that asked for a cap says anything about one.
   const cap = capacity && capacity.max > 0 ? capacity : null;
   const full = cap != null && cap.users >= cap.max;
 
   const registering = mode === 'register';
-  // The gate's own two refusals, which are the one case where the code field
-  // has to appear whatever the gate said — including when reading it is what
-  // failed, since then nothing else would let an invited reader in.
+
   const refused =
     error === 'auth.beta.refusedClosed' || error === 'auth.beta.refusedCode';
   const enough =
@@ -179,10 +159,7 @@ export const AuthDialog = () => {
             {t(COPY[mode].blurb)}
           </Text>
 
-          {/* Not to somebody who arrived on an invitation: a code is a way in
-              of its own and never looks at the free places, so how many are
-              left is nothing to do with them — and "they are all taken" reads
-              as a refusal. */}
+          {}
           {beta && registering && prompt !== 'inviteLink' && (
             <Alert color="yellow">
               {beta.openSlots > 0
@@ -191,9 +168,7 @@ export const AuthDialog = () => {
             </Alert>
           )}
 
-          {/* Unlike the free places, this is shown to an invited reader too:
-              a code buys an account but not a place, so being full is very
-              much their business. */}
+          {}
           {cap && registering && (
             <Text size="xs" c="dimmed">
               {t('shared.userCap', { count: cap.users, max: cap.max })}
@@ -204,8 +179,7 @@ export const AuthDialog = () => {
             <Alert color="yellow">{t('auth.cap.willQueue')}</Alert>
           )}
 
-          {/* Being queued is not a failure: the account was made and keeps
-              the code it cost. */}
+          {}
           {error && (
             <Alert color={error === 'auth.cap.queued' ? 'yellow' : 'red'}>
               {t(error)}

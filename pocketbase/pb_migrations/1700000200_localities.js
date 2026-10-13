@@ -1,18 +1,15 @@
 /// <reference path="../pb_data/types.d.ts" />
-//
-// Collection ids must not equal any collection name: PocketBase ≥0.23
-// rejects a collection whose name matches an existing id.
 
 migrate(
   (app) => {
     const users = app.findCollectionByNameOrId('users');
 
-    // Drops the MVP finds collection with its data.
+
     try {
       const oldFinds = app.findCollectionByNameOrId('finds');
       app.delete(oldFinds);
     } catch (_) {
-      /* fresh install — never existed */
+
     }
 
     const localities = new Collection({
@@ -65,7 +62,7 @@ migrate(
         id: 'loc_bbox',
         name: 'bbox',
         required: true,
-        // [minLon, minLat, maxLon, maxLat], EPSG:4326.
+
         maxSize: 200,
       }),
       new AutodateField({ name: 'created', onCreate: true }),
@@ -73,7 +70,7 @@ migrate(
     );
     app.save(localities);
 
-    // Name stays `finds`; the id differs from the deleted MVP collection's.
+
     const finds = new Collection({
       id: 'finds2',
       name: 'finds',
@@ -216,7 +213,7 @@ migrate(
       try {
         app.delete(app.findCollectionByNameOrId(name));
       } catch (_) {
-        /* already gone */
+
       }
     }
   },

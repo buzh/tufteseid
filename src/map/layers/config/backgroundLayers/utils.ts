@@ -39,7 +39,7 @@ export const getWMTSLayer = async (
     const url = layerConfig.provider.capabilitiesUrl;
     const cache = store.get(backgroundLayerCapabilitiesCacheAtom);
     let capabilitiesText: string;
-    // Keyed by URL: one document describes every layer a provider publishes.
+
     if (cache[url]) {
       capabilitiesText = cache[url]!;
     } else {
@@ -66,15 +66,14 @@ export const getWMTSLayer = async (
       );
     }
 
-    // Untainted canvas, so the map can be read back into one.
     const source = new WMTS({ ...layerOptions, crossOrigin: 'anonymous' });
-    // The tile URL out of the capabilities, which need not be the same host.
+
     guardTileSource(source, layerOptions.urls?.[0] ?? url);
 
     const layer = new TileLayer({
       source,
       properties: { id: `bg.${layerConfig.layerName}` },
-      // Pre-rendered, ~130 ms a tile.
+
       preload: 2,
     });
 
@@ -88,7 +87,6 @@ export const getWMTSLayer = async (
   }
 };
 
-// 8 stops per edge, not corners-only: a Norway-sized box out of UTM33 bows.
 const toViewExtent = (
   coverage: CoverageExtent | undefined,
   projection: string,
@@ -104,7 +102,6 @@ export const getWMSLayer = (layerConfig: WMSBackgroundLayer): TileLayer => {
   const projection = map.getView().getProjection().getCode();
   const properties = { id: `bg.${layerConfig.layerName}` };
 
-  // No SRS/CRS here: OL derives it from the source projection on every request.
   const source = new TileWMS({
     url: layerConfig.url,
     params: { ...layerConfig.props },
@@ -114,7 +111,7 @@ export const getWMSLayer = (layerConfig: WMSBackgroundLayer): TileLayer => {
   });
   guardTileSource(source, layerConfig.url);
   const extent = toViewExtent(layerConfig.coverageExtent, projection);
-  // No preload: these render on the fly, 3-12 s cold, holding a tile slot.
+
   return new TileLayer({
     source,
     properties,
@@ -136,8 +133,7 @@ export const getArcGISImageLayer = (
     params: { ...layerConfig.params },
     tileGrid: getWMSTileGrid(projection, 0, layerConfig.maxZoom),
     zDirection: WMS_Z_DIRECTION,
-    // On, SIZE and DPI would scale by pixel ratio and wmscache would key the
-    // same ground once per display.
+
     hidpi: false,
   });
   guardTileSource(source, layerConfig.url);
@@ -152,8 +148,6 @@ export const getArcGISImageLayer = (
   });
 };
 
-// On the grid the tiles were written on rather than the view's; OL reprojects
-// if `?projection=` puts the view elsewhere.
 export const getXYZLayer = (
   layerConfig: XYZBackgroundLayer,
 ): TileLayer | null => {
@@ -178,8 +172,7 @@ export const getXYZLayer = (
   const mask = layerConfig.coverageMask;
   if (mask) {
     const template = source.getTileUrlFunction();
-    // An undefined url leaves the tile EMPTY and unrequested, which is what
-    // the extent does at the box's edge and this does inside it.
+
     source.setTileUrlFunction((coord, pixelRatio, projection) =>
       mask(
         tileGrid.getTileCoordExtent(coord) as [number, number, number, number],
@@ -198,8 +191,7 @@ export const getXYZLayer = (
   return new TileLayer({
     source,
     properties: { id: `bg.${layerConfig.layerName}` },
-    // Hidden one zoom step coarser than the store's own coarsest level; OL
-    // would otherwise clamp there and ask for four screenfuls to upscale.
+
     maxResolution: tileGrid.getResolution(layerConfig.minZoom) * 2,
     preload: layerConfig.preload,
     cacheSize: WMS_TILE_CACHE_SIZE,
@@ -227,16 +219,11 @@ export const getLayerFromConfig = async (
   return null;
 };
 
-// `swapBackgroundLayers` sweeps `bg.` only, so the curtain's B side stays put.
-// Also namespaces the reuse signature: A and B often resolve to one config and
-// cannot share an instance.
 export type LayerNamespace = 'bg' | 'cmp';
 
 const isBackgroundLayer = (layer: BaseLayer): boolean =>
   String(layer.get('id') ?? '').startsWith('bg.');
 
-// Equal signatures mean equal pixels. Per-layer settings fixed across datasets
-// — maxZoom, interpolate, heldUrl — are left out.
 const layerSignature = (
   config: BackgroundLayer,
   projection: string,
@@ -249,7 +236,7 @@ const layerSignature = (
     const params = JSON.stringify(config.params);
     return `arcgis|${config.url}|${params}|${projection}`;
   }
-  // Levels and extent join the url: the url alone only names the store.
+
   if (config.type === 'XYZ') {
     const extent = JSON.stringify(config.coverageExtent);
     const levels = `${config.minZoom}-${config.maxZoom}`;
@@ -258,9 +245,6 @@ const layerSignature = (
   return null;
 };
 
-// Reuses a layer that would render identically, so callers must set opacity
-// and z-index explicitly: it may carry an earlier swap's. An OL layer belongs
-// to one map at a time, so `host` must be the map the layer is destined for.
 export const buildOrReuseBackgroundLayer = async (
   config: BackgroundLayer,
   projection: string,
@@ -282,22 +266,19 @@ export const buildOrReuseBackgroundLayer = async (
   }
   const layer = await getLayerFromConfig(config, projection);
   if (layer) {
-    // The builders all stamp `bg.<name>`.
+
     if (ns !== 'bg') layer.set('id', `${ns}.${config.layerName}`);
     if (signature) layer.set(POOL_KEY, signature);
   }
   return layer;
 };
 
-// How long the outgoing stack waits for a render that never comes; a cold LiDAR
-// tile takes 3-12 s.
 export const SWAP_TIMEOUT_MS = 15000;
 
 export const OUTGOING_OPACITY = 0.35;
 
 let cancelPendingRetire: (() => void) | null = null;
 
-// Both lists are bottom-first, over outgoing layers that go on rendercomplete.
 export const swapBackgroundLayers = (under: TileLayer[], over: TileLayer[]) => {
   const store = getDefaultStore();
   const map = store.get(mapAtom);
@@ -311,7 +292,6 @@ export const swapBackgroundLayers = (under: TileLayer[], over: TileLayer[]) => {
     .getArray()
     .filter((l) => isBackgroundLayer(l) && !layers.includes(l as TileLayer));
 
-  // Reposition rather than add: reused layers are already in the collection.
   under.forEach((layer, i) => {
     collection.remove(layer);
     collection.insertAt(i, layer);
@@ -340,7 +320,7 @@ export const clearBackgroundLayer = () => {
   const store = getDefaultStore();
   const map = store.get(mapAtom);
   cancelPendingRetire?.();
-  // Snapshot: getArray() is live, and removing while iterating skips entries.
+
   const allLayers = [...map.getLayers().getArray()];
   allLayers.forEach((layer) => {
     try {

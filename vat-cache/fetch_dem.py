@@ -1,9 +1,3 @@
-"""Float DEM patches out of hoydedata.no's Prosjekt_DTM ImageServer; quirks are
-documented in `docs/terrain-analysis.md`.
-
-The TIFF reader assumes what the endpoint answers: uncompressed, single band,
-32-bit float, tiled, never striped. Absent tiles (TileOffsets 0) are no coverage.
-"""
 
 import json
 import struct
@@ -20,9 +14,7 @@ DEFAULT_PROJECT = "Vestfold og Telemark 5pkt 2021"
 _TYPE_FMT = {1: "B", 3: "H", 4: "I", 11: "f", 12: "d"}
 _TYPE_SIZE = {"B": 1, "H": 2, "I": 4, "f": 4, "d": 8}
 
-
 def read_tiff_f32(buf: bytes) -> np.ndarray:
-    """Tiled uncompressed float32 TIFF -> (H, W) float32, absent tiles NaN."""
     if buf[:2] == b"II":
         en = "<"
     elif buf[:2] == b"MM":
@@ -45,8 +37,7 @@ def read_tiff_f32(buf: bytes) -> np.ndarray:
         else:
             (off,) = struct.unpack(en + "I", buf[p + 8 : p + 12])
             raw = buf[off : off + size]
-        # A no-coverage answer is a ~1.6 kB stub whose string tags point past the
-        # end of the body.
+
         if len(raw) < size:
             continue
         tags[tag] = struct.unpack(en + fmt * cnt, raw)
@@ -63,7 +54,7 @@ def read_tiff_f32(buf: bytes) -> np.ndarray:
     across = (width + tile_w - 1) // tile_w
     for k, (off, cnt) in enumerate(zip(offsets, counts)):
         if off == 0 or cnt == 0:
-            continue  # absent tile: no coverage here
+            continue
         tile = np.frombuffer(
             buf[off : off + cnt], dtype=en + "f4", count=tile_w * tile_h
         ).reshape(tile_h, tile_w)
@@ -73,9 +64,7 @@ def read_tiff_f32(buf: bytes) -> np.ndarray:
         out[row : row + h, col : col + w] = tile[:h, :w]
     return out
 
-
 def fetch(cx, cy, side_m, px, project=DEFAULT_PROJECT, timeout=180) -> np.ndarray:
-    """A square of DEM centred on (cx, cy) in EPSG:25833, px x px cells."""
     half = side_m / 2
     mosaic = {
         "mosaicMethod": "esriMosaicAttribute",
@@ -103,9 +92,7 @@ def fetch(cx, cy, side_m, px, project=DEFAULT_PROJECT, timeout=180) -> np.ndarra
         raise RuntimeError(f"not an image: {buf[:300]!r}")
     return read_tiff_f32(buf)
 
-
 def catalogue(where, out_fields=None, statistics=None, geometry=False, timeout=180):
-    """One /query against the mosaic catalogue."""
     query = {"where": where, "f": "json", "returnGeometry": str(geometry).lower()}
     if out_fields:
         query["outFields"] = ",".join(out_fields)

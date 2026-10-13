@@ -28,10 +28,6 @@ the gallery's redo on a `sunloop` or `rvt` row, are absent rather than failing
 read, download and carry their legend; the membership gate below is the second
 filter, on an installation that runs the sidecar at all.
 
-**Not headless QGIS.** PyQGIS offscreen is an 800 MB–2 GB image whose hillshade
-is gdaldem's — the same Lambert cosine with more machinery around it, and none of
-RVT's other visualizations come along.
-
 ## Contract
 
 ```
@@ -84,11 +80,6 @@ for.
 token, so the collection rules decide what a job may touch and the permission
 model is not reimplemented anywhere.
 
-The consequence worth knowing: **the claim PATCH is the write gate, not the GET.**
-A public spot's evidence is readable with no account at all, so a successful read
-proves nothing. The order is read → claim → enqueue, and a claim PocketBase
-refuses is answered 403 before anything is queued.
-
 ### Who may render at all
 
 A rule can say who may write a row. It cannot say who may spend two CPU-minutes,
@@ -101,12 +92,6 @@ administrator holds every feature whatever the row says, which
 
 Who holds `render` is granted per account in PocketBase's admin UI
 (`docs/identity.md`). What this side knows is one string.
-
-Two things follow from reading it rather than the token. **The token is
-verified**: a bucket cannot be picked by editing a JWT payload, so there is no
-forged-caller case left to reason about. And **a stale token is now 401 rather
-than a confusing 404** on the row read — PocketBase is asked about it before
-anything else is.
 
 A token expiring mid-render loses the write-back, not the render. The row keeps
 its `running` marker until it goes stale.
@@ -211,8 +196,6 @@ a row is settled **empty**.
 Picking up from the decoded grid.
 
 4. **`slope_aspect` once**, then `hillshade(…, slope=, aspect=)` per azimuth.
-   That is RVT's own reuse parameter, so the gradient is computed once without
-   reimplementing anything. Two things follow from it and are easy to get wrong:
    - The vertical exaggeration goes on `slope_aspect`. Given slope and aspect,
      `hillshade` never touches the DEM again and its own `ve_factor` is dead.
    - `slope_aspect` runs on a 1-px-padded grid, because `hillshade` pads
@@ -246,9 +229,6 @@ Picking up from the decoded grid.
    an abandoned ffmpeg would go on burning both cores against an output file the
    temporary-file block has already unlinked.
 8. **Measured, not predicted**, the way `fitImageBlob` is: over the field's 50 MB
-   the encode is redone at crf 40 then 48, and a third failure is a failure.
-   PocketBase answers 400 to an oversized file and answers it again to every
-   retry of the same bytes.
 9. **One multipart PATCH** puts the file and the finished `meta` on together,
    hand-rolled over `urllib`, mirroring `attachEvidenceFile`.
 
@@ -271,11 +251,6 @@ layer none of this touches. The transcription was checked against
 same blend loop — normalize, ramp, blend, render, last layer first — as
 `vat-cache/cvat.py`.
 
-**RVT's radii are pixel counts calibrated at 0.5 m/px**, so they are scaled here
-to hold their reach in metres whatever the acquisition publishes. A 0.25 m
-project would otherwise get half the neighbourhood the blend was designed
-around.
-
 **Two grids, because a blend reads far outside what it draws.** e4MSTP's broad
 MSTP scale reaches 250 m and its other layers 25 m. Given no context RVT pads
 `symmetric`, and the broad channel becomes a picture of the mirror. Fetching
@@ -286,9 +261,6 @@ MSTP scale reaches 250 m and its other layers 25 m. Given no context RVT pads
 | --- | --- | --- | --- |
 | fine | footprint + 25 m | the acquisition's own resolution, coarsened to fit `MAX_FETCH_PX` | local and meso MSTP, SVF, openness, local dominance, slope |
 | coarse | footprint + 250 m | 0.5 m/px or coarser | the broad MSTP channel alone, resampled up bilinearly |
-
-Measured against context fetched at full resolution, the coarse channel costs a
-mean 0.005 of the finished pixel; mirroring costs 0.087.
 
 **The slope layer is in radians, and that is not a bug.** `rvt.blend.e4mstp`
 calls `slope_aspect` without `output_units`, so the bottom layer is radians
@@ -303,13 +275,6 @@ hole mask, plus any pixel the blend itself left non-finite. `meta` is
 this kind is **stored bare**. A still is stamped in the reader's own tab at
 download time, so `WANTS_LEGEND` is false, the sidecar's `legend.py` never runs
 for it, and the stored pixels are the ones the map lays back over the ground.
-
-Budget, measured against live hoydedata.no on a 505 m footprint of 0.25 m
-ground — the worst case the footprint cap allows: 2002 px fine and 2010 px
-coarse, 200 s of fetch, 90 s of compute (62 of it local dominance), a 9.3 MB
-PNG, 315 s all told and 1.0 GB peak RSS against the container's 2 GB. A 300 m
-footprint is 45 s and 3.4 MB. The fetch dominates and varies with the day; the
-compute does not.
 
 ## When hoydedata.no is slow
 
@@ -327,9 +292,6 @@ So the patience is where the cost is bounded, not the pixels:
 | `FETCH_BUDGET_S` | 900 s | every attempt at one grid together, so patience never multiplies by the retry count. A blend fetches two grids and may spend twice this |
 | `MAX_ATTEMPTS` | 6 | with backoff doubling to a 60 s cap, jittered. A shed burst recovers in seconds; real load does not, and hammering is how a slow minute becomes a slow hour |
 | `PROBE_TIMEOUT_S` | 20 s | no retry. A probe that fails costs only this, because the fall-through assumes the finest resolution the services publish — erring towards more pixels than the ground has, never fewer |
-
-Every attempt after the first is logged with the grid's size and the reason, so
-a slow render can be told from a stuck one in the log rather than by waiting.
 
 The trade this accepts: one job can now hold the single worker for half an hour
 against a service having a bad afternoon, with `QUEUE_MAX` 8 behind it and
@@ -431,11 +393,6 @@ lines it was sent.
 | the credit inside `rights` | `CREDIT_TOKEN` (`{credit}`), filled from `expand.spot.credit` by `legend_of` |
 | `link` | composed by `share_link` from the spot's `code` and `visibility`; a `link` in the body is ignored |
 
-The rest of a rights line — the role, the holder, the licence — is still wording
-the client chose, so a caller who may PATCH the row can still put a wrong licence
-on a band. What they cannot do is put somebody else's name on their own render,
-or point the link somewhere else.
-
 `PUBLIC_ORIGIN` is how the sidecar knows what to link to: the origin readers
 visit, set in `docker-compose.yml`, with the scheme stripped off the way the
 client strips it so the two bands read the same. Unset, a loop prints no link,
@@ -469,15 +426,6 @@ rendered at the acquisition's own resolution — a 140 m footprint of half-metre
 ground is 276 px, of which a band that cannot set type below 11 px is better
 than a third, and blended in that third of the footprint would be caption
 instead of ground on the map.
-
-Four small differences from the still. The face is DejaVu, not Mulish — the image
-has no npm build to take Mulish from. The whole head line is bold rather than the
-title alone. The link sits beside the bar in the small face rather than in a cell
-of its own, and there is no centre cell. And past 40 % of the ground's height the
-link is dropped, then the scale bar, where a still instead mats its capture out
-to whatever width the band needs; a loop cannot, because its frames are the video
-and the band is already the thing keeping their height even. The rights lines are
-never shed either way.
 
 The difference that is not cosmetic is where the band ends up. A still's is in
 the downloaded copy only, and the stored file stays bare — which is the one the

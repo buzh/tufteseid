@@ -18,7 +18,6 @@ const textEntry = (path: string, body: string) => ({
 });
 
 describe('crc32', () => {
-  // The check value every CRC-32 implementation is published against.
   it('matches the published check value', () => {
     expect(crc32(new TextEncoder().encode('123456789'))).toBe(0xcbf43926);
   });
@@ -52,8 +51,6 @@ describe('zip', () => {
     expect(view.getUint32(22, true)).toBe(9);
   });
 
-  // Without bit 11 a reader decodes the name as CP437 and æøå come out as
-  // mojibake — which is most Norwegian spot names.
   it('flags entry names as UTF-8', async () => {
     const view = await bytesOf(await zip([textEntry('rør.txt', 'x')]));
     expect(view.getUint16(6, true) & 0x0800).toBe(0x0800);

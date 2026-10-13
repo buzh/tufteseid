@@ -51,9 +51,6 @@ the account is simply parked in the `queued` role until a place opens
    on purpose: the alternative is a sign-in box that shows no gate while
    every registration behind it dies.
 2. A code was submitted: it is spent and the reader admitted, or, if it does
-   not resolve to an unspent invite, they are **refused** rather than fallen
-   back on a free place. Admitting on a mistyped code would leave the reader
-   believing it had worked and spend a place they did not ask for.
 3. No code: a free place is spent if one remains, otherwise refused.
 
 The code travels from the sign-in box as the `X-Invite-Code` **header** on the
@@ -94,16 +91,6 @@ revoked — the delete rule refuses it — because it is the record of an
 admission. `redeemedAt` rather than `redeemedBy` is what says it is spent:
 `redeemedBy` empties if the invitee later closes their account, and an invite
 somebody came in on must not look unused again.
-
-How the code reached its holder is nothing the gate counts. Mailing one is a
-convenience the installation offers, not a second currency — see *Mailing an
-invite*.
-
-A reader mints, copies and sends from the account menu → *Invitasjoner*. The
-panel lists only the codes **nobody has come in on yet**, which are the ones
-left to act on, and carries the whole grant as two numbers that add to it:
-*tilgjengelig*, the quota less every row issued, and *sendt*, those rows. A
-redeemed invite leaves the list and stays in the second number.
 
 ## Running the SQL
 
@@ -166,10 +153,6 @@ WHERE (
       - (SELECT COUNT(*) FROM invites WHERE issuer = users.id) < 3;
 ```
 
-*Available* is the quota less **every** row the account has issued, spent or
-not — the same arithmetic the panel shows, so the third recipe will not top up
-somebody sitting on three unsent codes.
-
 ### Seeing where they went
 
 ```sql
@@ -227,10 +210,6 @@ versioned in a migration:
 | *Application* → Application URL | The redeem link in the mail is composed from it |
 | *Mail settings* → sender address and name | The `From:` header |
 
-A 502 reaches the reader as *"E-post er ikke satt opp på denne
-installasjonen. Send koden selv."* — the invite is still good to pass on by
-hand, which is the point of showing the code.
-
 The mail's Bokmål lives in the hook rather than in `src/locales/`: it is
 composed on the server, where the locale files do not reach, and letting the
 client post the wording would turn the route into a relay for whatever it
@@ -243,11 +222,6 @@ here rate-limits the create or verifies an address before spending a place, so
 a script can take every open slot in one pass. That is the trade of having
 free places at all; with `openSlots` at zero and invites the only way in, it
 does not arise. PocketBase's own rate limiter is the lever if it does.
-
-**A refused reader leaves nothing behind.** The create is refused inside a
-transaction, so there is no half-made account to clean up and no address held
-against a second attempt — somebody turned down today can register with the
-same address the moment a place opens or a code reaches them.
 
 ## Deploying a change here
 

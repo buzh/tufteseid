@@ -1,4 +1,4 @@
-/* Matches `AuthDialog.module.css`: `CloseButton` takes no `color` prop. */
+
 .close {
   color: var(--mantine-primary-color-contrast);
   background-color: var(--mantine-primary-color-filled);

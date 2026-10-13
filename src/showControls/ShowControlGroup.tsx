@@ -1,6 +1,4 @@
-// What is drawn over the ground: the heritage register, the open spot's own
-// drawing and everybody's at once. Beside the view control rather than among
-// the tools, because none of it belongs to one half.
+
 
 import {
   HeritageMenu,

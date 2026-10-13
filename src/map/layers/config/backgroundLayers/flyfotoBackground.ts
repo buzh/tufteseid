@@ -4,8 +4,6 @@ import { halved } from '../../../compare/halves';
 import { VIEW_MAX_ZOOM } from '../../wmsTileGrid';
 import type { ArcGISImageBackgroundLayer, XYZBackgroundLayer } from './types';
 
-// The <BoundingBox CRS="EPSG:25833"> the ortofoto WMS advertises; without it OL
-// asks for tiles over open ocean on every zoom out.
 const FLYFOTO_COVERAGE_EXTENT_25833: [number, number, number, number] = [
   -250025, 6299985, 1211155, 8985010,
 ];
@@ -34,12 +32,11 @@ export const buildFlyfotoProjectConfig = (
   layerName: 'flyfotoProject',
   url: FLYFOTO_PROJECT_IMAGESERVER,
   params: {
-    // JPEG inside coverage, transparent PNG outside; jpg paints the gaps black.
-    // Arrives as octet-stream, which nib-proxy re-labels by magic bytes.
+
     FORMAT: 'jpgpng',
     mosaicRule: flyfotoMosaicRule(project.id),
   },
-  // z18 is 0.083 m/px; ortofoto runs 0.04 m over cities, 0.25-0.5 m elsewhere.
+
   maxZoom: FLYFOTO_PROJECT_MAX_ZOOM,
   coverageExtent: { extent: project.bboxLonLat, crs: 'EPSG:4326' },
 });

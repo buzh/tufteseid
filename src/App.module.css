@@ -1,5 +1,4 @@
-/* A column, not an overlay: OpenLayers needs the map's height to be a real
-   number to size its canvas. */
+
 
 .shell {
   display: flex;

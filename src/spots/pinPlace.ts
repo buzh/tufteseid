@@ -45,8 +45,6 @@ export const useSpotPlacement = () => {
       pin.setGeometry(new Point(event.coordinate));
     };
 
-    // A wheel zoom is no pointer move, so re-place the pin from the last pixel
-    // once the movement ends.
     const onMoveEnd = () => {
       if (!lastPixel) return;
       const coordinate = map.getCoordinateFromPixel(lastPixel);
@@ -59,8 +57,6 @@ export const useSpotPlacement = () => {
       cursor.set('crosshair');
     };
 
-    // `singleclick`, not `click`: the first half of a double-click zoom must
-    // not also drop a pin.
     const onClick = (event: MapBrowserEvent) => {
       const [lon, lat] = transform(event.coordinate, view, 'EPSG:4326');
       place([lon, lat]);

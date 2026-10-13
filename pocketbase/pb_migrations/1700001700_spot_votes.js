@@ -1,14 +1,11 @@
 /// <reference path="../pb_data/types.d.ts" />
-//
-// Collection ids must not equal any collection name (PocketBase ≥0.23 rejects
-// that), hence `pbc_votes` and `pbc_spot_scores`.
 
 migrate(
   (app) => {
     const users = app.findCollectionByNameOrId('users');
     const spots = app.findCollectionByNameOrId('spots');
 
-    // How a spot stands is public (`spotScores` below); who voted is not.
+
     const ownRule = 'owner = @request.auth.id || @request.auth.role = "admin"';
 
     const votes = new Collection({
@@ -17,15 +14,15 @@ migrate(
       type: 'base',
       listRule: ownRule,
       viewRule: ownRule,
-      // A private spot is nobody's to rank, its owner's included.
+
       createRule:
         '@request.auth.id != "" && @request.auth.id = owner && ' +
         'spot.visibility = "public"',
       updateRule: ownRule,
       deleteRule: ownRule,
       indexes: [
-        // One vote per reader per spot. `castVote` creates and treats the
-        // resulting 400 as "already voted, update instead".
+
+
         'CREATE UNIQUE INDEX idx_votes_owner_spot ON votes (owner, spot)',
         'CREATE INDEX idx_votes_spot ON votes (spot)',
       ],
@@ -55,9 +52,9 @@ migrate(
         name: 'direction',
         required: true,
         maxSelect: 1,
-        // A select rather than ±1: no NumberField constraint says "not
-        // zero". Retracting deletes the row. Must match `VoteDirection` in
-        // `src/api/votes.ts`.
+
+
+
         values: ['up', 'down'],
       }),
       new AutodateField({ name: 'created', onCreate: true }),
@@ -66,8 +63,8 @@ migrate(
 
     app.save(votes);
 
-    // The tallies, open to a guest. A view collection carries no realtime
-    // feed, and a spot with no votes is absent rather than present at zero.
+
+
     const scores = new Collection({
       id: 'pbc_spot_scores',
       name: 'spotScores',
@@ -87,16 +84,16 @@ migrate(
     app.save(scores);
   },
   (app) => {
-    // The view reads `votes`, so it goes first.
+
     try {
       app.delete(app.findCollectionByNameOrId('spotScores'));
     } catch (_) {
-      /* already gone */
+
     }
     try {
       app.delete(app.findCollectionByNameOrId('votes'));
     } catch (_) {
-      /* already gone */
+
     }
   },
 );

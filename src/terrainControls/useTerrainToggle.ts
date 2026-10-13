@@ -1,4 +1,4 @@
-// On frames a square to be placed and fetches nothing; Start does the reading.
+
 
 import { useAtomValue, useSetAtom } from 'jotai';
 

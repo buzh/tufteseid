@@ -1,7 +1,4 @@
-// Of the two refusals only one is a dead end, so only one disables the thumbs:
-// an admin cannot publish somebody's private spot, but a reader with no
-// account can get one, so theirs stay live and open the sign-in box
-// (`docs/votes.md`).
+
 
 import { Tooltip } from '@mantine/core';
 import { useAtomValue, useSetAtom } from 'jotai';
@@ -23,21 +20,18 @@ export const VoteControl = ({ spot }: { spot: SpotRecord }) => {
   const myVotes = useAtomValue(myVotesAtom);
   const [busy, setBusy] = useState(false);
 
-  // Absent from the view means nobody has voted, not that the tally is unknown.
   const score = scores?.get(spot.id)?.score ?? 0;
 
   const tally = (
     <span
       className={styles.tally}
-      // `total`, not `count`: i18next reads `count` as a request for
-      // plural forms this key has none of.
+
       title={t('spots.voteScore', { total: score })}
     >
       {score}
     </span>
   );
 
-  // The author reads their own tally and is offered no thumbs at all.
   if (user != null && spot.owner === user.id) {
     return <span className={styles.group}>{tally}</span>;
   }
@@ -62,16 +56,14 @@ export const VoteControl = ({ spot }: { spot: SpotRecord }) => {
       mine?.direction === direction
         ? retractVote(mine.id)
         : castVote(spot.id, user.id, direction);
-    // The realtime feed carries the result back into `myVotesAtom` and
-    // refetches the tally, so there is nothing to set here.
+
     void done
       .catch((err) => console.warn('[votes] cast failed', err))
       .finally(() => setBusy(false));
   };
 
   return (
-    // The outer tooltip stands on a span: a disabled button fires no pointer
-    // events, so one on the button itself would never open.
+
     <Tooltip label={hint} disabled={hint == null}>
       <span className={styles.group}>
         <Tooltip label={t('spots.voteUp')} disabled={hint != null}>

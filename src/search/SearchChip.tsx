@@ -17,8 +17,6 @@ import {
 const DROPDOWN_WIDTH = 320;
 const FLY_DURATION_MS = 400;
 
-// Also the order the groups are listed in: what was typed outright, then the
-// names a reader of this map is looking for, then the street.
 const KINDS = [
   'coordinate',
   'place',
@@ -103,8 +101,7 @@ export const SearchChip = () => {
     >
       <div className={styles.box}>
         <Icon icon="search" size={18} className={styles.icon} />
-        {/* Collapsed, the field is the whole chip: a press lands on it, and
-            the focus that follows is what widens it. */}
+        {}
         <Combobox.Target withExpandedAttribute autoComplete="off">
           <input
             ref={field}
@@ -131,8 +128,7 @@ export const SearchChip = () => {
             onKeyDown={(event) => {
               if (event.key === 'Escape') collapse();
             }}
-            // Safe because neither the dropdown nor the clear button lets a
-            // press reach the focus: a blur means the reader has left.
+
             onBlur={collapse}
           />
         </Combobox.Target>
@@ -141,7 +137,7 @@ export const SearchChip = () => {
             type="button"
             className={styles.clear}
             aria-label={t('search.clear')}
-            // Or the press would take the focus off the field first.
+
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => {
               setQuery('');
@@ -154,8 +150,7 @@ export const SearchChip = () => {
         )}
       </div>
 
-      {/* The press that opens a row must not take the focus off the field
-          first, or the blur would fold the box away under it. */}
+      {}
       <Combobox.Dropdown onMouseDown={(event) => event.preventDefault()}>
         <Combobox.Options className={styles.options}>
           {groups}

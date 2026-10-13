@@ -1,6 +1,4 @@
-// The elements' own boxes rather than Excalidraw's `getCommonBounds`, which is
-// exact for a rotated element but lives in the lazy editor bundle. This only
-// seeds a rectangle the reader adjusts, or culls against the viewport.
+
 
 import { transformExtent } from 'ol/proj';
 
@@ -8,8 +6,6 @@ import type { Bbox } from '../map/bbox';
 import { sceneToCoord } from './frame';
 import type { Sketch } from './scene';
 
-/** The drawing's own ground, in `projection`. Null when no element has a
- *  finite box. */
 export const sketchExtentIn = (
   sketch: Sketch,
   projection: string,
@@ -29,9 +25,6 @@ export const sketchExtentIn = (
   }
   if (!(minX <= maxX)) return null;
 
-  // Scene y runs down the screen and projected y up, so the scene's top-left
-  // corner is the ground's north-west: the extent is assembled, not mapped
-  // corner for corner.
   const [west, north] = sceneToCoord(sketch.frame, minX, minY);
   const [east, south] = sceneToCoord(sketch.frame, maxX, maxY);
   const extent: [number, number, number, number] = [west, south, east, north];

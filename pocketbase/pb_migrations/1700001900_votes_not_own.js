@@ -1,9 +1,4 @@
 /// <reference path="../pb_data/types.d.ts" />
-//
-// Nobody ranks their own spot. Only create carries the rule: update already
-// pins `spot` and `owner`, so no existing vote can turn into a self-vote.
-// Self-votes cast before this keep their row and stop counting, the trade
-// `1700001800_votes_public_only.js` already made for a spot turned private.
 
 const CREATE_RULE = [
   '@request.auth.id != ""',

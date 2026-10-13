@@ -1,17 +1,4 @@
-/* Three columns, so the view and show controls keep the band's centre line
-   whatever the sections beside them carry. Neither wraps nor scrolls as a
-   whole: a second line would push the map down under the cursor, and a row
-   that scrolled would carry the tools off the right edge with it. What gives
-   instead is a ground section, inside its own scrollport (`.grounds`), that
-   being the only thing here whose width nobody can predict.
 
-   The height is a `height` and not a floor, because every context uses this
-   shell and the band must be the same height in all of them: the scene↔ground
-   mapping of an open drawing is bound to the map rectangle as it was when the
-   session froze (`shared/uiContext.ts`). One row of controls plus the padding
-   and the rule. Every scrollport in the band hides its scrollbar for the same
-   reason — a classic one takes its track out of the content box, and on a
-   platform that has them the band would grow by it. */
 .ribbon {
   flex: none;
   display: grid;
@@ -22,37 +9,25 @@
   padding: var(--mantine-spacing-xs) var(--mantine-spacing-sm);
   background: var(--mantine-color-body);
   border-bottom: 1px solid var(--mantine-color-default-border);
-  /* Under about 450px the centre and the tools alone outrun the band. A last
-     resort, not the design. */
+
   overflow-x: auto;
   scrollbar-width: none;
 }
 
-/* Two equal flexible tracks are what put the centre on the midline, and they
-   are also what starves the tools: the left column is handed as much room as
-   the right, while the right needs all 187px of controls that cannot shrink.
-   Below the width where both can be had, the centre gives up the midline
-   rather than the tools giving up the screen — the ground section on the left
-   absorbs the whole shortfall, having its own scrollport to do it in. */
 @media (max-width: 640px) {
   .ribbon {
     grid-template-columns: minmax(0, 1fr) auto auto;
   }
 }
 
-/* Safari had no `scrollbar-width` until 18.2. */
 .ribbon::-webkit-scrollbar {
   display: none;
 }
 
-/* The map's band standing down for another context. Out of flow, so the band in
-   front is the only one on the column and the shell's height is unchanged. */
 .away {
   display: none;
 }
 
-/* The draw context has nothing to put on the centre line, so its title takes
-   the run and the two ways out stay pinned right. */
 .drawBand {
   grid-template-columns: 1fr auto;
 }
@@ -72,9 +47,6 @@
   white-space: nowrap;
 }
 
-/* `min-width: 0` so a column may go under its contents. Without it each track
-   keeps its min-content width, the band overflows instead, and whatever is
-   past the right edge goes with it. */
 .side {
   display: flex;
   align-items: center;
@@ -82,11 +54,6 @@
   min-width: 0;
 }
 
-/* The one thing in the band that gives: a ground's controls run as long as the
-   flight name they carry, so the section scrolls inside the room its column
-   got rather than widening the row. The 3px is the focus ring's reach — a 2px
-   outline at 1px offset — which a scrollport would otherwise clip; the
-   matching negative margin keeps every control on the pixel it was on. */
 .grounds {
   flex: 0 1 auto;
   min-width: 0;
@@ -100,13 +67,6 @@
   display: none;
 }
 
-/* Held against the right edge of a column that no longer scrolls, rather than
-   by a sticky — which could not have worked here in any case: the containing
-   block is the grid area, and the track is sized to the tools, so there was
-   never any travel to take. The floor is what keeps the tools whole when the
-   column is squeezed: `.side` above lets a column shrink, a ground section
-   beside them gives first, and the track's own min-content never goes below
-   this. The draw band's two ways out wear both classes. */
 .tools {
   flex: none;
   min-width: max-content;

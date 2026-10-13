@@ -1,15 +1,11 @@
 /// <reference path="../pb_data/types.d.ts" />
-//
-// `1700001700_spot_votes.js` gated voting on a public spot at create time
-// only, so a vote PATCHed onto a private spot, or a spot turned private after
-// it was voted on, left a tally a guest could list.
 
 const OWN_RULE = 'owner = @request.auth.id || @request.auth.role = "admin"';
 
 const PUBLIC_UPDATE_RULE = [
   `(${OWN_RULE})`,
   'spot.visibility = "public"',
-  // The vote may change its mind, not its spot or its owner.
+
   '(@request.body.spot:isset = false || @request.body.spot = spot)',
   '(@request.body.owner:isset = false || @request.body.owner = owner)',
 ].join(' && ');

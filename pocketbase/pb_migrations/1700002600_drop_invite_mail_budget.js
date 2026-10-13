@@ -1,9 +1,4 @@
 /// <reference path="../pb_data/types.d.ts" />
-//
-// Drops the mail budget `1700002100_invite_mail_budget.js` added. A letter is
-// not a currency: what an invite costs is the quota row it was minted
-// against, and whether the code was redeemed is the only thing that decides
-// it is spent (`docs/closed-beta.md`).
 
 migrate(
   (app) => {

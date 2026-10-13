@@ -17,8 +17,6 @@ python -m venv .venv
 ```
 
 - `--no-deps` is required: rvt-py declares gdal, rasterio, geopandas and jupyter
-  for an IO layer none of this uses. The second line installs the four real
-  dependencies *with* their own deps (matplotlib will not import without).
 - `scipy<1.15`: `rvt.vis` imports `scipy.ndimage.morphology`, removed in 1.15.
 - `numpy<2.1` is the last line supporting python 3.9; drop it on a newer one.
 - `cvat.py` avoids `rvt.blend.BlenderCombination`, which pulls `rvt.default` →
@@ -191,13 +189,7 @@ its own grid and the reach changes with zoom.
   `RuntimeError`; `fetch_unit` retries 5× with backoff. This is the step that
   fails overnight.
 - **Coarse requests return ground that was never flown**: ImageServer serves
-  them from per-mosaic-item overviews that fill the item's whole rectangle. Over
-  a 0.17 km² survey, half of a 21 km window at z8 came back as data. Hence the
-  footprint alpha below z12.
 - **Costs**, over 1 106 km² of 0.25 m ground: a work unit is the same 2096 px
-  square at every level and takes 11–13 s wherever it is, fetch included. Full
-  z16–z7 is ~16.5 core-hours, ~90 GB fetched, ~3.3 GB written, three quarters of
-  it z16. z15–z12 (all a 0.5 m flight is owed) is ~4.5 core-hours, ~0.9 GB.
 - **A half-built store is not a broken one.** Missing levels are simply not
   served; the sidecar publishes what `metadata.levels` says. There is no
   half-written tile — tiles and the unit record land in one transaction.

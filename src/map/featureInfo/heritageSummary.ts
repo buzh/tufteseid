@@ -1,6 +1,4 @@
-// `parseXmlFeatureInfo` loses the sublayer element name each feature came back
-// under, so the kind is re-derived from the property fingerprint. The field
-// names below were read off live GetFeatureInfo, not off a specification.
+
 
 import type { LayerFeatureInfo } from './types';
 import { vernBucket, type VernBucket } from './heritageVocabulary';
@@ -29,7 +27,7 @@ interface HeritageGroup {
 
 export interface EnkeltminneSummary {
   key: string;
-  /** The register's own id, empty where it serves none; the key may be ours. */
+
   id: string;
   navn: string;
   art: string;
@@ -38,30 +36,27 @@ export interface EnkeltminneSummary {
   datering: string;
 }
 
-/** One thing on the map, whatever number of WMS features said so. Every string
- *  field is empty rather than absent; the plural ones are rolled up across a
- *  lokalitet and its enkeltminner. */
 export interface HeritageSummary {
   key: string;
   kind: FeatureKind;
   layerTitle: string;
-  /** The register's own id, never ours. */
+
   id: string;
   navn: string;
-  /** The 159-value `art`. */
+
   art: string;
-  /** The 12-value bucket, which the glyph is chosen from. */
+
   kategori: string;
   vernetyper: string[];
-  /** One bucket where they agree, `ukjent` where they do not. */
+
   vernTone: VernBucket;
-  /** Only where one vernetype and one date are shared, or it would misdate. */
+
   vernedato: string;
   dateringer: string[];
   kommune: string;
   antallEnkeltminner: string;
   informasjon: string;
-  /** Brukerminner only. */
+
   registrertAv: string;
   registrert: string;
   askeladden: string;
@@ -84,7 +79,7 @@ const refineHeritageSitesKind = (
     return 'enkeltminne';
   if ('lokalitetsart' in properties || 'antallenkeltminner' in properties)
     return 'lokalitet';
-  // Sikringssoner carry a kulturminneid and almost nothing else.
+
   if (
     'kulturminneid' in properties &&
     !('navn' in properties) &&
@@ -123,20 +118,17 @@ const ART_FIELDS = [
 const DATERING_FIELDS = ['datering', 'tidsangivelsetekst'] as const;
 const ID_FIELDS = ['lokalid', 'kulturminneid', 'askeladdenid'] as const;
 
-// Brukerminner serve no id, so the kulturminnesøk link is the only thing on the
-// wire separating two of them.
 const identityOf = (properties: Record<string, unknown>): string =>
   firstOf(properties, ID_FIELDS) || stringify(properties['linkkulturminnesok']);
 
 const formatDate = (v: unknown): string => {
   const s = stringify(v);
   if (!s) return '';
-  // "2014-12-17 00:00:00" → "2014-12-17"
+
   const m = s.match(/^\d{4}-\d{2}-\d{2}/);
   return m ? m[0] : s;
 };
 
-/** Unique, in order, empties dropped. */
 const distinct = (values: string[]): string[] =>
   Array.from(new Set(values.filter((v) => v.length > 0)));
 
@@ -152,8 +144,7 @@ const getParentId = (
     if (lokalid) return lokalid.split('-')[0];
   }
   if (feature.kind === 'lokalitet') {
-    // Some ids are suffixed ("300651-0"); the `lokalitetid` enkeltminner carry
-    // is the numeric prefix.
+
     const raw =
       stringify(p['kulturminneid']) ||
       stringify(p['lokalid']) ||
@@ -162,7 +153,7 @@ const getParentId = (
     return `lok-${fallbackIndex}`;
   }
   if (feature.kind === 'sikringssone') {
-    // Sikringssoner have their own id space; keep them as their own group.
+
     return `sz-${stringify(p['lokalid']) || stringify(p['kulturminneid']) || fallbackIndex}`;
   }
   return identityOf(p) || stringify(p['objid']) || `other-${fallbackIndex}`;
@@ -190,9 +181,6 @@ const toHeritageFeatures = (layers: LayerFeatureInfo[]): HeritageFeature[] => {
 const groupFeatures = (layers: LayerFeatureInfo[]): HeritageGroup[] => {
   const features = toHeritageFeatures(layers);
 
-  // Dedupe the *ikoner twins — one record drawn as both polygon and pin —
-  // keeping whichever copy carries more fields. A record with no identity gets
-  // a key of its own.
   let anonymous = 0;
   const seen = new Map<string, HeritageFeature>();
   for (const f of features) {
@@ -281,7 +269,7 @@ const summarizeGroup = (group: HeritageGroup): HeritageSummary => {
   const askeladden =
     stringify(props['linkaskeladden']) ||
     (hasReal && props['lokalid']
-      ? `https://askeladden.ra.no/askeladden/?kid=${stringify(props['lokalid'])}`
+      ? `https:
       : '');
 
   return {
@@ -302,8 +290,7 @@ const summarizeGroup = (group: HeritageGroup): HeritageSummary => {
     vernedato:
       vernetyper.length === 1 && vernedatoer.length === 1 ? vernedatoer[0] : '',
     dateringer: distinct(memberProps.map((p) => firstOf(p, DATERING_FIELDS))),
-    // Brukerminner serve a `fylke` and kulturminner2 does not; a kommune name
-    // on its own is ambiguous nationally.
+
     kommune: [stringify(props['kommune']), stringify(props['fylke'])]
       .filter(Boolean)
       .join(', '),
@@ -327,7 +314,6 @@ const summarizeGroup = (group: HeritageGroup): HeritageSummary => {
   };
 };
 
-/** One entry per thing, not one per WMS feature. */
 export const summarizeHeritage = (
   layers: LayerFeatureInfo[],
 ): HeritageSummary[] => groupFeatures(layers).map(summarizeGroup);

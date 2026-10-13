@@ -1,7 +1,4 @@
 /// <reference path="../pb_data/types.d.ts" />
-//
-// The author's name denormalized onto the record: `users` is closed to
-// guests, so `expand=owner` is empty for the reader a share link is for.
 
 migrate(
   (app) => {

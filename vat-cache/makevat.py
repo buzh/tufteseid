@@ -1,60 +1,3 @@
-"""One acquisition, one MBTiles file, from upstream DEM — on any machine.
-
-    .venv/bin/python makevat.py -l                everything hoydedata.no carries
-    .venv/bin/python makevat.py -l vestfold       the ones whose name says so
-    .venv/bin/python makevat.py -l -v vestfold    with the ladder and the names checked
-    .venv/bin/python makevat.py -g 1421           build number 1421
-    .venv/bin/python makevat.py -g 1421 -z 15     build only its z15
-    .venv/bin/python makevat.py -g vestfold-10pkt-2025      the same, by the file
-    .venv/bin/python makevat.py -g vestfold-10pkt-2025 -z 14-12   add three levels
-    .venv/bin/python makevat.py -g vestfold-10pkt-2025 -z 16 --redo   fetch it again
-    .venv/bin/python makevat.py -c 1421           read back what came out
-    .venv/bin/python makevat.py -l --refresh      re-ask the catalogue
-
-What comes out is one self-contained `<slug>.mbtiles`. Copying it into the store
-a tufteseid install serves is the whole deploy:
-
-    scp vestfold-10pkt-2025.mbtiles server:/site/tufteseid/data/cvat/
-
-No manifest to edit, no import step, nothing to restart. Each database carries
-its own acquisition name, levels and recipe in its `metadata` table, and the
-cvat-tiles sidecar builds `/cvat/manifest.json` out of the files it finds — so
-the file really is the whole of the delivery, and the app offers the new ground
-on the next page load.
-
-This is the machine-independent half of `vatcache.py`: no store, no committed
-queue, no manifest, no notion of a server. It wants Python, `requirements.txt`,
-disk, and a route to hoydedata.no — about 11 s of somebody else's CPU per work
-unit, which is why it is worth being able to run it somewhere with more of it.
-A build here knows nothing about what the destination already holds, and does
-not need to: an acquisition is a file, and files do not overlap.
-
-**An acquisition is a number, a name, or a file.** The names carry spaces, æøå
-and parentheses, which a shell takes apart if you let it, so `-l` prints the
-catalogue numbered and `-g` takes the number. The numbers come off a local
-snapshot (`catalogue.json`, written on first use) and stay put — `--refresh`
-re-asks hoydedata.no and puts what is new on the end rather than renumbering
-around it, so a number written down today still means the same acquisition next
-month. They number *this* catalogue, though, and `vatcache.py`'s number the
-build queue, so one carried across from there means another flight entirely:
-`-g` and `-c` also take the acquisition's name, the stem of the `.mbtiles`
-already holding it, or enough of either to be unambiguous, and those mean the
-same acquisition in both tools.
-
-A file already on disk is continued, not started over: levels it does not hold
-are added and units it has finished are skipped, so `-g` on it is how a tileset
-grows. `--redo` is the other half — it hands the finished units of the levels
-this run covers back to the build, so ground fetched badly or rendered under an
-older recipe is fetched and rendered again in place. `--limit` cuts that
-hand-back as it cuts the build, so a pilot re-render leaves no hole.
-
-How deep the ladder goes needs no asking. It comes off the cell size the
-catalogue publishes the acquisition on — z16 for the 0.25 m flights, z15 for the
-0.5 m ones, z14 for the 1 m ones. `-z` builds part of that ladder (`-z 15`,
-`-z 16-14`, `-z 16,12`), never past it: a level finer than the DTM renders the
-interpolation between height values as terrain, which is the fault the ladder
-exists to prevent.
-"""
 
 import argparse
 import json
@@ -71,111 +14,18 @@ from report import level_range, plural, size, spaced
 
 HERE = Path(__file__).resolve().parent
 
-# The numbered catalogue as this machine last saw it; a build artefact like the
-# masks, not a committed file.
 SNAPSHOT = HERE / "catalogue.json"
 
-# Where a tufteseid install keeps its store, for the copy line at the end. This
-# script never writes there.
 SERVED_STORE = "/site/tufteseid/data/cvat"
 
-
 def snapshot(refresh=False):
-    """The catalogue, numbered by position and pinned to this machine.
-
-    Refreshing appends rather than re-sorting, so a number keeps meaning the same
-    acquisition; a withdrawn acquisition keeps its number and stops being
-    buildable."""
-    have = json.loads(SNAPSHOT.read_text()) if SNAPSHOT.exists() else None
-    if have and not refresh:
-        return have
-
-    print("asking hoydedata.no what it carries…", file=sys.stderr)
-    names = sorted(acquisitions.catalogue_names())
-    cells = acquisitions.catalogue_cells(names)
-
-    order = list(have["names"]) if have else []
-    added = [n for n in names if n not in set(order)]
-    order += added
-    withdrawn = sorted(set(order) - set(names))
-
-    fresh = {
-        "taken": time.strftime("%Y-%m-%d"),
-        "names": order,
-        "cells": {n: cells[n] for n in order if n in cells},
-        "withdrawn": withdrawn,
-    }
-    SNAPSHOT.write_text(json.dumps(fresh, indent=1, ensure_ascii=False))
-    if have:
-        moved = [f"{len(added)} new"] if added else []
-        if withdrawn:
-            moved.append(f"{len(withdrawn)} no longer published")
-        print(f"  {', '.join(moved) or 'nothing changed'}; "
-              f"{len(order)} numbered\n", file=sys.stderr)
-    return fresh
-
-
-def pick(snap, index):
-    """The acquisition that number means."""
     names = snap["names"]
     if not 1 <= index <= len(names):
         sys.exit(f"no acquisition {index}; the numbers run 1..{len(names)}. "
                  "Try -l")
     return names[index - 1]
 
-
 def resolve(snap, out, token):
-    """The acquisition a -g or -c argument means.
-
-    A number indexes the catalogue as -l prints it. Anything else is matched
-    against the acquisition names and against the files already built, so the
-    name, `vestfold-10pkt-2025`, `vestfold-10pkt-2025.mbtiles` and a piece of
-    any of them all reach the same flight. That is the currency to carry
-    between the two tools: `vatcache.py` numbers the queue and this numbers the
-    catalogue, so its number means another acquisition here."""
-    token = token.strip()
-    if token.isdigit():
-        return pick(snap, int(token))
-
-    held = in_hand(out)
-    names = list(snap["names"])
-    names += sorted(n for n in held if n not in set(names))
-
-    stem = Path(token).name
-    if stem.endswith(build_tiles.STORE_SUFFIX):
-        stem = stem[: -len(build_tiles.STORE_SUFFIX)]
-    key = acquisitions.slug(stem)
-    hits = [n for n in names if n == token or acquisitions.slug(n) == key]
-    if not hits:
-        hits = [n for n in names if token.casefold() in n.casefold()]
-    if len(hits) == 1:
-        return hits[0]
-    if not hits:
-        sys.exit(
-            f"no acquisition here answers to {token!r}. -l lists the catalogue "
-            "and -l <piece>\nfilters it; a name has to be spelled the way "
-            "hoydedata.no spells it."
-        )
-
-    # One of them is already a file here, which is the one a re-fetch or an
-    # extension means; anything else has to be said exactly.
-    built = [n for n in hits if n in held]
-    if len(built) == 1:
-        print(f"{token!r} fits {len(hits)} acquisitions; {built[0]!r} is the "
-              "one already built here.\n")
-        return built[0]
-    numbered = {n: i for i, n in enumerate(snap["names"], 1)}
-    print(f"{token!r} fits {len(hits)} acquisitions:", file=sys.stderr)
-    for name in hits[:20]:
-        print(f" {str(numbered.get(name, '—')).rjust(5)}  {name}"
-              f"{'   ← built here' if name in held else ''}", file=sys.stderr)
-    if len(hits) > 20:
-        print(f"    …and {len(hits) - 20} more", file=sys.stderr)
-    sys.exit("Name one of them in full, or give its number.")
-
-
-def cell_of(snap, name):
-    """The finest cell the catalogue publishes this acquisition on, which decides
     the ladder. Read from the snapshot; `--refresh` re-asks."""
     cell = snap["cells"].get(name)
     if cell is None:
@@ -186,24 +36,7 @@ def cell_of(snap, name):
         )
     return cell
 
-
 def in_hand(out):
-    """Acquisition name to the levels the databases in this directory hold, read
-    out of each file's own stamp."""
-    held = {}
-    for path in sorted(Path(out).glob(f"*{build_tiles.STORE_SUFFIX}")):
-        try:
-            with build_tiles.Store(path) as store:
-                name = store.meta("name")
-                held[name or f"?{path.stem}"] = store.levels()
-        except sqlite3.DatabaseError as err:
-            print(f"warning: {path.name} does not read ({err})",
-                  file=sys.stderr)
-    return held
-
-
-def guard(target, name, recipe, building, force, redo):
-    """Refuse to add levels to a database holding another acquisition, or one
     built under a different recipe (which would mix two kinds of pixel)."""
     if not target.exists():
         return
@@ -221,8 +54,7 @@ def guard(target, name, recipe, building, force, redo):
         print("  It carries no recipe, so there is no telling whether it was "
               "built like this one.")
     elif digest != want:
-        # --redo over every level the file holds leaves none of the old pixels
-        # behind, so the two recipes never meet in it.
+
         replacing = redo and not set(levels) - set(building)
         if not (force or replacing):
             sys.exit(
@@ -235,7 +67,6 @@ def guard(target, name, recipe, building, force, redo):
         print(f"  Recipe {digest} ≠ {want}, "
               + ("and --redo rebuilds every level it holds." if replacing
                  else "forced."))
-
 
 def do_list(snap, pattern, out, verbose):
     names = snap["names"]
@@ -273,8 +104,7 @@ def do_list(snap, pattern, out, verbose):
         else:
             print("      grid    withdrawn from the catalogue — nothing left "
                   "to fetch")
-        # The app joins the manifest onto the per-project WMS's layer prefixes
-        # and drops an acquisition the WMS does not publish.
+
         known = "ok" if name in wms else "MISSING — the app would drop this"
         print(f"      wms     {known}")
         mask = coverage_mod.mask_file(name)
@@ -288,33 +118,7 @@ def do_list(snap, pattern, out, verbose):
     if not verbose:
         print(f"\n`here` is what {out} already holds. -g <number> builds one.")
 
-
 def parse_levels(text):
-    """`-z 14`, `-z 16,14,12`, `-z 16-14`: one level, a list, or an inclusive
-    range either way up. Returns them deepest first, bounded by the ladder
-    `build_tiles` defines."""
-    deepest, coarsest = build_tiles.DEFAULT_LEVELS[0], build_tiles.COARSEST_LEVEL
-    found = set()
-    for piece in (p.strip() for p in text.split(",")):
-        if not piece:
-            continue
-        low, dash, high = piece.partition("-")
-        try:
-            ends = [int(low), int(high)] if dash else [int(low)]
-        except ValueError:
-            sys.exit(f"-z: {piece!r} is not a zoom level, or a range of them "
-                     "written as 16-14")
-        if not all(coarsest <= z <= deepest for z in ends):
-            sys.exit(f"-z: {piece} is outside the ladder, which runs "
-                     f"z{deepest} down to z{coarsest}")
-        found.update(range(min(ends), max(ends) + 1))
-    if not found:
-        sys.exit("-z: no zoom level named")
-    return sorted(found, reverse=True)
-
-
-def wanted_levels(name, cell, asked):
-    """Which levels to build. `-z` selects within the ladder the cell earns; it
     cannot reach past it."""
     earned = list(build_tiles.levels_for(cell))
     if not asked:
@@ -333,11 +137,9 @@ def wanted_levels(name, cell, asked):
           f"building {level_range(asked)}\n")
     return asked
 
-
 def do_get(args, snap, name):
     out = Path(args.out)
-    # Levels and the file first: both can refuse the run, and deriving a mask
-    # takes minutes.
+
     levels = wanted_levels(name, cell_of(snap, name), args.levels)
     target = build_tiles.store_path(out, name)
     recipe = build_tiles.settings(levels, args.unit_tiles)
@@ -360,41 +162,12 @@ def do_get(args, snap, name):
         build_tiles.run_levels(store, name, mask, levels, args.unit_tiles,
                                args.jobs, args.limit)
     finally:
-        # Again at the end, for the level span: the first stamp predates this
-        # run's tiles.
+
         store.stamp(name, recipe)
         store.close()
     delivered(target, name)
 
-
 def forget(out, name, mask, levels, unit_tiles, limit=None):
-    """Hand the finished units of these levels back to the build, tiles and
-    record together, so the run fetches the ground again instead of skipping
-    it. Levels the run does not cover keep theirs.
-
-    In the footprint's own order and cut by `--limit` like the build is, so a
-    pilot hands back the units it is about to make and no more."""
-    dropped = {}
-    for z in levels:
-        done = build_tiles.marked_units(out, name, z)
-        units = [u for u in mask.units(z, unit_tiles) if u in done]
-        if limit:
-            units = units[:limit]
-        if not units:
-            continue
-        build_tiles.unmark(out, name, z, units, unit_tiles)
-        dropped[z] = len(units)
-    if not dropped:
-        print("--redo: nothing was finished at these levels, so there is "
-              "nothing to redo.\n")
-        return
-    made = ", ".join(f"z{z} {spaced(n)}" for z, n in dropped.items())
-    print(f"--redo: {plural(sum(dropped.values()), 'finished unit')} handed "
-          f"back to the build ({made}).\n")
-
-
-def delivered(target, name):
-    """What came out, and the one command that deploys it."""
     with build_tiles.Store(target) as store:
         levels = store.levels()
         tiles = store.db.execute("SELECT count(*) FROM tiles").fetchone()[0]
@@ -405,7 +178,6 @@ def delivered(target, name):
           "restart, offered on the next\npage load:\n")
     print(f"    scp {target} <server>:{SERVED_STORE}/")
 
-
 def do_check(args, name):
     out = Path(args.out)
     target = build_tiles.store_path(out, name)
@@ -414,8 +186,7 @@ def do_check(args, name):
                  "-g builds it.")
     with build_tiles.Store(target) as store:
         held = store.levels()
-    # What the file holds, not every level the tool can build: a 0.5 m flight is
-    # not owed a z16.
+
     levels = args.levels or held
     if not levels:
         sys.exit(f"{target.name} holds no tiles at all.")
@@ -434,8 +205,7 @@ def do_check(args, name):
     if not args.fix:
         print(f"\n{plural(total, 'work unit')} to (re)build. Add -g to fix.")
         return
-    # A repair clears the unit before rebuilding it, so a dry run would destroy
-    # and not repair.
+
     if args.dry_run:
         print(f"\n{plural(total, 'work unit')} to (re)build. Drop --dry-run "
               "to fix.")
@@ -452,7 +222,6 @@ def do_check(args, name):
     finally:
         store.stamp(name, recipe)
         store.close()
-
 
 def main():
     p = argparse.ArgumentParser(
@@ -513,14 +282,12 @@ def main():
         do_list(snap, args.list, args.out, args.verbose)
         print()
     if args.get is None and args.check is None:
-        return  # -l or --refresh on its own
+        return
 
     if args.redo and args.check is not None:
         sys.exit("--redo rebuilds whatever is there, and -c reads it back to "
                  "find what needs\nrebuilding; ask for one or the other.")
 
-    # One acquisition between them: -c vestfold -g and -g 3 -c 3 are both a
-    # single request.
     asked = list(dict.fromkeys(t for t in (args.get, args.check) if t))
     named = {resolve(snap, args.out, token) for token in asked}
     if len(named) > 1:
@@ -537,7 +304,6 @@ def main():
         do_check(args, name)
     else:
         do_get(args, snap, name)
-
 
 if __name__ == "__main__":
     main()

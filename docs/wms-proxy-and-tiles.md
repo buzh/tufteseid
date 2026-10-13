@@ -296,8 +296,6 @@ paths the app has stopped asking for (`docs/architecture.md`).
 - **Anonymous mint**: `GET https://backend-api.klienter-prod-k8s2.norgeibilder.no/token/nib`
   with `Referer: https://norgeibilder.no/`. No login.
 - **The token is bound to the requesting IP and referer**, so it must be minted
-  and used in the same place. A token never travels between workstation and
-  server — mint a fresh one wherever the call is made.
 - **Lifetime**: the JWT's own `exp` when present, otherwise a 20-minute
   fallback; refreshed 60 s before expiry. Concurrent mints are coalesced.
 - **Re-mint and retry once** on auth failure: HTTP 401/403/498/499, *or* a JSON
@@ -357,10 +355,6 @@ contacts hoydedata.no for this, the sidecar does.
 
 ## Kulturminnesøk (`/kms/*`)
 
-The one upstream here that is not a map source: one JSON lookup per heritage
-card, resolving an Askeladden id to a Kulturminnesøk uuid. Proxied because the
-API sends no CORS headers at all.
-
 A large minority of the register is not in that index. A miss is a 200 echoing
 the raw number back, and the record API then answers 200 with an all-null shell;
 `src/map/featureInfo/kulturminnesok.ts` reads a null `externalid` as the miss
@@ -368,9 +362,6 @@ and marks the link rather than hiding it. Cached 7 d (`/kms-api/`), because a
 missing record is one RA reindex from existing.
 
 ## CSP
-
-Everything above is same-origin, so none of those hosts appears in the
-Caddyfile CSP. It covers only what the browser contacts itself:
 
 - `img-src 'self' data: blob: cache.kartverket.no` — the WMTS tiles are the only
   images not fetched same-origin.
@@ -410,8 +401,6 @@ fewer requests.
 | Pointer snap grid | 6 px | `heritageQuery.ts` |
 
 - **Split view is a second `Map` with its own queue**, also 48, so up to 96
-  tiles in flight. The queue is a per-map scheduler, not a budget against the
-  upstream; the two half-width panes still cover about one screenful.
 - **Curtain**: the `prerender` canvas clip culls nothing — the renderer has
   already queued the whole viewport — so the B stack also carries a layer
   `extent`, intersected with its `coverageExtent` and recomputed on `moveend`
@@ -429,10 +418,6 @@ fewer requests.
   end, so a store holding only some levels still aligns (a cVAT acquisition
   passes z7–z15, the national relief z0–z16).
 - **`interpolate: false` on the relief** — the `/cache/` national mosaics, the
-  same mosaics' WMS, the per-project LiDAR WMS, and the cVAT ground. These are
-  read upsampled, and OL's bilinear kernel clamps at each tile's edge, leaving a
-  visible step at every seam. Photographs, scanned sheets and the label overlay
-  keep the default.
 - **Ortofoto asks for JPEG** (68 kB against 528 kB per 512 px tile over Oslo);
   a single acquisition needs transparent gaps and uses `jpgpng`.
 - **Every background layer that can reach an upstream needs a `coverageExtent`**
@@ -447,10 +432,6 @@ fewer requests.
   | `wms.topo` overlay, and `amtskart` | `-127998, 6377920, 1145510, 7976800` |
   | NiB ortofoto mosaic | `-250025, 6299985, 1211155, 8985010` |
   | one LiDAR project, one ortofoto acquisition | its own `bboxLonLat` (EPSG:4326) |
-
-  Per-project cases must use their own box; the services advertise the union of
-  everything they hold. The cVAT ground needs one for a different reason: not to
-  spare an upstream, but to keep the layer off ground the flight never covered.
 
 ### Off-screen grabs
 
@@ -488,10 +469,6 @@ ceiling and its own bounded retry.
 
 ### `guardTileSource` (`src/upstream/tileGuard.ts`)
 
-Wraps a tile source in admission control (for origins the breaker knows) plus a
-bounded retry (for every source that reaches an upstream, including those no
-origin claims).
-
 - Two retries at 400 ms and 900 ms, plus up to 300 ms jitter, then the tile is
   left `ERROR`. Without it the ~1-in-200 upstream 502 is a hole that lasts until
   reload, and only at the zoom level it happened on.
@@ -507,9 +484,6 @@ origin claims).
   flag — MapProxy culls to a coverage polygon and answers a blank 200 inside it.
 
 ## Circuit breaker (`src/upstream/`)
-
-One breaker per origin, plus the ribbon chip that reports an open one. An origin
-is the set of requests that stop answering together, not a hostname.
 
 | Origin | Prefixes | Probe |
 |---|---|---|
@@ -537,8 +511,6 @@ Constants (`health.ts`):
 | `HEALTHY_RESET_MS` | 60 000 of continuous health before the backoff forgets |
 
 - **Net, not consecutive**: `proxy_cache_use_stale` serves cached tiles straight
-  through an upstream 504, so a pan over half-visited ground interleaves hits
-  and failures. A success pays the counter down by one rather than zeroing it.
 - **While open, no request goes out.** Tiles are marked `ERROR` without touching
   the network (a tile left `LOADING` holds a slot); `fetchWithin` throws
   `UpstreamDownError` before fetching, which the retry loops in `dem.ts`,
@@ -586,8 +558,6 @@ Constants (`health.ts`):
 6. The layer-config half — name union, config file, `infoFormat` — is
    `docs/map-layers.md`.
 7. Nothing for the breaker unless the source is a *fifth* thing that can fail on
-   its own. A layer under one of the four prefixes is covered; one under none
-   has no breaker, which is the right answer for a single overlay.
 8. `docker compose restart wmscache`.
 
 ## Verifying

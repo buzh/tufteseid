@@ -1,5 +1,4 @@
-// Every spot has a rectangle and nobody is asked for one: the first write that
-// finds a record without one derives it here (`docs/architecture.md`).
+
 
 import type { SpotPoint, SpotSketch } from '../api/spots';
 import {
@@ -13,18 +12,14 @@ import {
 import { sketchBbox } from '../sketch/bounds';
 import { sketchOf } from '../sketch/scene';
 
-/** What a spot gets when there is nothing but the pin to go on. */
 export const DEFAULT_FOOTPRINT_SIDE_M = MIN_SIDE_M;
 
 export type DerivedFootprint = {
   bbox: Bbox;
-  /** The drawing's own span fell outside `MIN_SIDE_M`…`MAX_SIDE_M`, so the
-   *  square is not what was drawn. */
+
   clamped: 'min' | 'max' | null;
 };
 
-/** The square around the drawing if there is one, and otherwise the default
- *  around the pin. */
 export const derivedFootprint = (
   point: SpotPoint,
   sketch: SpotSketch | null,

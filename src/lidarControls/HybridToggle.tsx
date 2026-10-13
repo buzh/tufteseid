@@ -1,5 +1,4 @@
-// Contours ride the overlay's own GetMap (`topoOverlay.ts`), so the contour
-// button exists only while the overlay is on.
+
 
 import { Tooltip } from '@mantine/core';
 import { useTranslation } from 'react-i18next';

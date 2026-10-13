@@ -29,11 +29,9 @@ const isInvalidAddressSearch = (query: string): boolean => {
   return directionWithNumber.test(q) || latLonLike.test(q);
 };
 
-// Both page sizes are the search box's list lengths: nothing pages.
 const ADDRESS_SEARCH_PAGE_SIZE = 8;
 const PLACE_SEARCH_PAGE_SIZE = 8;
 
-/** What the lookups behind one point are given, each on its own. */
 const POINT_DEADLINE_MS = 8000;
 
 const emptyAddressResult = (query: string): AddressApiResponse => ({
@@ -207,10 +205,6 @@ export const getProperties = async (query: string): Promise<Property[]> => {
   }
 };
 
-/** Metres above the vertical datum at one point, or null where the national
- *  mosaic has no coverage — which arrives as the string `NoData` rather than
- *  as an error. Water inside coverage reads exactly 0
- *  (`docs/terrain-analysis.md`). */
 export const getElevation = async (
   x: number,
   y: number,
@@ -240,9 +234,6 @@ export const getElevation = async (
   return isNumberOk(metres) ? metres : null;
 };
 
-/** Which kommune and fylke the point falls in. Off the mainland the service
- *  answers 404 rather than an empty body, so "nowhere" throws like a failure
- *  does. */
 export const getMunicipalityAtPoint = async (
   east: number,
   north: number,
@@ -261,8 +252,6 @@ export const getMunicipalityAtPoint = async (
   );
 };
 
-/** The matrikkel parcels within a metre of the point. Empty off registered
- *  land, which is a 200 with no features. */
 export const getCadastreAtPoint = async (
   east: number,
   north: number,

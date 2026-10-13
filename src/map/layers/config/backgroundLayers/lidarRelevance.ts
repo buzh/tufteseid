@@ -7,12 +7,11 @@ import {
   sortProjectsByRelevance,
 } from './lidarProjects';
 
-// Failing a bar demotes a project to `secondary`; nothing is excluded outright.
 export type LidarFilterSettings = {
   minYear: number;
-  // A project at >= 5 pkt/m² meets the year bar even when older than minYear.
+
   grandfatherDense: boolean;
-  // Fraction of the viewport a project must paint.
+
   minAreaRatio: number;
 };
 
@@ -41,7 +40,6 @@ export const meetsSizeBar = (
   filters: LidarFilterSettings,
 ): boolean => areaRatio >= filters.minAreaRatio;
 
-// How many entries ever get a list row, primary and secondary together.
 export const RENDER_CAP = 25;
 
 type RelevanceInput = {
@@ -49,7 +47,6 @@ type RelevanceInput = {
   areaRatio: number;
 };
 
-// `sorted` arrives in display order (sortByOnScreenCoverage); this only tiers.
 export const classifyRelevance = <T extends RelevanceInput>(
   sorted: T[],
   filters: LidarFilterSettings,
@@ -74,14 +71,12 @@ export const lidarFilterSettingsAtom = atom<LidarFilterSettings>(
 
 export type LidarViewportEntry = {
   project: LidarProject;
-  // WFS polygon parts, at least one of which touches the viewport.
+
   geometries: Geometry[];
-  // Fraction of the viewport those polygons paint, 0..1.
+
   areaRatio: number;
 };
 
-// Bucketed at 5% so near-identical candidates fall back to newest/densest
-// instead of swapping places on sampling noise while panning.
 const COVERAGE_BUCKET = 0.05;
 
 export const sortByOnScreenCoverage = (
@@ -96,15 +91,13 @@ export const sortByOnScreenCoverage = (
 };
 
 export type LidarViewportStatus =
-  // Not in LiDAR mode: nothing fetched, nothing drawn.
+
   | 'idle'
   | 'loading'
   | 'ready'
-  // Viewport too wide to ask the WFS about.
+
   | 'zoomedOut'
-  // Kartverket not answering; the entries are what the cVAT store holds here.
-  // Envelopes, not footprints: `areaRatio` is an upper bound, `geometries` is
-  // empty.
+
   | 'held'
   | 'error';
 
@@ -126,8 +119,6 @@ export const lidarPickerOpenHalves = halved(false);
 
 export const livePickerOpenAtom = acrossHalves(lidarPickerOpenHalves);
 
-// Set while datasets are cycled from the keyboard: same WFS fetch, no polygons.
-// Cleared by useLidarControls after an idle period.
 export const lidarCyclingAtom = atom(false);
 
 export const hoveredLidarProjectIdAtom = atom<string | null>(null);

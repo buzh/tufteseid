@@ -22,14 +22,6 @@ anybody is signed in — a guest's carries *Logg inn* and the size preference
 mirrors it into Jotai through `pbAuthSyncEffect` and nothing writes that atom
 directly.
 
-**Registering and signing in are one round trip each, in that order.** The
-create answers with the record but no token — PocketBase does not authenticate
-a collection create — so the dialog signs in immediately afterwards with the
-password it still has in hand. A create that succeeds and a sign-in that fails
-would leave an account the reader has to sign into by hand, which is the one
-seam here; it needs PocketBase to accept a password it has just stored and
-refuse it a moment later.
-
 **Password reset needs SMTP**, the same settings the invite mail already uses
 (`docs/closed-beta.md`). The route answers 204 whether or not the address is
 one we know, so nothing in it can be used to ask whether somebody has an
@@ -54,9 +46,6 @@ dropping it is the whole of it.
 The row cannot go away. `spots.owner`, `evidence.owner`, `votes.owner` and
 `invites.issuer` are all relations to it, every collection rule is written
 against `@request.auth.*`, and PocketBase can only judge a record of its own.
-
-Three fields on it are **not the reader's to set**, and it takes two
-mechanisms to hold that — one at create, one after:
 
 | field | what it decides |
 | --- | --- |
@@ -115,12 +104,6 @@ spot's footprint is the *service's* to offer, not the feature's.
 **An administrator holds every feature.** `src/auth/features.ts` and
 `rendersvc/server.py` both say so, so that a `features` entry nobody
 remembered to grant cannot lock an installation out of its own renders.
-
-**Pictures already rendered stay readable to everybody who can see the spot**,
-guests included: a feature decides what may be *asked for*, never what a spot
-already carries. Flyfoto bends that — browsing an archive is reading, and it is
-gated because every pan is another call on the quota — but no evidence row goes
-dark for want of a feature.
 
 ### `name` is what gets the credit
 
@@ -215,10 +198,6 @@ for, and there is no reading of a bad value that should lock everybody out.
 Compose passes the key to the `pocketbase` service alone;
 `pb_hooks/capacity.js` is the only thing that reads it, and the SPA asks
 `/pb/api/capacity` rather than being told at build time.
-
-**Being full refuses nobody.** Registration works at the cap exactly as it
-does below it, and whatever paid for it — a free place, an invite — is spent
-all the same. What changes is the role the row is written with:
 
 - **Under the cap**, `pb_hooks/identity.pb.js` pins `role` to `user` as it
   always did, and the account is seated.

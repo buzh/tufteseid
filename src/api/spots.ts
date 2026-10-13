@@ -4,11 +4,8 @@ const COLLECTION = 'spots';
 
 export type SpotVisibility = 'private' | 'public';
 
-/** Lon/lat, EPSG:4326. */
 export type SpotPoint = [lon: number, lat: number];
 
-/** The ground the spot's evidence covers, EPSG:4326. Structurally the `Bbox`
- *  of `src/map/bbox.ts`, restated so this module stays clear of OpenLayers. */
 export type SpotFootprint = [
   minLon: number,
   minLat: number,
@@ -16,13 +13,11 @@ export type SpotFootprint = [
   maxLat: number,
 ];
 
-/** An Excalidraw scene plus its georeference; only `src/sketch/` reads
- *  `elements`. */
 export type SpotSketch = {
   frame: {
-    /** View projection at freeze, e.g. `EPSG:25833`. */
+
     projection: string;
-    /** The frozen viewport's ground, in that projection. */
+
     extent: [number, number, number, number];
     widthPx: number;
     heightPx: number;
@@ -39,25 +34,17 @@ export type SpotRecord = {
   credit: string;
   visibility: SpotVisibility;
   point: SpotPoint;
-  /** The square every picture is rendered over. Every spot has one — the client
-   *  derives it from the drawing or the pin (`spots/footprint.ts`) rather than
-   *  asking. Still nullable for rows written before that rule, which `SpotCard`
-   *  repairs on sight. */
+
   footprint: SpotFootprint | null;
   sketch: SpotSketch | null;
-  /** Which drawing the spot puts on the shared drawing layer: a sketch id, or
-   *  empty for the `sketch` column below — which is every record written
-   *  before the field existed, and the only drawing a spot can hold today.
-   *  Resolved by `sketch/scene.ts`. */
+
   mapSketch: string;
   created: string;
   updated: string;
 };
 
-/** The reserved `mapSketch` value naming the `sketch` column itself. */
 export const MAP_SKETCH_COLUMN = 'sketch';
 
-// Mirrors the column widths in `pb_migrations/1700001100_spots.js`.
 export const SPOT_NAME_MAX = 200;
 export const SPOT_DESCRIPTION_MAX = 20000;
 
@@ -80,7 +67,6 @@ export type SpotPatch = Partial<{
   mapSketch: string;
 }>;
 
-// Crockford base32; 32 divides 256, so `% 32` on a random byte is unbiased.
 const CODE_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 
 const newSpotCode = (): string => {
@@ -90,20 +76,15 @@ const newSpotCode = (): string => {
   return code;
 };
 
-// PocketBase reports a unique-index violation as a 400 with a per-field entry:
-// the outer `code` is our field, the inner is its name for the error kind.
 const isCodeTaken = (err: unknown): boolean =>
   (err as { response?: { data?: Record<string, { code?: string }> } })?.response
     ?.data?.code?.code === 'validation_not_unique';
 
-// 32^6 ≈ 1.07e9 codes, so one redraw suffices.
 const CODE_ATTEMPTS = 2;
 
 const accountName = (): string =>
   (pb.authStore.record as SiteUser | null)?.name?.trim() ?? '';
 
-// PocketBase parses a JSON field over REST but hands it back as a string over
-// realtime SSE.
 const asJson = <T>(value: unknown): T | null => {
   if (value == null || value === '') return null;
   if (typeof value !== 'string') return value as T;
@@ -165,9 +146,6 @@ export const listSpots = async (): Promise<SpotRecord[]> =>
     })
   ).map(hydrate);
 
-// Uppercased because SQLite's `=` does not case-fold. `requestKey: null`
-// opts out of the SDK's auto-cancel: a deep link asks twice, before and after
-// sign-in.
 export const getSpotByCode = async (code: string): Promise<SpotRecord> =>
   hydrate(
     await pb

@@ -27,35 +27,27 @@ export const getUrlParameter = (key: UrlParameter): string | null => {
 };
 
 export type UrlParameter =
-  // The open spot's six-character code, not its PocketBase id.
+
   | 'lok'
-  // An invite code to the closed beta. Read at boot by
-  // `src/invites/inviteLink.ts` and dropped by the sign-in box, which is the
-  // only place it can be spent.
+
   | 'invite'
   | 'projection'
   | 'backgroundLayer'
   | 'hybrid'
   | 'contours'
   | 'lidarModel'
-  // Which LiDAR render. Not derivable from `backgroundLayer`: the two flight
-  // grounds are named for cVAT or not-cVAT, and the mosaic's name says nothing
-  // at all.
+
   | 'lidarRender'
-  // The two-ground view: which one, the B half's ground, and where the seam
-  // sits as a whole percent. All three are absent while one ground is up, and
-  // `curtain` is absent at the 50 % default and in the split.
+
   | 'viewMode'
   | 'backgroundLayerB'
   | 'curtain'
-  // The ticked registers, comma-separated. Absent means the default set
-  // (`heritageSites`), empty means none ticked.
+
   | 'themeLayers'
   | 'heritageDetails'
   | 'heritageRender'
   | 'heritageOpacity'
-  // Every spot's chosen drawing on the ground at once. On by default, so only
-  // `false` is ever written.
+
   | 'sketches'
   | 'lat'
   | 'lon'

@@ -257,13 +257,6 @@ the whole gathering so the heritage query stays out of the way of both. The
 open spot is dropped by the cluster's `geometryFunction`, not merely left
 unstyled, so losing its pin also takes it out of the count.
 
-Both ways a click could land on nothing are closed. Clustering is off at the
-view's deepest zoom, because two spots six metres apart is an ordinary thing to
-record and a gathering that no amount of zooming could break apart would answer
-a click with silence; and a gathering whose pins share one coordinate exactly —
-which no zoom separates either — opens the first of them instead of fitting to
-a rectangle of no width.
-
 A spot is written as it is made. `createSpot` runs the moment the pin lands —
 under the pin's own coordinate as a provisional name, because the column is
 required and the place-name register has not answered yet — and every unit after
@@ -383,8 +376,6 @@ megabytes on every press.
   no resting state: the stage's own Ferdig or Avbryt writes and closes it in one
   act, which is why the controller carries `finish`/`abort` alongside `close`.
 - **A misplaced pin is a real record**, so the properties box carries its own
-  Slett, behind a two-press confirm. It is not on the card: a destructive button
-  on a surface pressed constantly buys nothing.
 
 ## The pictures of a spot
 
@@ -404,13 +395,7 @@ size and changes none of them.
   both surfaces ask, and a sun loop passes — both surfaces ground a loop as
   readily as a still.
 - A drop writes one row. `sortForMove` (`evidence/order.ts`) takes the midpoint
-  between the row's new neighbours, so nothing else moves; a row dropped last
-  takes the current time instead, or a picture kept a moment later would sort
-  in front of it. The write is optimistic and puts the row back on a refusal.
 - The rows are one height, so a drag measures every slot's middle once at the
-  press and then takes the nearest one to the pointer: the preview moves rows
-  between slots, and the slots themselves do not move. The handle answers ↑ and
-  ↓ too, and stops the press reaching OpenLayers' keyboard pan.
 - Pictures are their own records, so reordering — like keeping and deleting —
   is written when it happens, as is every other unit of a spot
   (*Making a spot*).
@@ -419,10 +404,6 @@ size and changes none of them.
   is one press with no source name attached: the row it makes carries the title
   (`evidenceTitle`), and the reader chose the view by looking at it.
 - **What is offered follows the map.** `keepOfferAtom` publishes a reading of
-  the ground as it stands, or of the analysis when one is running — the
-  analysis wins, because it is then what is on screen and the ground it was
-  computed from is underneath it. Where neither can be re-rendered (cartography,
-  the empty ground) the offer is null and the camera is dead.
 - **A cached VAT is kept like any other flight.** `lidarCvat` offers a `lidar`
   spec keyed by the flight it was computed from, told apart from that flight's
   WMS grounds by `style: 'cvat'`, so the duplicate guard, the title and the
@@ -547,10 +528,6 @@ holds the ground still and changes only how it was seen.
 - The outgoing picture comes off only once the incoming one has pixels. A blink
   between two readings of the same ground would make the comparison worthless.
 - Left and right flip. `keyboardEventTarget` is the document (`map/atoms.ts`),
-  so the listener is in the capture phase — OpenLayers' own keyboard pan would
-  otherwise answer the same press. Up and down are swallowed there too and do
-  nothing: half an arrow cluster flipping pictures while the other half slid
-  the ground out from under them read as a fault.
 - The drawing sits above the pictures at z 2, so `SketchFade` (`src/sketch/`)
   takes it part of the way off the ground, `SketchToggle` in the band takes it
   off altogether, and **`t`** — tegning — does the same from the keyboard. The
@@ -558,10 +535,6 @@ holds the ground still and changes only how it was seen.
   card as well; it is inert while Excalidraw has the map, and it keeps its hands
   off a press aimed at an input.
 - A row whose render has not landed, or that has no rectangle, is not part of
-  the reading; the gallery on the card is where it is waited on. A reading with
-  nothing left in it steps back to the card — where there is one. For a reader
-  who may not edit the spot there is not, so the box stays and says the spot has
-  no pictures yet; stepping back would close a spot they had just opened.
 - **A sun loop is read on the ground, like everything else.** It plays over its
   own `bbox25833`, looping, and the transparency slider fades it the way it
   fades a still, so the sun can be walked round a mound against the map under
@@ -620,29 +593,12 @@ component, because the reader is keyed on the spot and remounts when another is
 opened.
 
 - **Nothing gives the box a size.** It is `width: max-content` under ceilings,
-  so it shrink-wraps its content in both axes: a reading of three pictures with
-  no prose gets a box that small. The ceilings are the layout's own — 46rem by
-  60 % for the bar, 23rem by the full height for the column — and the grip is
-  the only thing that ever sets another. It therefore only ever makes the box
-  *smaller* than its content, which is what it is for, since the prose and the
-  strip scroll.
 - Until the box has been moved or resized the layout's own CSS places it too.
   The first gesture takes over with an inline corner, and `.placed` switches
   the CSS anchors off; choosing a layout drops the placement again, which is
   also the way back from a box left somewhere unhelpful.
 - **Pushing a box through a wall docks it there**: flush at the gutter, in the
-  shape that wall asks for. The shape is as much of the dock as the anchor is —
-  down the side is a column, along the top or the bottom a bar — and the layout
-  is what makes a column narrow, so a dock carries no ceiling of its own and
-  drops any the grip had set. A side dock pins the top corner; a top or bottom
-  dock keeps the run it was dragged to, so it does not slide sideways under the
-  hand that put it there.
 - The dock is why a dragged box is *not* clamped: crossing a wall is the ask,
-  and the dock puts the box back inside the map, so nothing ever ends up off
-  it. Everything else is clamped — a resize, a window resized under the box,
-  and the pass on mount that catches a window resized between two readings.
-  What is measured for all of that is the box as drawn, not the ceiling, which
-  may be higher than the content needs.
 - The caption rides in the footer between the flip buttons and the transparency
   slider rather than on a line of its own: in the bar layout that slack is the
   only thing there was to put there.
@@ -679,18 +635,8 @@ written only as `false`, since absent is the default.
   still in flight keeps its pin until the drawing is really there. A spot with
   no drawing keeps its pin at every zoom — it has nothing else to be found by.
 - **The cost is the export, not the drawing.** Each scene is re-exported
-  through Excalidraw at the view's resolution, so the layer culls to the
-  viewport, skips anything under 24 px across, holds two exports in flight at
-  a time and gives each a quarter of the pixel budget a lone drawing gets.
-  Renders off screen are dropped once more than forty are held. A hidden layer
-  is never asked for a canvas, so a layer switched off costs nothing at all.
 - **A click reads the alpha channel**, not the rectangle: the pixel under the
-  pointer is looked up in the render that covers it, within six pixels, and the
-  smallest drawing wins where two overlap. A pin takes the click first — it is
-  the smaller target and it says which spot it opens.
 - **The list is fetched signed out too** (`spots/spotRecords.ts`). A public
-  spot is readable with no account, so a guest gets the coverage and the pins
-  that go with it; signing in adds the reader's own records to the same list.
 
 ## The provenance legend
 
@@ -719,9 +665,6 @@ and the producers publish between 1 and 0.08 m/px, so a capture is anywhere from
 of that.
 
 - **Line one** is the title in weight 600 and `evidenceFacts` after it, the same
-  list the card and the reader print. Too long for the width, it sheds facts
-  from the end, so the render date is the first to go. A title too long for the
-  width on its own is cut with an ellipsis.
 - **Below it, the rights lines**, flush left and one per holder rather than one
   joined line: Norge i bilder's holder name is sixty characters on its own.
 - **Last, a footer row** in three cells: the scale bar at the left edge, the
@@ -750,9 +693,6 @@ of that.
   over a small capture means a ruler wider than the picture. That reads
   correctly: the mat beside it is not ground.
 - **The download is no longer registered to its bbox** — the capture sits
-  inset. That is the trade for spending no pixel of ground on caption, and it
-  costs nothing downstream: the file the map lays back over the rectangle is the
-  *stored* one, which is never stamped.
 - **A loop cannot be stamped at the door**: `decodeToCanvas` is
   `createImageBitmap`, which throws on a WebM, so `stampEvidence` hands a video
   back untouched and the band is burnt in at render time instead. The wording is
@@ -790,9 +730,6 @@ is the convenience half, and the one with a version attached.
   inset picture and a band. Anything that "fixes" the export to use the
   nicer-looking file breaks the georeferencing silently.
 - **Which is why the rights lines move to a text file.** `legendContentFor` is
-  the same authority either door, so the readme prints each picture's title,
-  facts and rights in the reader's language. The lines a licence requires are
-  what that file is for; everything else in it is courtesy.
 - **The pixel size is measured off the decoded image**, not `meta.metresPerPx`
   — the stored figure is what the producer aimed at and the fit may have
   coarsened it. `withLegend`'s scale bar is measured the same way.
@@ -806,11 +743,6 @@ is the convenience half, and the one with a version attached.
   The polygon is the metric rectangle's own corners carried back, so it frames
   the pictures rather than sitting askew of them.
 - **The zip is store-only and written here.** Every byte in a bundle is already
-  compressed, so deflating would buy nothing, and a library would be a
-  dependency bought on the server. Entry names carry the UTF-8 flag, because
-  most spot names have a Norwegian letter in them. One entry's bytes are held
-  at a time — the CRC needs them and the archive does not — so peak memory is
-  the largest single row rather than the whole spot.
 - Attribute names in the GeoJSON mirror the collection's own columns rather
   than the reader's language: a schema that changed with the locale could not
   be joined to another export.
@@ -918,9 +850,6 @@ empty list answers the default, and by then the effect mirroring the ground
 back to the URL has overwritten the parameter. One value for the whole page
 load, not one per ground section.
 
-Two of them name something rather than set something, and both are read once
-at import and then taken off the address bar:
-
 - `lok`, the open spot's six-character code, written back by whatever record
   is open (`src/spots/shareLink.ts`).
 - `invite`, a closed-beta invite code, which is the whole of an invitation
@@ -1006,21 +935,6 @@ address bar as it stands: every ground, overlay and the centre are already
 parameters on it. Same gesture and same two-second answer as the button in a
 spot's title row, both out of `src/spots/useShareCopy.ts`.
 
-**Which section a new control goes in is a question about the control, never
-about where there is room.** A control that means something different per ground
-belongs to an arm; one that turns something on over the ground belongs to the
-show group; anything else that applies to the reading belongs to the tools.
-
-**When the band runs out of room, a ground section gives and nothing else
-does.** The centre and the tools are fixed-width icon controls that cannot
-shrink by a pixel, while a ground section carries a flight name no one can
-predict the width of. So each ground section is its own scrollport and the band
-is not one: the view switch, the show group and the tools stay put at every
-width, and a ground's controls scroll inside the column they were given. The
-one thing in the tools whose width moves is the search field, and it moves only
-while it has the focus — which is why what it widens to is capped against the
-viewport as well.
-
 The three columns are what put the view switch on the band's centre line, and
 they are also what runs the tools off the right edge: the two flexible tracks
 share the slack evenly, so the left column is handed as much room as the right
@@ -1031,8 +945,6 @@ widths under about 450px where the centre and the tools alone outrun it, but
 that is a last resort rather than the design.
 
 - Every arm takes a controller object (`useLidarControls(half)` and friends) and
-  owns no atoms of its own. All three controllers mount whichever arm is
-  showing: each remembers something across a visit to another ground.
 - `ControlChip` is the labelled box that opens something — icon, label, hint,
   chevron. `ControlButton` is the square icon toggle, optionally split into two
   lit halves.
@@ -1062,10 +974,6 @@ that is a last resort rather than the design.
   - **Geometry in JavaScript**, which no CSS reaches: `Icon` wraps its `size`
     prop, and `useFloatingPanel` reads the factor as a number through
     `uiScaleFactor()`.
-
-  Deliberately left alone: border and outline widths and their offsets, and
-  the media-query breakpoints, which are about the viewport rather than the
-  chrome.
 
   The map is not scaled: a doubled canvas would read the terrain at half the
   resolution, which is the one thing this app is for. The size control is out
@@ -1124,18 +1032,8 @@ that is a last resort rather than the design.
   are also the only calls in the module that would go to `api.norgeskart.no`
   rather than straight to Geonorge.
 - **The record list carries every drawing.** `listSpots` is one `getFullList`
-  of whole records, so every readable spot's scene — up to 5 MB apiece — is
-  fetched on load whether or not the shared drawing layer is ever switched on,
-  and now for a guest as well. Fine at a few dozen records, which is also all
-  the index is built for.
 - **A drawing gives no hover affordance.** The shared layer answers a click on
-  its strokes but the cursor never changes over them, so nothing says a drawing
-  can be opened; testing the alpha channel on every pointer move is what that
-  would cost.
 - **The spot index does not light the pin.** `SpotMenu` is a Mantine `Menu`
-  with three tabs — the reader's own by date, their favourites by when they
-  starred them, and every public one by score — and no hover-to-light: enough
-  for a few dozen records, not a few hundred.
 - **A spot carries no discussion.** A public spot can be voted on and starred
   and nothing else; there is no way for a reader to write on somebody else's
   record (`docs/votes.md`).

@@ -28,17 +28,12 @@ export const usePlaceInfo = (): PlaceInfo => {
 
   const close = useCallback(() => setReading(null), [setReading]);
 
-  // The box rides an OpenLayers overlay on the map element, which a drawing
-  // session wears a CSS transform on: left up it would be dragged and scaled
-  // with the ground rather than anchored to it.
   useEffect(() => {
     if (context === 'map') return;
     setArmed(false);
     setReading(null);
   }, [context, setArmed, setReading]);
 
-  // The other half of the rule `armPlaceInfoAtom` keeps: whoever takes the map
-  // back takes the next click with it.
   useEffect(() => {
     if (otherHold) setArmed(false);
   }, [otherHold, setArmed]);
@@ -51,12 +46,9 @@ export const usePlaceInfo = (): PlaceInfo => {
       .getProjection()
       .getCode() as ProjectionIdentifier;
 
-    // Leased, because the pin and the terrain rectangle write the cursor too.
     const cursor = cursorLease(viewport);
     cursor.set('crosshair');
 
-    // `singleclick`, not `click`: the first half of a double-click zoom must
-    // not also ask.
     const onClick = (event: MapBrowserEvent) => {
       setArmed(false);
       setReading(placeAt(event.coordinate as [number, number], view));
@@ -69,7 +61,6 @@ export const usePlaceInfo = (): PlaceInfo => {
     };
   }, [armed, map, setArmed, setReading]);
 
-  // Outside the effect above, which the click itself tears down by disarming.
   useEffect(() => {
     if (!reading?.busy) return;
     const query = new AbortController();

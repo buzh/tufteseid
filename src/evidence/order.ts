@@ -1,10 +1,7 @@
 import type { EvidenceRecord } from '../api/evidence';
 
-// Epoch milliseconds, the same units `nextEvidenceSort` writes.
 const STEP_MS = 60_000;
 
-/** `list` with the row at `from` displayed at `to` instead, both indices into
- *  the list as drawn. */
 export const moved = <T>(list: readonly T[], from: number, to: number): T[] => {
   const rest = [...list];
   const [row] = rest.splice(from, 1);
@@ -14,8 +11,6 @@ export const moved = <T>(list: readonly T[], from: number, to: number): T[] => {
 
 type SortWrite = { id: string; sort: number };
 
-// Evenly spaced keys ending on the list's current greatest, so none moves ahead
-// of `Date.now()` and a picture kept after still lands last.
 const renumbered = (list: readonly EvidenceRecord[]): SortWrite[] => {
   const last = Math.max(...list.map((rec) => rec.sort));
   return list
@@ -26,9 +21,6 @@ const renumbered = (list: readonly EvidenceRecord[]): SortWrite[] => {
     .filter((write, i) => write.sort !== list[i].sort);
 };
 
-// The `sort` writes that put `id` at index `to`, or nothing for a row already
-// there. A row dropped last takes the current time, not a step past its
-// neighbour, so a picture kept a moment later still lands after it.
 export const sortsForMove = (
   list: readonly EvidenceRecord[],
   id: string,
@@ -48,8 +40,7 @@ export const sortsForMove = (
   }
 
   const between = (before + after) / 2;
-  // No key left between the neighbours (equal keys, or a gap halved to
-  // nothing); spread the whole list out again instead.
+
   if (between > before && between < after) return [{ id, sort: between }];
   return renumbered(moved(list, from, to));
 };

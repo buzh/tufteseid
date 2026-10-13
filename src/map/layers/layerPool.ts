@@ -2,18 +2,14 @@ import type BaseLayer from 'ol/layer/Base';
 import type TileLayer from 'ol/layer/Tile';
 import type OlMap from 'ol/Map';
 
-// The property a layer carries its reuse signature in; one without a key is not
-// pooled.
 export const POOL_KEY = 'poolKey';
 
-// One background stack plus one B stack: the most a single toggle retires.
 const MAX_POOLED = 8;
 
 const POOL_TTL_MS = 300000;
 
 type PooledLayer = { layer: TileLayer; timer: number };
 
-// Insertion-ordered, so the first key is the oldest.
 const pool = new Map<string, PooledLayer>();
 
 const drop = (key: string) => {
@@ -28,8 +24,6 @@ const keyOf = (layer: BaseLayer): string | null => {
   return typeof key === 'string' ? key : null;
 };
 
-// Only what came off a map is pooled: OL moves a still-attached layer to
-// whichever map takes it next, blanking the first.
 export const retireLayer = (map: OlMap, layer: BaseLayer): void => {
   if (!map.removeLayer(layer)) return;
   const key = keyOf(layer);

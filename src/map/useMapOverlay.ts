@@ -1,7 +1,4 @@
-// Hands back the element the `Overlay` positions, for a portal: React must not
-// own a node OpenLayers writes `style.transform` onto. The element is
-// `pointer-events: none`; content opts back in, or the overlay's box swallows
-// drags over map it is not covering.
+
 
 import { useAtomValue } from 'jotai';
 import { Overlay } from 'ol';
@@ -16,7 +13,7 @@ export const useMapOverlay = (
 ): HTMLElement => {
   const map = useAtomValue(mapAtom);
   const overlayRef = useRef<Overlay | null>(null);
-  // Read once: rebuilding the overlay would detach the portal under React.
+
   const optionsRef = useRef(options);
 
   const [element] = useState(() => {
@@ -35,8 +32,6 @@ export const useMapOverlay = (
     };
   }, [map, element]);
 
-  // `undefined` hides an Overlay: OpenLayers sets `display: none` and leaves
-  // the element in the DOM.
   useEffect(() => {
     overlayRef.current?.setPosition(position);
   }, [position]);

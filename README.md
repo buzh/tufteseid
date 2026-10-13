@@ -3,9 +3,6 @@
 *tuft*: sted der et hus har stått; spor etter gammel bebyggelse
 *seid*: norrønt ord for magi/trolldom
 
-Tilpasset kartløsning for lenestolsarkeologi — a map viewer for reading
-Norwegian LiDAR terrain against the Riksantikvaren heritage register.
-
 ## Install
 
 A default install is the map, the heritage register, the LiDAR grounds, the
@@ -117,11 +114,6 @@ Readers sign in with an email address and a password, held by PocketBase
 itself. There is nothing else to configure and no second system to register
 the app with. [`docs/identity.md`](docs/identity.md) has the full account.
 
-Two things want **Settings → Mail settings** filled in, and neither works
-without SMTP: the *Glemt passord* letter, and mailing somebody an invite. A
-reader whose invite mail fails is told to pass the code on by hand; a reader
-who cannot reset their password has no way round it but you.
-
 **Make yourself an app administrator.** This is separate from the PocketBase
 superuser you just made — that one is the database's, not the app's. Register
 in the app as an ordinary reader (open a free place first, or that first
@@ -148,12 +140,6 @@ registration by a hook — the admin UI is the only way any of them
 moves ([`docs/identity.md`](docs/identity.md)).
 
 ## Who may register
-
-A fresh install **registers nobody**. The app ships as a closed beta: a reader
-registering for the first time gets an account only if a free place is left or
-they present an invite code, and until you say otherwise there are none of
-either. Existing accounts are never re-checked, and the map and the public
-spots stay open to anybody with the address.
 
 Open some places:
 
@@ -250,12 +236,6 @@ log off entirely.
 
 ## Licence
 
-Tufteseid is not Norgeskart and is not operated by Kartverket. It is an
-independent, non-commercial hobby project built on the source code of
-Kartverket's Norgeskart. Map and elevation data come from Kartverket and
-Geonorge, heritage data from Riksantikvaren; nothing you find here has been
-vetted by any of them.
-
 The **Arkeologisk relieff** background is the one picture this project computes
 rather than fetches: relief visualizations made with the Relief Visualization
 Toolbox from Kartverket's LiDAR terrain model and stored as tiles
@@ -267,10 +247,6 @@ another acquisition offers it on the next page load with no rebuild. It
 need not be computed here either — `vat-cache/makevat.py` renders one
 acquisition into one self-contained file on whatever machine has the cores, and
 copying that file into the store is the whole of the deploy.
-
-The Toolbox is ZRC SAZU's, and its authors ask that work using the tools cite
-them. A figure whose relief came from it carries a short *metode:* line in its
-legend, pointing here:
 
 > Zakšek, K., Oštir, K., Kokalj, Ž. 2011. Sky-View Factor as a Relief
 > Visualization Technique. *Remote Sensing* 3: 398–415.

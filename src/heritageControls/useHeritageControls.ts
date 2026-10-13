@@ -1,5 +1,4 @@
-// On/off is the product of `activeThemeLayersAtom` (the ticked RA services) and
-// `heritageHiddenAtom` (a blind over all of them), so the ticks survive an off.
+
 
 import { useAtom, useAtomValue } from 'jotai';
 import { useCallback, useEffect, useState } from 'react';
@@ -20,7 +19,6 @@ import type { ThemeLayerName } from '../map/layers/themeWMS';
 import { sketchSessionAtom } from '../sketch/session';
 import { TYPING_SURFACE } from '../ui/hints';
 
-/** `k` for kulturminner. */
 const TOGGLE_KEY = 'k';
 
 export const useHeritageControls = () => {
@@ -35,8 +33,7 @@ export const useHeritageControls = () => {
   const sitesShown = sources.has(RESHAPEABLE_THEME_LAYER);
 
   const toggleShown = useCallback(() => {
-    // With nothing ticked, arm the overlay rather than raise a blind over an
-    // empty selection.
+
     if (sources.size === 0) {
       setSources(new Set([RESHAPEABLE_THEME_LAYER]));
       setHidden(false);
@@ -45,7 +42,6 @@ export const useHeritageControls = () => {
     setHidden(!hidden);
   }, [sources, hidden, setSources, setHidden]);
 
-  // Excalidraw binds its own single-letter shortcuts while the canvas is up.
   const penHasTheMap = useAtomValue(sketchSessionAtom) !== null;
   useEffect(() => {
     if (penHasTheMap) return;
@@ -67,7 +63,7 @@ export const useHeritageControls = () => {
       else next.add(id);
       return next;
     });
-    // The blind covers every source at once, so ticking one has to raise it.
+
     if (!sources.has(id)) setHidden(false);
   };
 
@@ -91,8 +87,6 @@ export const useHeritageControls = () => {
     };
   }, [map]);
 
-  // Every RA service is capped below city scale, so the overlay can be on and
-  // drawing nothing. The floor is the lowest of the ticked sources'.
   const floor = Math.min(
     ...Array.from(sources, (id) => themeLayerMinZoom(id) ?? -Infinity),
   );
@@ -103,7 +97,7 @@ export const useHeritageControls = () => {
     toggleShown,
     sources,
     toggleSource,
-    /** kulturminner2 is ticked, so its registers and renders are on offer. */
+
     sitesShown,
     details,
     toggleDetail,

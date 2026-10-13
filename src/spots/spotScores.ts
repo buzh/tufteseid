@@ -13,17 +13,10 @@ import {
 import { currentUserAtom } from '../auth/atoms';
 import { spotRecordsAtom } from './spotRecords';
 
-/** Tally per spot id. Null until the first list lands; a spot missing from the
- *  map has no votes rather than an unknown score. */
 export const spotScoresAtom = atom<Map<string, SpotScore> | null>(null);
 
-/** The reader's own vote per spot id. Empty when signed out — the list rule
- *  hands a guest nothing. */
 export const myVotesAtom = atom<Map<string, VoteRecord>>(new Map());
 
-/** Every public spot, best first, `updated` breaking a tie so the order is
- *  stable rather than the fetch's. Unvoted ones are in it at zero, and the
- *  tallies are not waited on: unranked reads better than a spinner. */
 export const popularSpotsAtom = atom((get): SpotRecord[] | null => {
   const records = get(spotRecordsAtom);
   if (!records) return null;
@@ -36,10 +29,6 @@ export const popularSpotsAtom = atom((get): SpotRecord[] | null => {
     );
 });
 
-/** Mounted once, by `SpotSurface`. PocketBase publishes no realtime feed on a
- *  view, so `spotScores` is fetched and `votes` subscribed to instead — which
- *  means a tally moves on the reader's own vote and picks up everybody else's
- *  at the next full fetch. */
 export const useSpotScores = () => {
   const user = useAtomValue(currentUserAtom);
   const setScores = useSetAtom(spotScoresAtom);
@@ -77,8 +66,6 @@ export const useSpotScores = () => {
     const unsubscribe = subscribeVotes((action, record) => {
       if (!live) return;
 
-      // An admin's list rule covers every account's votes, so the feed
-      // carries rows this reader never cast. They move a tally, not a thumb.
       if (record.owner === user?.id) {
         setMyVotes((previous) => {
           const next = new Map(previous);
@@ -88,7 +75,6 @@ export const useSpotScores = () => {
         });
       }
 
-      // The vote moved, so the tally did too. Only this spot's row is stale.
       void getSpotScore(record.spot).then((score) => {
         if (!live) return;
         if (score) byId.set(record.spot, score);

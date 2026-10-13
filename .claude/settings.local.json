@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add *)",
+      "Bash(git commit -m 'tighten CLAUDE.md comment rule and clean evidence/ directory *)"
+    ]
+  }
+}

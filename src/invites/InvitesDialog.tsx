@@ -1,6 +1,4 @@
-// What a reader can do with the invites an administrator has granted them:
-// mint one, copy its link, or have the backend mail it. The quota itself is
-// granted by hand in SQL (docs/closed-beta.md) — nothing here hands one out.
+
 
 import {
   ActionIcon,
@@ -39,15 +37,11 @@ const validationCode = (err: unknown, field: 'email' | 'issuer'): string =>
   (err as { response?: { data?: Record<string, { code?: string }> } })?.response
     ?.data?.[field]?.code ?? '';
 
-/** The hook tells SMTP's failure apart from a bad address, so the reader
- *  learns whether it is theirs or the installation's fault. */
 const sendFailure = (err: unknown): string =>
   validationCode(err, 'email') === 'mail_failed'
     ? 'invites.mailFailed'
     : 'invites.sendFailed';
 
-/** The quota only refreshes on the next page load, so a mint the hook refuses
- *  is the ordinary way for a stale count to be found out. */
 const mintFailure = (err: unknown): string =>
   validationCode(err, 'issuer') === 'invite_quota_spent'
     ? 'invites.quotaSpent'
@@ -81,10 +75,6 @@ const InviteRow = ({
       .catch(() => setCopied(false));
   };
 
-  // Cleared in `finally`, not in the catch: the row survives a successful
-  // send — `onChanged` refetches rather than remounting it — and a row left
-  // busy is one whose revoke button never comes back, which is the way out of
-  // a mistyped address.
   const send = () => {
     setBusy(true);
     setFailure(null);
@@ -192,24 +182,15 @@ export const InvitesDialog = () => {
     [],
   );
 
-  // Re-read on every opening, and leave the last list up while it lands: the
-  // only way it changes behind the reader's back is somebody spending one.
   useEffect(() => {
     if (!open) return;
     void load();
   }, [open, load]);
 
-  // Every row counts against the quota, redeemed or not, so the two numbers
-  // add up to it and revoking an unspent one moves both. Only the rows
-  // somebody has yet to come in on are worth listing — a redeemed invite is
-  // nothing the reader can act on.
   const minted = invites?.length ?? 0;
   const left = (user?.inviteQuota ?? 0) - minted;
   const outstanding = invites?.filter((invite) => invite.redeemedAt === '');
 
-  // Only an installation that asked for a cap says anything about one. A code
-  // is still good while it is full — it just buys a queued account, which is
-  // worth knowing before the reader sends one (docs/identity.md).
   const cap = capacity && capacity.max > 0 ? capacity : null;
 
   const mint = () => {

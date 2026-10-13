@@ -1,9 +1,3 @@
-"""What ground a LiDAR acquisition actually covers, and where to sample it.
-
-`sum(SHAPE.AREA)` is not the coverage: the mosaic catalogue carries one row per
-raster plus a row per overview level, and every level re-covers the whole
-project. Rasterise the union of the footprints instead.
-"""
 
 from pathlib import Path
 
@@ -12,22 +6,18 @@ import numpy as np
 from acquisitions import slug
 from fetch_dem import catalogue
 
-CELL = 25.0  # rasterisation cell, metres
+CELL = 25.0
 
 HERE = Path(__file__).resolve().parent
 
-
 def footprints(project):
-    """Catalogue rows with geometry, for one LAS_PROJECT_NAME."""
     return catalogue(
         f"LAS_PROJECT_NAME = '{project}'",
         out_fields=["OBJECTID", "CATEGORY", "LOWPS", "SHAPE.AREA"],
         geometry=True,
     )["features"]
 
-
 def rasterise(features, cell=CELL):
-    """Even-odd scanline fill of the union. Returns (mask, (x0, x1, y0, y1), cell)."""
     rings = [np.asarray(r) for f in features for r in f["geometry"]["rings"]]
     xs = np.concatenate([r[:, 0] for r in rings])
     ys = np.concatenate([r[:, 1] for r in rings])
@@ -65,9 +55,7 @@ def rasterise(features, cell=CELL):
         mask |= sub
     return mask, (x0, x1, y0, y1), cell
 
-
 def sample_sites(mask, bounds, cell, count=6, side_m=1024.0, seed=7):
-    """Centres where a side_m square sits wholly inside coverage, spread apart."""
     x0, _x1, y0, _y1 = bounds
     h, w = mask.shape
     integral = np.cumsum(np.cumsum(mask.astype(np.int32), 0), 1)
@@ -94,8 +82,7 @@ def sample_sites(mask, bounds, cell, count=6, side_m=1024.0, seed=7):
         if len(candidates) > 4000:
             break
     if not candidates:
-        # No square of this size fits inside the footprint; ordinary for small
-        # supplementary acquisitions, and the build needs no sites.
+
         return np.empty((0, 2))
     candidates = np.array(candidates)
 
@@ -108,13 +95,7 @@ def sample_sites(mask, bounds, cell, count=6, side_m=1024.0, seed=7):
         picked.append(candidates[int(np.argmax(d))])
     return np.array(picked)
 
-
 def tile_fill(mask, cell, tile_m, grid_origin=(-2500000.0, 9045984.0), mask_origin=None):
-    """Tiles touched, and their mean covered fraction, on the app's tile grid.
-
-    grid_origin is the EPSG:25833 top-left the app's TileGrid uses
-    (src/map/layers/wmsTileGrid.ts, origin = [extent[0], extent[3]]).
-    """
     h, w = mask.shape
     mx0, my0 = mask_origin
     gx0, gy0 = grid_origin
@@ -132,21 +113,16 @@ def tile_fill(mask, cell, tile_m, grid_origin=(-2500000.0, 9045984.0), mask_orig
     hit = counts > 0
     return int(hit.sum()), float((counts[hit] / per_tile).mean())
 
-
 def mask_file(project, directory=None):
-    """Where this acquisition's mask lives."""
     return Path(directory or HERE) / f"coverage-{slug(project)}.npz"
 
-
 def load_or_build(project, directory=None):
-    """The acquisition's mask, derived on first use. Returns its path."""
     path = mask_file(project, directory)
     if not path.exists():
         print(f"no mask for {project!r} yet; deriving {path.name}\n")
         build_mask(project, path)
         print()
     return path
-
 
 def build_mask(project, out):
     feats = footprints(project)
@@ -174,8 +150,7 @@ def build_mask(project, out):
         bounds=np.array(bounds),
         cell=cell,
         sites=sample_sites(mask, bounds, cell),
-        # build_tiles.py checks this stamp: a mask paired with another
-        # acquisition's DEM fails silently, writing no tiles but marking done.
+
         project=project,
     )
     print(f"\n  wrote {Path(out).name} (mask, bounds, cell, sites, project)")

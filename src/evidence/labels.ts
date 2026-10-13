@@ -1,4 +1,4 @@
-// The module-level `t` is deliberate: these are strings rather than components.
+
 import { t } from 'i18next';
 
 import type { EvidenceKind, EvidenceRecord } from '../api/evidence';
@@ -69,7 +69,6 @@ export const exportLabel = (state: {
         : 'export.label',
   );
 
-/** Where the row stands, or what it came out at once it stands nowhere. */
 export const renderNote = (
   rec: EvidenceRecord,
   state: RenderState | undefined,
@@ -83,8 +82,6 @@ export const renderNote = (
     : '';
 };
 
-// Which knobs the visualization actually answered to: a sun angle under a
-// Skyview would be a fact about nothing.
 const terrainFacts = (
   spec: Extract<EvidenceSpec, { kind: 'terrain' }>,
 ): string[] => {
@@ -112,14 +109,9 @@ const terrainFacts = (
   return facts;
 };
 
-// The mosaic is cited by the resolution the render came out at, so only a
-// named acquisition is a fact of its own.
 const sourceFacts = (source: string): string[] =>
   source === AUTO_SOURCE ? [] : [source];
 
-// Everything true of a row before any pixel of it exists. Separate from
-// `evidenceFacts` because a row about to render still holds the previous
-// figures.
 export const specFacts = (spec: EvidenceSpec): string[] => {
   switch (spec.kind) {
     case 'lidar': {
@@ -133,11 +125,11 @@ export const specFacts = (spec: EvidenceSpec): string[] => {
     case 'terrain':
       return terrainFacts(spec);
     case 'flyfoto':
-      // Already `YYYY-MM-DD` off the catalogue.
+
       if (spec.photoDate) return [spec.photoDate];
       return spec.year != null ? [String(spec.year)] : [];
     case 'sunloop':
-      // No azimuth: it is every azimuth, which is what the frame count says.
+
       return [
         spec.model.toUpperCase(),
         ...sourceFacts(spec.source),
@@ -145,13 +137,12 @@ export const specFacts = (spec: EvidenceSpec): string[] => {
         t('evidence.facts.zFactor', { z: spec.zFactor }),
         t('evidence.facts.frames', { n: Math.round(360 / spec.stepDeg) }),
       ];
-    // Every other parameter is RVT's own; the blend's name already says it.
+
     case 'rvt':
       return [spec.model.toUpperCase(), ...sourceFacts(spec.source)];
   }
 };
 
-// Source facts, render resolution and date, in the order they would be cited.
 export const evidenceFacts = (rec: EvidenceRecord): string[] => {
   const spec = specOf(rec);
   const facts: string[] = spec ? specFacts(spec) : [];

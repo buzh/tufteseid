@@ -1,4 +1,4 @@
-/* Shared by `VoteControl` and `StarControl`, which stand side by side. */
+
 
 .group {
   display: flex;
@@ -7,7 +7,6 @@
   gap: calc(2px * var(--ui-scale));
 }
 
-/* Tabular figures so the row does not shift as a tally crosses 9 or 99. */
 .tally {
   min-width: 2ch;
   color: var(--mantine-color-dimmed);

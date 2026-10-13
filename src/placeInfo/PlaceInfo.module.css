@@ -1,4 +1,4 @@
-/* The overlay element is `pointer-events: none`; this box takes it back. */
+
 .popup {
   box-sizing: border-box;
   width: 90vw;
@@ -31,8 +31,6 @@
   overflow-wrap: anywhere;
 }
 
-/* The second line of the coordinate row: the same point, said in the grid the
-   renders are made on. */
 .rowAside {
   color: var(--mantine-color-dimmed);
   font-size: var(--mantine-font-size-xs);
@@ -84,8 +82,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* `pointer-events: none`, or the banner would be the one place on the map a
-   lookup cannot be asked for. */
 .prompt {
   position: absolute;
   top: var(--mantine-spacing-xs);

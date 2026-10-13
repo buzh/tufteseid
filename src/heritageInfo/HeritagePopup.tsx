@@ -109,8 +109,7 @@ const NestedEnkeltminner = ({
 
 const HeritageLinks = ({ summary }: { summary: HeritageSummary }) => {
   const { t } = useTranslation();
-  // RA serves a Kulturminnesøk link for every record, but some land on an empty
-  // page; the status arrives after this render, so mark rather than withhold.
+
   const missing = useKulturminnesokStatus(summary.kulturminnesok) === 'missing';
 
   if (!summary.askeladden && !summary.kulturminnesok) return null;
@@ -170,7 +169,7 @@ const HeritageCard = ({
     summary.dateringer,
     t('kulturminner.flereDateringer'),
   );
-  // Registers with no noun of ours fall back to their own layer title.
+
   const kindLabel = t(`kulturminner.${summary.kind}`, {
     defaultValue: summary.layerTitle,
   });

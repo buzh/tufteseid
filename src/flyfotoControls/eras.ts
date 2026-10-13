@@ -1,8 +1,5 @@
 import type { FlyfotoProject } from '../map/layers/config/backgroundLayers/flyfotoProjects';
 
-// Breaks in the Norwegian aerial archive: digital omløp from 2010, colour from
-// 1990, systematic national coverage from 1960. Labels are year ranges, so they
-// are not translated.
 export const FLYFOTO_ERAS = [
   { id: 'e2010', from: 2010, to: null },
   { id: 'e1990', from: 1990, to: 2009 },
@@ -30,7 +27,7 @@ const inEra = (p: FlyfotoProject, era: FlyfotoEra): boolean => {
   const def = FLYFOTO_ERAS.find((e) => e.id === era);
   if (!def) return true;
   const year = projectYear(p);
-  // Undated rows appear only under "Alle".
+
   if (year == null) return false;
   return (
     (def.from == null || year >= def.from) && (def.to == null || year <= def.to)

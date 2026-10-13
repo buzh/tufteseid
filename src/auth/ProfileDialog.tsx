@@ -1,8 +1,4 @@
-// The reader's own `users` row, theirs to edit again
-// (`1700002900_user_profile.js`): a name, a picture and a line about
-// themselves. The two things that can take the account away — the address and
-// the password — sit apart and each costs the current password
-// (`docs/identity.md`).
+
 
 import {
   Alert,
@@ -34,14 +30,10 @@ import {
 import styles from './ProfileDialog.module.css';
 import { badFields } from './session';
 
-// Must match `users.description` in `1700002900_user_profile.js`.
 const ABOUT_MAX = 120;
 
-// What the stock `avatar` field will take.
 const PICTURES = 'image/png,image/jpeg,image/webp,image/gif,image/svg+xml';
 
-/** Both refusals are the route's own `ValidationError`, named in
- *  `pb_hooks/profile.pb.js`; the field is enough to tell them apart. */
 const emailFailure = (err: unknown): string => {
   const fields = badFields(err);
   if (fields.includes('password')) return 'profile.email.wrongPassword';
@@ -49,8 +41,6 @@ const emailFailure = (err: unknown): string => {
   return 'profile.email.failed';
 };
 
-/** PocketBase's own, off the upsert form: `oldPassword` for one that does not
- *  match, `password` for one too short to take. */
 const passwordFailure = (err: unknown): string => {
   const fields = badFields(err);
   if (fields.includes('oldPassword')) return 'profile.password.wrongOld';
@@ -62,16 +52,13 @@ const ProfileForm = ({ user }: { user: SiteUser }) => {
   const { t } = useTranslation();
   const [name, setName] = useState(user.name);
   const [about, setAbout] = useState(user.description ?? '');
-  // undefined leaves the stored picture alone, null drops it, a File replaces
-  // it — the three states `ProfileEdit.avatar` is written against.
+
   const [picture, setPicture] = useState<File | null | undefined>(undefined);
   const [preview, setPreview] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  // The URL is minted where the file is picked, so all an effect is left to
-  // do is let the previous one go — on the next pick and on unmount alike.
   useEffect(
     () => (preview ? () => URL.revokeObjectURL(preview) : undefined),
     [preview],
@@ -98,8 +85,7 @@ const ProfileForm = ({ user }: { user: SiteUser }) => {
       avatar: picture,
     })
       .then(() => {
-        // Back to "leave it alone": the row now holds what was picked, and
-        // the stored thumbnail takes the preview's place.
+
         setPreview(null);
         setPicture(undefined);
         setSaved(true);
@@ -371,15 +357,11 @@ export const ProfileDialog = () => {
 
   if (!user) return null;
 
-  // Mantine unmounts the content, so the three forms start over by
-  // themselves; this one lives out here and has to be put back by hand.
   const close = () => {
     setChangingPassword(false);
     setOpen(false);
   };
 
-  // The old token died with the old password and the new session did not
-  // land, so there is nothing left to edit — the sign-in box is next.
   const sessionLost = () => {
     close();
     openSignIn(true);
@@ -417,3 +399,4 @@ export const ProfileDialog = () => {
     </Modal>
   );
 };
+

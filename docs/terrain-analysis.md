@@ -117,8 +117,6 @@ any pixels: the envelope, `spatialRel=esriSpatialRelIntersects`,
   in-tab (`coverageCache`); a failed probe is `'unknown'`, distinct from
   `'none'`, and is evicted.
 - Probed on the bare rectangle, fetched on rectangle + margin: otherwise the
-  margin can pull in a finer neighbouring acquisition and resample the whole
-  grid to a resolution the rectangle itself has no data for.
 
 ### The margin and the three extents
 
@@ -190,8 +188,6 @@ square had data (`docs/render-sidecar.md`).
 ## Constraints that look like bugs
 
 - **`MULTI_AZIMUTHS` spans three quadrants, not the full circle.** Six azimuths
-  225…90 weighted 3/4/5/4/3/2, peaking at 315°. Equal weights around the whole
-  circle cancel the directional term and collapse the blend to a slope map.
 - **`SVF_MAX_RADIUS_PX` (24) is a budget on *steps*, not metres.** Reach is
   bought by decimating: `horizonDecimation` averages down to no coarser than
   `HORIZON_MIN_M_PER_PX` (1 m), scans, then bilinearly interpolates back masked
@@ -211,8 +207,6 @@ square had data (`docs/render-sidecar.md`).
 - **A direction with no readable cell reads as a flat horizon**, not as NaN;
   sky-view floors the horizon angle at level ground, openness must not.
 - **Slope and negative openness are painted on a reversed grey ramp.** Negative
-  openness is high in a depression; straight, it would put ditches in white
-  while sky-view beside it puts them in black. RVT inverts the same two.
 - **Nearest-neighbour when the render is scaled up** (`terrainLayer.ts`) —
   smoothing blurs away the single-pixel step the picture exists to show.
 
@@ -253,9 +247,6 @@ does.
   distance. RVT's `svf_noise` is not a filter but an inner radius, taken as
   `innerMetres`.
 - **Sun and exaggeration are frozen**: `VAT_AZIMUTH` 315, `VAT_Z_FACTOR` 1
-  (against the app's z-factor 2 default), stretches absolute. Two VAT renders
-  are comparable; two sky-view renders are not. Wiring the azimuth slider to VAT
-  would break that silently.
 - **All four layers are computed on one grid** at `VAT_SCAN_M_PER_PX` (0.5 m,
   RVT's calibration resolution) via `vatDecimation`, and only the finished
   composite is interpolated back. Mixing resolutions between layers breaks the

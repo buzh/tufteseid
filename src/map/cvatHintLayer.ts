@@ -15,12 +15,8 @@ import { sortProjectsByRelevance } from './layers/config/backgroundLayers/lidarP
 import { LIDAR_LAYERS } from './layers/config/backgroundLayers/stack';
 import { getXYZLayer } from './layers/config/backgroundLayers/utils';
 
-/** Must stay outside the `bg.` namespace: `swapBackgroundLayers` sweeps every
- *  `bg.` layer that is not in the stack it is installing. */
 const CVAT_HINT_ID_PREFIX = 'cvatHint.';
 
-// Over every ground (0), under hybrid's topo overlay (0.75). See the z-order
-// table in `docs/map-layers.md`.
 const CVAT_HINT_Z_INDEX = 0.5;
 
 const hintLayers = (map: OlMap): BaseLayer[] =>
@@ -29,21 +25,17 @@ const hintLayers = (map: OlMap): BaseLayer[] =>
     .getArray()
     .filter((l) => String(l.get('id') ?? '').startsWith(CVAT_HINT_ID_PREFIX));
 
-/** One acquisition's layer. `getXYZLayer` supplies the culling — the extent,
- *  and the boundary mask inside it — without which every acquisition takes
- *  hundreds of 404s per pan (`docs/map-layers.md`). */
 const buildHintLayer = (acquisition: CvatAcquisition) => {
   const layer = getXYZLayer(buildCvatGroundConfig(acquisition));
   if (!layer) return null;
   layer.set('id', `${CVAT_HINT_ID_PREFIX}${acquisition.path}`);
   layer.setZIndex(CVAT_HINT_Z_INDEX);
-  // Deep end of the band; the coarse end is the config's `maxResolution`.
+
   layer.setMinResolution(AUTO_ENGAGE_M_PER_PX);
   layer.setVisible(false);
   return layer;
 };
 
-/** Mount once. */
 export const useCvatHintLayer = () => {
   const map = useAtomValue(mapAtom);
   const mode = useAtomValue(viewModeAtom);
@@ -63,7 +55,7 @@ export const useCvatHintLayer = () => {
   }, []);
 
   useEffect(() => {
-    // Worst first: layers sharing a z-index draw in the order they were added.
+
     const ordered = [...cached]
       .sort((a, b) => sortProjectsByRelevance(a.project, b.project))
       .reverse();

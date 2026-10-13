@@ -1,4 +1,4 @@
-// One (source × style) stitched at that source's native ground resolution.
+
 
 import { isUpstreamDown } from '../upstream/health';
 import { LidarSource, nativeResolutionMetersPerPx } from './sources';
@@ -9,10 +9,8 @@ import {
   runWithConcurrency,
 } from './stitch';
 
-// Past ~4, wmscache starts answering 502 under normal map-browsing load.
 const MAX_CONCURRENT_TILES = 4;
 
-// Transient 5xx during bursts is common upstream.
 const TILE_MAX_RETRIES = 3;
 const TILE_RETRY_BASE_MS = 500;
 
@@ -25,7 +23,6 @@ type TileJob = {
   ctx: CanvasRenderingContext2D;
 };
 
-// 'aborted' is not counted: the run it belonged to is gone.
 type TileOutcomeKind = 'painted' | 'blank' | 'failed' | 'aborted';
 
 async function paintTile(
@@ -49,8 +46,7 @@ async function paintTile(
     } catch (err) {
       lastErr = err;
       if (signal.aborted) return { kind: 'aborted' };
-      // Refused by the breaker: no request went out, so there is nothing to
-      // back off from.
+
       if (isUpstreamDown(err)) break;
       if (attempt < TILE_MAX_RETRIES) {
         await sleep(TILE_RETRY_BASE_MS * 2 ** attempt, signal);
@@ -71,8 +67,6 @@ export type ExtractedCanvas = {
   bbox25833: [number, number, number, number];
 };
 
-/** `null` when nothing painted and nothing failed — no coverage; a run where
- *  every tile errored throws instead. */
 export async function extractCanvas(
   bbox25833: [number, number, number, number],
   source: LidarSource,
@@ -115,17 +109,15 @@ export async function extractCanvas(
     signal?.removeEventListener('abort', abort);
   }
 
-  // Throwing, not null: null means "no coverage" and is acted on below.
   if (signal?.aborted) throw new Error('extract cancelled');
 
-  // A network blip must not be reported as no coverage.
   if (painted === 0 && failed > 0) {
     throw new Error(`every tile failed: ${source.label} / ${style}`);
   }
   if (painted === 0) return null;
   return {
     canvas,
-    // What the stitch produced: planTiles scales down past its canvas cap.
+
     metresPerPx: (bbox25833[2] - bbox25833[0]) / plan.widthPx,
     widthPx: plan.widthPx,
     heightPx: plan.heightPx,

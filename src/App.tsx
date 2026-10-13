@@ -7,8 +7,7 @@ import { MapComponent } from './map/MapComponent.tsx';
 import { Ribbon } from './ribbon/Ribbon.tsx';
 
 export const App = () => {
-  // Mirrors PocketBase's authStore into `currentUserAtom`; mounted here because
-  // several surfaces read it.
+
   useAtom(pbAuthSyncEffect);
 
   return (

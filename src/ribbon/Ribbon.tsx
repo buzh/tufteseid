@@ -15,9 +15,7 @@ export const Ribbon = () => {
 
   return (
     <>
-      {/* Hidden rather than taken down for a drawing: each arm's controller
-          remembers something across a visit elsewhere — the flyfoto era, the
-          dataset lists — and an unmount would lose it and fetch it again. */}
+      {}
       <header className={cx(styles.ribbon, drawing && styles.away)}>
         <div className={styles.side}>
           <GroundSection half="a" />

@@ -22,13 +22,9 @@ import {
   isProfileDialogOpenAtom,
 } from './atoms';
 
-// The GoAccess report Caddy serves out of the stats bind mount, and
-// PocketBase's own dashboard behind the same proxy path as its API.
 const STATS_URL = '/stats/';
 const POCKETBASE_ADMIN_URL = `${getEnv().pocketbaseUrl.replace(/\/$/, '')}/_/`;
 
-// Not a `Menu.Item`: those close the dropdown on click, and the reader wants to
-// see what the other size looks like before letting go of it.
 const UiScaleSection = () => {
   const { t } = useTranslation();
   const [scale, setScale] = useAtom(uiScaleAtom);
@@ -96,8 +92,7 @@ export const AuthButton = () => {
       <Menu.Dropdown>
         <Menu.Label>
           <Group gap="xs" wrap="nowrap">
-            {/* Only ever their own: `users` is closed to everybody else, so
-                nobody else's picture can be read (`docs/identity.md`). */}
+            {}
             <Avatar
               size={20}
               radius="xl"
@@ -158,8 +153,7 @@ export const AuthButton = () => {
         <Menu.Item
           leftSection={<Icon icon="logout" size={16} />}
           onClick={() => {
-            // The account box draws nothing without an account, but the atom
-            // would otherwise have it up again on the next sign-in.
+
             setProfileOpen(false);
             pb.authStore.clear();
           }}

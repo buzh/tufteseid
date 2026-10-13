@@ -1,19 +1,10 @@
-"""Combined VAT: parameters and layer order transcribed from RVT's own
-`VAT_Combined.rft.xml`, with `rvt.vis` and `rvt.blend_func` doing the work.
-
-`rvt.blend.BlenderCombination` would hold the order too, but importing it pulls
-in `osgeo.gdal`. Radii are RVT's, stated in pixels against a 0.5 m DEM.
-"""
 
 import numpy as np
 from rvt.blend_func import blend_images, normalize_image, render_images
 from rvt.vis import byte_scale, hillshade, sky_view_factor, slope_aspect
 
-# byte_scale is re-exported so the writer quantises with RVT's rule: 0..1 -> 0..255,
-# NaN -> 255.
 __all__ = ["VAT_PRESETS", "byte_scale", "cvat", "radii_for"]
 
-# VAT_general.rft.xml and VAT_flat.rft.xml, verbatim.
 VAT_PRESETS = {
     "general": {
         "sun_elevation": 35,
@@ -36,14 +27,12 @@ VAT_PRESETS = {
 SUN_AZIMUTH = 315
 N_DIRECTIONS = 16
 VE_FACTOR = 1
-# VAT_Combined.rft.xml: general over flat, normal, 50 %.
+
 COMBINED_OPACITY = 50
-# The resolution RVT's pixel radii were calibrated at.
+
 CALIBRATION_M_PER_PX = 0.5
 
-
 def _stack(dem, resolution, preset, radius_scale):
-    """One VAT preset -> 0..1. Layers are listed bottom-first, as RVT orders them."""
     r_max = max(1, int(round(preset["svf_r_max"] * radius_scale)))
     horizon = sky_view_factor(
         dem,
@@ -79,30 +68,14 @@ def _stack(dem, resolution, preset, radius_scale):
         if rendered is None:
             rendered = norm
             continue
-        # RVT quirk, reproduced: blend_overlay writes through `background`, so on
-        # the openness layer `top` and `background` alias and its 50 % does nothing.
+
         top = blend_images(mode, norm, rendered)
         rendered = render_images(top, rendered, opacity)
     return rendered
 
-
 def cvat(dem, resolution, radius_in_metres=True):
-    """Combined VAT as a float array in 0..1. NaN where the DEM has none.
-
-    `radius_in_metres` scales RVT's pixel radii to hold the 0.5 m reach in metres;
-    False uses them as written."""
     scale = CALIBRATION_M_PER_PX / resolution if radius_in_metres else 1.0
-    general = _stack(dem, resolution, VAT_PRESETS["general"], scale)
-    flat = _stack(dem, resolution, VAT_PRESETS["flat"], scale)
-    return render_images(blend_images("normal", general, flat), flat,
-                         COMBINED_OPACITY)
 
-
-def radii_for(resolution, radius_in_metres=True):
-    """(r_max, r_min) in pixels and metres, per preset, for the manifest."""
-    scale = CALIBRATION_M_PER_PX / resolution if radius_in_metres else 1.0
-    # svf_noise is a level 0-3; rvt.vis.sky_view_factor maps it to r_min as a
-    # percentage of r_max via sc_svf_r_min.
     r_min_pct = (0.0, 10.0, 20.0, 40.0)
     out = {}
     for name, preset in VAT_PRESETS.items():
@@ -116,14 +89,13 @@ def radii_for(resolution, radius_in_metres=True):
         }
     return out
 
-
 if __name__ == "__main__":
     import time
 
     rng = np.random.default_rng(0)
     n = 512
     y, x = np.mgrid[0:n, 0:n].astype(np.float32)
-    # A hillside, a bank and a ditch, plus 3 cm of noise.
+
     dem = 0.04 * x + 0.01 * y
     dem += 0.6 * np.exp(-(((y - 200) / 6.0) ** 2))
     dem -= 0.5 * np.exp(-(((y - 320) / 4.0) ** 2))

@@ -4,7 +4,6 @@
   align-items: center;
 }
 
-/* Only so `:focus-visible` below has something to raise. */
 .unit > * {
   position: relative;
 }
@@ -20,7 +19,6 @@
   border-end-end-radius: 0;
 }
 
-/* Without this the lapped neighbour paints out the ring on the seam side. */
 .unit > :focus-visible {
   z-index: 1;
 }

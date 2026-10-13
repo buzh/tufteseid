@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { CRS_WKT, worldExtension, worldFile } from '../../src/export/georef';
 import type { Metric } from '../../src/map/bbox';
 
-// A 500 m square — the largest footprint the app allows — at 0.25 m/px.
 const BBOX: Metric = [250000, 6650000, 250500, 6650500];
 const SIDE_PX = 2000;
 
@@ -23,7 +22,6 @@ describe('worldFile', () => {
     expect(yRes).toBeCloseTo(-0.25, 10);
   });
 
-  // Rows run down the image and northings run up the grid.
   it('negates the y pixel size and leaves the rotations at zero', () => {
     const [, rotY, rotX, yRes] = linesOf(BBOX, SIDE_PX, SIDE_PX);
     expect(rotY).toBe(0);
@@ -31,8 +29,6 @@ describe('worldFile', () => {
     expect(yRes).toBeLessThan(0);
   });
 
-  // A world file names the centre of the top-left pixel, not its corner: half
-  // a pixel out is a whole pixel of misregistration against the ground.
   it('anchors on the centre of the top-left pixel', () => {
     const [, , , , originX, originY] = linesOf(BBOX, SIDE_PX, SIDE_PX);
     expect(originX).toBeCloseTo(250000 + 0.125, 6);
@@ -51,7 +47,6 @@ describe('worldFile', () => {
     expect(worldFile([250000, 6650000, 250000, 6650500], 10, 10)).toBeNull();
   });
 
-  // Eastings run to seven figures, so millimetres need ten decimals.
   it('keeps enough decimals for a millimetre at UTM 33 eastings', () => {
     const text = worldFile(BBOX, SIDE_PX, SIDE_PX);
     expect(text?.split('\n')[0]).toBe('0.2500000000');

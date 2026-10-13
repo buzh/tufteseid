@@ -1,20 +1,11 @@
 # Tufteseid — armchair archaeology on Norwegian public data
 
-Map viewer for reading Norwegian LiDAR terrain against the Riksantikvaren
-heritage register (Kulturminner). React + Mantine + OpenLayers SPA, a Caddy
-static server, and a handful of caching sidecars in front of Kartverket,
-Geonorge, Riksantikvaren and Norge i bilder.
-
 Hard fork of Kartverket's Norgeskart, not tracking upstream. The pre-rebuild
 app is on the `legacy` branch.
 
 **Scope**: Kulturminner theme layers, LiDAR hillshade and per-project LiDAR
 backgrounds, LiDAR tile extract, client-side terrain analysis, place/property
 search, and a record of the reader's own (`spots`).
-
-**De-branded on purpose**: no Norgeskart naming or Kartverket visual identity in
-user-visible strings, page titles, export filenames or assets. Attribution
-belongs in prose (README, LICENCE), not in the app.
 
 Surfaces are Mantine primitives styled from `src/ui/theme.ts`: anthracite
 ground, papaya accent, **dark only**. There is no light scheme, so CSS that
@@ -203,9 +194,6 @@ moves an account's address, which PocketBase refuses on a self-PATCH
 - **Collection ids must not equal any collection name** (0.23+ rejects that),
   hence `pbc_localities` / `finds2` / `pbc_attachments`.
 - **Ordering**: PocketBase applies all of its built-in Go migrations during
-  bootstrap and only then registers the JS ones, whatever the timestamps say. A
-  JS migration can never run before a core one; anything that must precede a
-  core migration happens out of band against a stopped database.
 - **Sign-in is PocketBase's own password auth**, versioned in
   `1700002500_password_auth.js` rather than left to the admin UI, and
   `oauth2` is switched off with its `providers` cleared — a config left

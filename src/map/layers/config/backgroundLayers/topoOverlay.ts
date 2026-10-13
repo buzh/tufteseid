@@ -6,8 +6,6 @@ const OVERLAY_URL = {
   contours: '/cache/topo-ref-contours/{z}/{x}/{y}.png',
 };
 
-// wms.topo's declared EPSG:25833 bounds; without it OL takes the grid from the
-// projection extent and asks for tiles over open ocean.
 const TOPO_COVERAGE_EXTENT_25833: CoverageExtent = {
   extent: [-127998, 6377920, 1145510, 7976800],
   crs: 'EPSG:25833',

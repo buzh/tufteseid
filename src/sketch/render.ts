@@ -1,10 +1,5 @@
-// `exportToCanvas` frames on the drawing's common bounds grown by
-// `exportPadding`, not on the viewport, so the placement below uses those same
-// bounds.
 
-// Must stay above the imports below: `excalidraw()` is a second way into the
-// editor bundle, which reads the font path off the global as it evaluates, and
-// a short link renders here without `SketchCanvas` ever mounting.
+
 import './excalidrawAssets';
 import type { Extent } from 'ol/extent';
 import { transformExtent } from 'ol/proj';
@@ -12,18 +7,14 @@ import { transformExtent } from 'ol/proj';
 import { sceneToCoord, type SketchFrame } from './frame';
 import type { SceneElement } from './scene';
 
-// Scene units. Common bounds are the geometry's, so a stroke sits partly
-// outside them; this is Excalidraw's own default padding for that.
 const EXPORT_PADDING = 10;
 
-// A frame budget, not a storage one: the overlay re-exports on every zoom step.
-// The shared layer asks for less, having many drawings up at once.
 const MAX_RENDER_PIXELS = 16000000;
 
 export type SceneRender = {
-  /** Transparent. */
+
   canvas: HTMLCanvasElement;
-  /** Ground the canvas covers, in EPSG:25833 — the overlay's own projection. */
+
   extent25833: [number, number, number, number];
 };
 
@@ -36,9 +27,6 @@ const excalidraw = (): Promise<ExcalidrawModule> => {
   return modulePromise;
 };
 
-/** Never throws; null when there is nothing to draw or the export failed.
- *  `scale` is device pixels per scene unit, 1 being the resolution the drawing
- *  was made at. */
 export const renderScene = async (
   frame: SketchFrame,
   elements: readonly SceneElement[],
@@ -55,10 +43,6 @@ export const renderScene = async (
     return null;
   }
 
-  // Restored before the bounds are read: `exportToCanvas` restores again and
-  // frames on that, so leaving it to do both would put the placement and the
-  // pixels on two rectangles. Guarded because `sketchOf` checks the frame, not
-  // the elements.
   let restored: ReturnType<ExcalidrawModule['restoreElements']>;
   let bounds: ReturnType<ExcalidrawModule['getCommonBounds']>;
   try {
@@ -94,8 +78,7 @@ export const renderScene = async (
         viewBackgroundColor: 'transparent',
         exportWithDarkMode: false,
       },
-      // Annotated: the package gives this callback's parameters no contextual
-      // type, which `noImplicitAny` rejects.
+
       getDimensions: (width: number, height: number) => ({
         width: Math.max(1, Math.round(width * drawn)),
         height: Math.max(1, Math.round(height * drawn)),
@@ -107,8 +90,6 @@ export const renderScene = async (
     return null;
   }
 
-  // Scene y runs down, projected y up: the scene's top-left is the ground's
-  // north-west, so the extent is assembled, not mapped corner for corner.
   const [west, north] = sceneToCoord(
     frame,
     minX - EXPORT_PADDING,
@@ -135,8 +116,6 @@ export const renderScene = async (
   };
 };
 
-/** `extent` is EPSG:25833, as the render is. Both overlays draw into an
- *  `ImageCanvasSource`. */
 export const paintRender = (
   ctx: CanvasRenderingContext2D,
   render: SceneRender,

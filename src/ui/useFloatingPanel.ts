@@ -1,7 +1,4 @@
-// A `Panel` that floats over the map: dragged by its title row, resized from a
-// corner grip, and docked by being pushed through a wall. The placement lives
-// in module-level atoms, so it survives a component that remounts — and so only
-// one floating panel can be up at a time.
+
 
 import { atom, useAtom } from 'jotai';
 import {
@@ -13,47 +10,33 @@ import {
 } from 'react';
 import { uiScaleFactor } from './uiScale';
 
-/** `wide` is a bar along an edge, `tall` a column down one. */
 export type PanelLayout = 'wide' | 'tall';
 
 type Side = 'left' | 'right' | 'top' | 'bottom';
 
 type Size = { width: number; height: number };
 
-/** How big the box may get, never how big it is. Absent means the layout's own
- *  ceiling stands: only the grip sets one of these. */
 type Ceiling = { maxWidth?: number; maxHeight?: number };
 
 type Placement = Ceiling & {
-  /** The wall it is stuck to, or null for a box standing free. */
+
   side: Side | null;
-  /** The corner it hangs from. The axis a dock pins is read off `side`
-   *  instead, so one of these is ignored while docked. */
+
   left: number;
   top: number;
 };
 
 const panelLayoutAtom = atom<PanelLayout>('wide');
 
-/** Null until the box has been moved, resized or docked: until then the
- *  layout's own CSS places it. */
 const panelPlacementAtom = atom<Placement | null>(null);
 
-/** Floors for the ceiling: under these the box has nothing to show. */
 const MIN_WIDTH = 260;
 const MIN_HEIGHT = 140;
 
-/** `--mantine-spacing-xs`, the gap every box on the map keeps from the edge.
- *  A dock is flush with that gap, not with the pixel. */
 const GUTTER = 10;
 
-/** All three are the small UI's pixels, and everything they are measured
- *  against scales with the reader's preference (`src/ui/uiScale.ts`). */
 const scaled = (px: number) => px * uiScaleFactor();
 
-/** A wall implies a shape: down the side is a column, along the top or the
- *  bottom a bar. The layout's own ceilings are what make a column narrow, so a
- *  dock keeps none of its own and drops any the grip had set. */
 const LAYOUT_OF: Record<Side, PanelLayout> = {
   left: 'tall',
   right: 'tall',
@@ -61,8 +44,6 @@ const LAYOUT_OF: Record<Side, PanelLayout> = {
   bottom: 'wide',
 };
 
-/** The map rectangle the box floats over. The box is absolutely positioned, so
- *  its offset parent is the one positioned element around the map. */
 const parentOf = (box: HTMLElement): HTMLElement | null =>
   box.offsetParent instanceof HTMLElement ? box.offsetParent : null;
 
@@ -71,8 +52,6 @@ const boundsOf = (parent: HTMLElement): Size => ({
   height: parent.clientHeight,
 });
 
-/** What the box came out at, which under a ceiling is its content and no
- *  more. Both gestures measure rather than trust the stored ceiling. */
 const rectOf = (box: HTMLElement, parent: HTMLElement) => {
   const mine = box.getBoundingClientRect();
   const theirs = parent.getBoundingClientRect();
@@ -87,16 +66,11 @@ const rectOf = (box: HTMLElement, parent: HTMLElement) => {
 const between = (value: number, least: number, most: number) =>
   Math.min(Math.max(value, least), Math.max(least, most));
 
-/** A corner the box can be grabbed back from: wholly inside the map, given
- *  what it currently measures. */
 const inside = (left: number, top: number, size: Size, within: Size) => ({
   left: between(left, 0, within.width - size.width),
   top: between(top, 0, within.height - size.height),
 });
 
-/** The wall a box has been pushed through, and the hardest one when it is a
- *  corner. A box at rest keeps the gutter, so no ordinary nudge reaches a wall
- *  by accident. */
 const wallCrossed = (
   at: { left: number; top: number },
   size: Size,
@@ -114,15 +88,11 @@ const wallCrossed = (
   return past[worst] > 0 ? worst : null;
 };
 
-/** Flush against one wall. A column is pinned to the top of its side; a bar
- *  keeps the run it was dragged to, or it would slide out from under the hand
- *  that put it there. */
 const dockedTo = (side: Side, at: { left: number; top: number }): Placement =>
   side === 'left' || side === 'right'
     ? { side, left: scaled(GUTTER), top: scaled(GUTTER) }
     : { side, left: at.left, top: scaled(GUTTER) };
 
-/** A dock pins the axis it is a wall of; the other keeps its corner. */
 const styleOf = (placed: Placement): CSSProperties => ({
   left: placed.side === 'right' ? undefined : placed.left,
   right: placed.side === 'right' ? scaled(GUTTER) : undefined,
@@ -135,9 +105,7 @@ const styleOf = (placed: Placement): CSSProperties => ({
 type Gesture = {
   mode: 'move' | 'resize';
   at: { left: number; top: number };
-  /** What the box measured when the press landed. The ceiling may be higher;
-   *  it is the pixels on screen that a wall is crossed by and that the grip
-   *  is dragged from. */
+
   size: Size;
   ceiling: Ceiling;
   within: Size;
@@ -151,8 +119,6 @@ export const useFloatingPanel = () => {
   const boxRef = useRef<HTMLDivElement>(null);
   const gesture = useRef<Gesture | null>(null);
 
-  // Choosing a layout is also the way back: a box docked or dragged somewhere
-  // unhelpful is put right by asking for the shape it should have had.
   const setLayout = useCallback(
     (next: PanelLayout) => {
       setLayoutAtom(next);
@@ -161,9 +127,6 @@ export const useFloatingPanel = () => {
     [setLayoutAtom, setPlacement],
   );
 
-  // A window resized under the box leaves it off the map — as does one resized
-  // between two uses, hence the pass on mount too. A dock survives it: the wall
-  // it names is an anchor, not a number.
   useEffect(() => {
     const onResize = () => {
       const box = boxRef.current;
@@ -182,10 +145,9 @@ export const useFloatingPanel = () => {
 
   const start =
     (mode: Gesture['mode']) => (event: ReactPointerEvent<HTMLElement>) => {
-      // Primary button only: the context menu swallows a right-click's
-      // `pointerup`, so that drag would never end.
+
       if (!event.isPrimary || event.button !== 0) return;
-      // The close and the layout switch share the title row with the handle.
+
       if (mode === 'move' && (event.target as HTMLElement).closest('button')) {
         return;
       }
@@ -198,9 +160,7 @@ export const useFloatingPanel = () => {
         mode,
         at: { left: rect.left, top: rect.top },
         size: rect,
-        // A ceiling the grip has set is kept across a move; one it has not is
-        // not invented here, or the box would freeze at the size its content
-        // happened to need.
+
         ceiling: {
           maxWidth: placement?.maxWidth,
           maxHeight: placement?.maxHeight,
@@ -209,8 +169,7 @@ export const useFloatingPanel = () => {
         x: event.clientX,
         y: event.clientY,
       };
-      // Deliberately writes no placement: a press that turns out to be a click
-      // must leave the box on the layout's own CSS anchor.
+
     };
 
   const move = (event: ReactPointerEvent<HTMLElement>) => {
@@ -221,8 +180,7 @@ export const useFloatingPanel = () => {
     const dy = event.clientY - held.y;
 
     if (held.mode === 'resize') {
-      // Off the corner the box is drawn at, not off the ceiling: the grip is
-      // where the hand is, and a ceiling above the content is not.
+
       setPlacement({
         side: null,
         left: at.left,
@@ -241,22 +199,19 @@ export const useFloatingPanel = () => {
       return;
     }
 
-    // Unclamped on purpose: a box pushed through a wall is what asks for the
-    // dock, and a docked box is inside the map again.
     const pushed = { left: at.left + dx, top: at.top + dy };
     const side = wallCrossed(pushed, size, within);
     if (!side) {
       setPlacement({ side: null, ...pushed, ...ceiling });
       return;
     }
-    // Switching the layout here rather than on release is what makes the wall a
-    // preview of the dock.
+
     setLayoutAtom(LAYOUT_OF[side]);
     setPlacement(dockedTo(side, inside(pushed.left, pushed.top, size, within)));
   };
 
   const end = (event: ReactPointerEvent<HTMLElement>) => {
-    // A pointer that was refused above never took the capture.
+
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
@@ -274,8 +229,7 @@ export const useFloatingPanel = () => {
     layout,
     setLayout,
     boxRef,
-    /** Moved, resized or docked, so the layout's own anchor no longer
-     *  applies. */
+
     placed: placement !== null,
     placementStyle: placement ? styleOf(placement) : undefined,
     dragHandle: handlers('move'),

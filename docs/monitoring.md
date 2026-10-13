@@ -6,9 +6,6 @@
 | Are we being rude to the upstreams | wmscache access log in `docker compose logs` | `scripts/usage-report.sh` → printed digest |
 | Is it healthy | both, plus `df`, plus `live-check.sh` | `scripts/health-check.sh`, from cron |
 
-Both scripts are server-only and invoked by hand or cron, not daemons. GoAccess
-runs as a throwaway container. There is no client-side analytics.
-
 ## First run
 
 ```sh

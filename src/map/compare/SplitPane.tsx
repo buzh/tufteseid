@@ -1,5 +1,4 @@
-// A viewport for the second OL map. Releasing the target on unmount stops it
-// rendering but keeps its layers.
+
 
 import { useEffect, useRef } from 'react';
 import styles from './SplitPane.module.css';

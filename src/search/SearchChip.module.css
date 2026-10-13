@@ -1,7 +1,4 @@
-/* Collapsed, the field is chip-sized and the magnifier is all there is to see;
-   the focus widens it in place. The tools are the one section the band never
-   takes room from, so the widening is capped against the viewport rather than
-   left to run the ground arms off the screen (`docs/architecture.md`). */
+
 .box {
   position: relative;
   display: flex;
@@ -83,8 +80,6 @@
   color: var(--mantine-color-dimmed);
 }
 
-/* `min-width: 0` so the two lines may be ellipsised: a flex item is as wide as
-   its content until it is told otherwise. */
 .rowText {
   min-width: 0;
 }

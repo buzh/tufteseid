@@ -38,7 +38,6 @@ const ICONS: Record<BoxTool, MaterialSymbol> = {
   eraser: 'ink_eraser',
 };
 
-// Long enough not to fire on an ordinary press, short enough to be found.
 const HOLD_MS = 350;
 
 type Choose = (tool: BoxTool, locked: boolean) => void;
@@ -46,10 +45,9 @@ type Choose = (tool: BoxTool, locked: boolean) => void;
 type ToolButtonProps = {
   icon: MaterialSymbol;
   label: string;
-  /** Left out by the note button, which does a thing rather than being a
-   *  state: `aria-pressed="false"` would promise a toggle that is not there. */
+
   on?: boolean;
-  /** Marks the corner, so a button with more under it looks like one. */
+
   grouped?: boolean;
   ref?: Ref<HTMLButtonElement>;
 } & Omit<ComponentPropsWithoutRef<'button'>, 'className'>;
@@ -80,8 +78,6 @@ const ToolButton = ({
   </Tooltip>
 );
 
-/** A press picks the member being shown, a hold opens the rest. Which member
- *  that is is the last one picked, remembered by `pen.ts`. */
 const ToolGroup = ({
   members,
   current,
@@ -117,8 +113,7 @@ const ToolGroup = ({
           icon={ICONS[current]}
           on={live.tool === current}
           label={t(`spots.penTool.${current}`)}
-          // Set here rather than left to `Popover.Target`, which hands its
-          // props to the `Tooltip` in between and gets no further.
+
           aria-haspopup="true"
           aria-expanded={open}
           onPointerDown={() => {
@@ -128,8 +123,7 @@ const ToolGroup = ({
             }, HOLD_MS);
           }}
           onPointerUp={() => {
-            // Still counting: released before the flyout opened, so an
-            // ordinary press.
+
             const press = held.current != null;
             cancel();
             if (press) {
@@ -141,8 +135,7 @@ const ToolGroup = ({
           onPointerLeave={cancel}
         />
       </Popover.Target>
-      {/* Portalled, so it is outside the strip and needs the same guard against
-          taking focus off Excalidraw's container. */}
+      {}
       <Popover.Dropdown
         className={styles.flyout}
         onPointerDown={(event) => event.preventDefault()}
@@ -204,9 +197,7 @@ export const SketchTools = ({
       className={styles.strip}
       role="toolbar"
       aria-label={t('spots.penTools')}
-      // `handleKeyboardGlobally` is off, so Excalidraw's shortcuts are bound to
-      // its own container: a press that moved focus out here would lose them
-      // until the reader clicked back. Tabbing in still works.
+
       onPointerDown={(event) => event.preventDefault()}
     >
       <div className={styles.row}>
@@ -286,8 +277,7 @@ export const SketchTools = ({
                   )}
                   onClick={() => set({ width: width.value })}
                 >
-                  {/* A 1 px bar on a button reads as a hairline crack, so the
-                      bars are the widths plus one. */}
+                  {}
                   <span
                     className={styles.bar}
                     style={{

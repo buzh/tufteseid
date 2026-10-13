@@ -1,24 +1,7 @@
 /// <reference path="../pb_data/types.d.ts" />
-//
-// The closed beta, enforced. `1700002000_closed_beta.js` has the collections
-// and `docs/closed-beta.md` the SQL for opening slots and granting invites.
-//
-// None of this could be an API rule: a rule cannot count a reader's invites
-// or decrement a counter.
-//
-// Registrations and nothing else. Every handler runs in a runtime of its own
-// and cannot see this file's scope, so each one requires what it needs — see
-// `closed_beta.js`, which is where the logic lives and why.
 
-// Registration. Every account comes into being through the record-create API
-// on `users`, so this one hook covers all of them.
-//
-// The transaction is what keeps a refusal from leaking a free place: the
-// counter is spent before `e.next()` writes the row, and a throw from either
-// rolls both back. Reassigning `e.app` is what makes the inner handlers write
-// through the same transaction.
 onRecordCreateRequest((e) => {
-  // An administrator adding somebody by hand is not a registration.
+
   if (e.hasSuperuserAuth()) {
     e.next();
     return;
@@ -26,11 +9,11 @@ onRecordCreateRequest((e) => {
 
   const beta = require(`${__hooks}/closed_beta.js`);
 
-  // `requestInfo()`, not `e.request`, which a record event does not carry
-  // however much the types suggest otherwise — only a route event does. The
-  // keys are snake-cased by `inflector.Snakecase`, the same normalization
-  // behind `@request.headers.*` in a collection rule, so `X-Invite-Code`
-  // arrives as `x_invite_code`.
+
+
+
+
+
   const code = e.requestInfo().headers['x_invite_code'] || '';
 
   const outerApp = e.app;
@@ -40,7 +23,7 @@ onRecordCreateRequest((e) => {
       const invite = beta.admit(txApp, code);
       e.next();
       if (invite) {
-        // Only now does the account have an id.
+
         invite.set('redeemedBy', e.record.id);
         txApp.save(invite);
       }
@@ -50,9 +33,6 @@ onRecordCreateRequest((e) => {
   }
 }, 'users');
 
-// Minting an invite. The create rule has already established that the reader
-// is signed in and is the issuer; what it cannot say is how many they have
-// left.
 onRecordCreateRequest((e) => {
   const beta = require(`${__hooks}/closed_beta.js`);
   const outerApp = e.app;
@@ -67,13 +47,6 @@ onRecordCreateRequest((e) => {
   }
 }, 'invites');
 
-// Sending an invite. A route of its own rather than an update rule, because
-// the reader may set the address but nothing else, and because the row is
-// only marked sent once the mail is actually away.
-//
-// One mail per invite and nothing beyond it: what an invite costs is the
-// quota row it was minted against, never the letter. A reader who mistyped
-// the address revokes the invite and mints another.
 routerAdd(
   'POST',
   '/api/invites/{id}/send',
@@ -84,9 +57,9 @@ routerAdd(
     e.bindBody(body);
 
     const email = String(body.email || '').trim();
-    // Shape is the `EmailField`'s to judge, below, so that what SMTP is handed
-    // is exactly what the row will hold. Empty is this one's: the field is not
-    // required, so '' would save.
+
+
+
     if (!email) throw new BadRequestError('Ugyldig e-postadresse.');
 
     let invite;
@@ -104,11 +77,11 @@ routerAdd(
       throw new BadRequestError('Invitasjonen er allerede sendt.');
     }
 
-    // Judged by the `EmailField` itself rather than by a second rule here,
-    // which would disagree with it sooner or later, and judged before the
-    // mail rather than after: an address the row will not hold must not be
-    // one a letter has already gone to. `validate` writes nothing, so only
-    // the save below can fail on anything but the address, and that is a 500.
+
+
+
+
+
     invite.set('email', email);
     try {
       e.app.validate(invite);
@@ -123,8 +96,8 @@ routerAdd(
       e.app
         .logger()
         .error('invite mail failed', 'error', String(err), 'invite', invite.id);
-      // 502 rather than 500: the installation's SMTP settings are the usual
-      // cause, and the invite is still good to pass on by hand.
+
+
       throw new ApiError(502, 'Fikk ikke sendt invitasjonen.', {
         email: new ValidationError(
           'mail_failed',

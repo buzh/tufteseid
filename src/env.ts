@@ -7,14 +7,13 @@ type layerProviderParameters = {
 type Env = {
   apiUrl: string;
   geoNorgeApiBaseUrl: string;
-  // Same-origin path proxied by Caddy to the pocketbase container.
+
   pocketbaseUrl: string;
-  // Likewise, to the render sidecar.
+
   renderUrl: string;
   layerProviderParameters: layerProviderParameters;
 };
 
-// Compiled-in defaults; every field is overridable at runtime from config.js.
 const DEFAULT_ENV: Env = {
   apiUrl: 'https://api.norgeskart.no',
   geoNorgeApiBaseUrl: 'https://ws.geonorge.no',

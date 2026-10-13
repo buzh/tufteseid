@@ -26,14 +26,12 @@ import { ControlChip } from '../ui/ControlChip';
 import { Icon } from '../ui/Icon';
 import styles from './SpotMenu.module.css';
 
-/** How many rows before the list gets a filter over it. */
 const FILTER_FROM = 8;
 
 const LIST_MAX_HEIGHT = 340;
 
 type Tab = 'mine' | 'favourites' | 'popular';
 
-/** Which empty and failure line each tab reads with. */
 const TAB_COPY = {
   mine: { empty: 'spots.mine.empty', failed: 'spots.mine.failed' },
   favourites: {
@@ -63,8 +61,6 @@ export const SpotMenu = () => {
   const [tab, setTab] = useState<Tab>('popular');
   const [query, setQuery] = useState('');
 
-  // The ranking needs no account, so the menu opens for a guest too. The
-  // other two tabs are the reader's own and ask for one.
   const ownTab = tab === 'mine' || tab === 'favourites';
   const spots =
     tab === 'mine' ? mine : tab === 'favourites' ? favourites : popular;
@@ -84,15 +80,14 @@ export const SpotMenu = () => {
   const title = drafting
     ? t('spots.list.busy')
     : signedIn && mine
-      ? // `total`, not `count`: i18next reads `count` as a request for
-        // plural forms this key has none of.
+      ?
+
         t('spots.mine.count', { total: mine.length })
       : t('spots.list.label');
 
   const row = (spot: SpotRecord) => {
     const open = spot.id === active?.id;
-    // Absent from the view means nobody has voted or starred, not an
-    // unknown tally.
+
     const score = scores?.get(spot.id)?.score ?? 0;
     const stars = starCounts?.get(spot.id)?.stars ?? 0;
     return (
@@ -108,8 +103,7 @@ export const SpotMenu = () => {
         }
       >
         <Group gap="xs" wrap="nowrap" justify="space-between">
-          {/* `miw={0}` so the name can be ellipsised: a flex item is as wide
-              as its content unless told it may be narrower. */}
+          {}
           <Text size="sm" truncate miw={0}>
             {spot.name}
           </Text>

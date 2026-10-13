@@ -3,7 +3,7 @@ import BaseLayer from 'ol/layer/Base';
 import ImageLayer from 'ol/layer/Image';
 import Layer from 'ol/layer/Layer';
 import TileLayer from 'ol/layer/Tile';
-// Aliased: OpenLayers' `Map` would shadow the global one the memo below uses.
+
 import type OLMap from 'ol/Map';
 import { ImageWMS, TileWMS } from 'ol/source';
 import { fetchWithin } from '../../shared/utils/deadline';
@@ -18,14 +18,9 @@ import { DEFAULT_INFO_FORMAT } from './types';
 
 export type QueryableWMSLayer = TileLayer | ImageLayer<ImageWMS>;
 
-// Not `getVisible()`, which is only the checkbox: a layer with a `minZoom`
-// still reports visible below it. `isVisible` folds in the zoom, resolution and
-// extent limits.
 const isRendering = (layer: BaseLayer, map: OLMap): boolean =>
   layer instanceof Layer && layer.isVisible(map.getView());
 
-/** The WMS layers a click can be put to: queryable, drawing at this zoom, and
- *  among `ids`. */
 export const getQueryableWMSLayers = (
   map: OLMap,
   ids: ReadonlySet<string>,
@@ -358,7 +353,6 @@ const remember = (key: string, features: FeatureInfoFeature[]) => {
   memo.set(key, features);
 };
 
-/** Well under wmscache's 30 s read timeout. */
 const FEATURE_INFO_DEADLINE_MS = 12_000;
 
 export const fetchLayerFeatureInfo = async (

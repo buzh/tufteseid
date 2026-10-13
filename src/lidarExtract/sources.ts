@@ -1,5 +1,4 @@
-// Each style is its own named layer (`<prefix>:skyggerelieff`), so "styles"
-// here is the set of layer suffixes advertised under a prefix.
+
 
 import {
   bboxIntersects,
@@ -13,9 +12,6 @@ import {
   stylesForModel,
 } from '../map/layers/config/backgroundLayers/lidarProjects';
 
-// The catalogue's own name for the seamless best-available ground, not a
-// user-visible string: it is written into a kept render's provenance and has to
-// read the same years later, in any locale.
 export const NATIONAL_LIDAR_LABEL = 'Nasjonal mosaikk';
 
 export type LidarSource = {
@@ -26,13 +22,10 @@ export type LidarSource = {
   pointDensity: string | null;
   model: LidarModel;
   wmsUrl: string;
-  layerPrefix: string; // 'NHM_DTM_25833' or the project name
+  layerPrefix: string;
   styles: string[];
 };
 
-// `stylesForModel` is not optional: DOM publishes only `skyggerelieff`, and
-// asking it for `multiskyggerelieff` answers HTTP 200 with a JSON body the
-// browser decodes as a broken image.
 export const nationalLidarSource = (
   nationalStyles: string[],
   model: LidarModel,
@@ -48,9 +41,6 @@ export const nationalLidarSource = (
   styles: stylesForModel(nationalStyles, model),
 });
 
-// The only namer of a flight's `LidarSource.key`, which is also what a kept
-// render stores as `sourceKey` and is found again by — including the cached
-// VAT, whose pixels come from our own store rather than from a source here.
 export const projectSourceKey = (projectName: string): string =>
   `project:${projectName}`;
 
@@ -65,12 +55,11 @@ export const projectLidarSource = (
   pointDensity: p.pointDensity,
   model,
   wmsUrl: LIDAR_PROJECT_WMS_URL[model],
-  // The same string for both services; the DOM WMS uses the project name too.
+
   layerPrefix: p.projectName,
   styles: stylesForModel(p.styles, model),
 });
 
-// bbox in EPSG:4326.
 export async function enumerateLidarSources(
   bboxLonLat: [number, number, number, number],
   model: LidarModel,
@@ -88,8 +77,6 @@ export async function enumerateLidarSources(
   return [nationalLidarSource(nationalStyles, model), ...overlapping];
 }
 
-// 0.25 m is the data's floor: the per-project models are published on a 0.25 m
-// grid and 10 pkt/m² is 0.32 m mean spacing.
 export function nativeResolutionMetersPerPx(source: LidarSource): number {
   if (source.kind === 'national') return 1;
   const d = source.pointDensity;

@@ -32,7 +32,7 @@ export const MapComponent = () => {
   const viewMode = useAtomValue(viewModeAtom);
   useAtom(themeLayerEffect);
   useAtom(backgroundLayerAtomEffect);
-  // Also runs the WFS pass that fills `lidarViewportAtom`.
+
   useLidarFootprintsLayer();
   useCvatHintLayer();
   useAtom(compareLayerAtomEffect);
@@ -50,9 +50,6 @@ export const MapComponent = () => {
     };
   }, [setTargetElement, mapRef]);
 
-  // From a mount rather than module scope, and after the target is set: the
-  // seed the restore writes over is only as full as the import graph that has
-  // been evaluated.
   useEffect(() => {
     restoreCompare();
   }, [restoreCompare]);

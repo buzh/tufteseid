@@ -15,8 +15,6 @@ import { PIN_Z_INDEX, draftPinStyle, withinDraftPin } from './pinStyle';
 
 type Store = ReturnType<typeof useStore>;
 
-/** The pin's position in view coordinates, or null: an interaction can
- *  outlive the draft it was mounted for. */
 const positionIn = (store: Store, view: string) => {
   const current = store.get(spotDraftAtom);
   if (!current) return null;
@@ -30,9 +28,6 @@ export const useSpotPinAdjust = () => {
   const open = draft?.box === 'editor';
   const placing = draft?.stage === 'pin';
 
-  // The pin is drawn for the whole of an editor draft; the drag interaction
-  // below runs only in the `pin` stage, since the sketch canvas covers the map.
-  // A card draft gets none: the box behind it shows no pin either.
   useEffect(() => {
     if (!open) return;
     const view = map.getView().getProjection().getCode();
@@ -53,8 +48,7 @@ export const useSpotPinAdjust = () => {
 
     redraw();
     map.addLayer(layer);
-    // Subscribed rather than taken as a dependency: the drag writes the draft
-    // every frame, and rebuilding the layer to follow it would be costly.
+
     const unsubscribe = store.sub(spotDraftAtom, redraw);
 
     return () => {

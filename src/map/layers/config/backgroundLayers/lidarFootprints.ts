@@ -10,13 +10,10 @@ const TYPE_NAME = 'metadata_prosjekt:Prosjektavgrensning';
 
 export type LidarFootprint = {
   project: LidarProject;
-  // A project can appear as several disjoint WFS features; keep every part.
+
   geometries: Geometry[];
 };
 
-// By name, never by BBOX: the ArcGIS spatial filter silently under-returns for
-// narrow boxes, and wide ones are uncompressed GeoJSON (4.4 MB at 33 km, 504
-// past 65 km). URLSearchParams handles the URL encoding.
 const buildNameFilter = (projectName: string): string => {
   const literal = projectName
     .replace(/&/g, '&amp;')
@@ -31,9 +28,6 @@ const buildNameFilter = (projectName: string): string => {
   );
 };
 
-// A fallback only: a few catalogue names differ from the WFS spelling by the
-// density token alone, but 81 name groups differ by nothing else and would
-// collapse onto one footprint if this were the primary key.
 const stripDensity = (name: string): string =>
   name
     .replace(/\b\d+\s*(pkt|pnt)\b/gi, '')
@@ -42,7 +36,6 @@ const stripDensity = (name: string): string =>
 
 const YEAR_TOLERANCE = 2;
 
-// Per page; a page takes 300-900 ms, and six of these run at once.
 const PAGE_TIMEOUT_MS = 12000;
 
 type WfsProperties = {
@@ -55,8 +48,6 @@ const crsUrn = (projection: string): string | undefined => {
   return m ? `urn:ogc:def:crs:EPSG::${m[1]}` : undefined;
 };
 
-// The legacy `crs` member this ArcGIS-backed WFS sets when output is not WGS84,
-// whether or not SRSNAME was honoured.
 const epsgFromCrsMember = (doc: unknown): string | undefined => {
   const name = (doc as { crs?: { properties?: { name?: string } } })?.crs
     ?.properties?.name;
@@ -65,12 +56,9 @@ const epsgFromCrsMember = (doc: unknown): string | undefined => {
   return m ? `EPSG:${m[1]}` : undefined;
 };
 
-// A boundary is static, so entries never expire; bounded by count instead, an
-// entry being 10s-100s kB.
 const MAX_CACHE_ENTRIES = 400;
 const cache = new Map<string, Promise<LidarFootprint | null>>();
 
-// Map iterates in insertion order, so re-inserting on read makes eviction LRU.
 const readCache = (key: string): Promise<LidarFootprint | null> | undefined => {
   const hit = cache.get(key);
   if (!hit) return undefined;
@@ -88,20 +76,16 @@ const writeCache = (key: string, value: Promise<LidarFootprint | null>) => {
   }
 };
 
-// Features per request. Truncation raises nothing — an over-long boundary comes
-// back as a valid short FeatureCollection — so the query pages until a page
-// comes back short.
 const PAGE_SIZE = 100;
-// Cap so a service that ignores STARTINDEX cannot loop on the same page.
+
 const MAX_PAGES = 25;
 
 type NameQueryResult = {
   geometries: Geometry[];
-  // The paging stopped short of exhausting the rows.
+
   truncated: boolean;
 };
 
-// One WFS name query, paged; null means no rows for that name.
 const requestByName = async (
   project: LidarProject,
   projectName: string,
@@ -139,8 +123,6 @@ const requestByName = async (
     });
     if (features.length === 0) break;
 
-    // The same row opening two consecutive pages means STARTINDEX was ignored
-    // and the rest are unreachable.
     const firstId = features[0].getId();
     if (firstId != null && firstId === previousFirstId) {
       truncated = true;
@@ -150,7 +132,7 @@ const requestByName = async (
 
     for (const feature of features) {
       const props = feature.getProperties() as WfsProperties;
-      // Beyond YEAR_TOLERANCE it is a different project under the same name.
+
       const wfsYear = props.AARSTALL != null ? Number(props.AARSTALL) : null;
       if (
         project.year != null &&
@@ -171,7 +153,6 @@ const requestByName = async (
   return geometries.length > 0 ? { geometries, truncated } : null;
 };
 
-// One project's boundary in `projection`, or null if the WFS has none.
 const fetchOne = (
   project: LidarProject,
   projection: string,
@@ -194,8 +175,6 @@ const fetchOne = (
 
   writeCache(key, promise);
 
-  // Entries never expire, so anything short of the whole answer comes back out.
-  // Only this promise's own entry: eviction may already have replaced the key.
   const forget = () => {
     if (cache.get(key) === promise) cache.delete(key);
   };
@@ -207,25 +186,22 @@ const fetchOne = (
   return promise;
 };
 
-// ~0.2 s per answer, but roughly one request in five hangs outright.
 const CONCURRENCY = 6;
 
 export type LidarFootprintFetch = {
-  /** Keyed by LidarProject.id; projects with no boundary are absent. */
+
   footprints: Map<string, LidarFootprint>;
-  /** Nothing was answered and something failed — a service outage, as opposed
-   *  to a viewport no flight covers. False for an empty candidate list. */
+
   unanswered: boolean;
 };
 
-// `projects` order is the fetch order, so pass the best candidates first.
 export async function fetchLidarFootprints(
   projects: LidarProject[],
   projection: string,
 ): Promise<LidarFootprintFetch> {
   const out = new Map<string, LidarFootprint>();
   const queue = [...projects];
-  // A null boundary is an answer: the WFS has no rows under that name.
+
   let answered = 0;
   let failed = 0;
   const worker = async () => {
@@ -238,7 +214,7 @@ export async function fetchLidarFootprints(
         if (footprint) out.set(project.id, footprint);
       } catch (err) {
         failed++;
-        // Breaker open: every remaining project would fail the same way.
+
         if (isUpstreamDown(err)) {
           queue.length = 0;
           return;
@@ -253,11 +229,8 @@ export async function fetchLidarFootprints(
   return { footprints: out, unanswered: answered === 0 && failed > 0 };
 }
 
-// Samples per axis. Grid-sampled because OL has no polygon intersection;
-// `extent` and `geometries` must share a metric CRS.
 const COVERAGE_GRID = 24;
 
-// How much of `extent` the footprint paints, 0..1.
 export const viewportCoverage = (
   geometries: Geometry[],
   extent: [number, number, number, number],
@@ -267,8 +240,6 @@ export const viewportCoverage = (
   const cellH = (extent[3] - extent[1]) / COVERAGE_GRID;
   if (cellW <= 0 || cellH <= 0) return 0;
 
-  // The sample sees no finer than a cell; getSimplifiedGeometry wants the
-  // tolerance squared.
   const tolerance = Math.min(cellW, cellH);
   const simplified = geometries.map((g) =>
     g.getSimplifiedGeometry(tolerance * tolerance),
@@ -285,10 +256,6 @@ export const viewportCoverage = (
   return hits / (COVERAGE_GRID * COVERAGE_GRID);
 };
 
-// Stricter than the coverage sample: real geometry, not the envelope. OL's
-// `intersectsExtent` walks every segment with no cheap rejection of its own,
-// and this runs per tile under `coverageMask`, so the boundary's own box goes
-// first — `getExtent` is memoised on the geometry.
 export const touchesExtent = (
   geometries: Geometry[],
   extent: [number, number, number, number],
