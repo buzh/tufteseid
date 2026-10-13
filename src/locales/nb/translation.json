@@ -411,6 +411,7 @@
     "play": "Lag bildet",
     "confirm": "Trykk en gang til",
     "busy": "Jobber, vennligst vent",
+    "largeSite": "Ikke klart for større områder ennå",
     "settings": "Innstillinger",
     "source": {
       "auto": "Beste dekning",
@@ -512,6 +513,7 @@
     },
     "footprintHint": "Dra rektangelet, hjørnene endrer størrelsen",
     "footprintSide": "{{metres}} m",
+    "footprintTiles": "{{metres}} m · {{tiles}} ruter",
     "footprintPending": "(automatisk)",
     "footprintChange": "Endre utsnittet",
     "footprintClamped": {

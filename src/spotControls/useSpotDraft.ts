@@ -15,6 +15,7 @@ import {
 } from '../api/spots';
 import { currentUserAtom } from '../auth/atoms';
 import { bboxWidthMetres } from '../map/bbox';
+import { mosaicTiles } from '../map/grid';
 import { suggestPlaceName } from '../search/placeNames';
 import { drawHoldAtom } from '../shared/uiContext';
 import { sketchShownAtom } from '../sketch/overlay';
@@ -65,6 +66,8 @@ export type SpotDraftController = {
   /** Leaving a stage writes what it changed. */
   setStage: (stage: SpotDraft['stage']) => void;
   footprintSideMetres: number | null;
+  /** How many render tiles the boundary covers; 1 is an ordinary single box. */
+  footprintTiles: number;
   /** The drawing the rectangle was derived from was smaller than `MIN_SIDE_M`
    *  or larger than `MAX_SIDE_M`, so the square is not what was drawn. */
   footprintClamped: 'min' | 'max' | null;
@@ -472,6 +475,7 @@ export const useSpotDraft = (
     footprintSideMetres: footprint
       ? Math.round(bboxWidthMetres(footprint))
       : null,
+    footprintTiles: footprint ? mosaicTiles(footprint).length : 1,
     footprintClamped,
     hasSketch: (sketch?.elements.length ?? 0) > 0,
     busy: writes > 0,

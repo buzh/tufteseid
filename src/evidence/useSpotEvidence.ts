@@ -20,7 +20,8 @@ import {
 } from '../api/evidence';
 import type { SpotRecord } from '../api/spots';
 import { currentUserAtom } from '../auth/atoms';
-import { bboxToMetric } from '../map/bbox';
+import { bboxFromMetric, bboxToMetric, type Bbox } from '../map/bbox';
+import { mosaicTiles } from '../map/grid';
 import { sunLoopLegend } from './legendContent';
 import { keepOfferAtom } from './offer';
 import { sortsForMove } from './order';
@@ -32,7 +33,12 @@ import {
   type RenderState,
 } from './queue';
 import type { Produced } from './render';
-import { evidenceMatches, metaOf, type EvidenceSpec } from './spec';
+import {
+  evidenceBbox,
+  evidenceMatches,
+  metaOf,
+  type EvidenceSpec,
+} from './spec';
 
 type KeepOffer = {
   spec: EvidenceSpec;
@@ -126,20 +132,27 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
 
   const footprint = spot.footprint;
 
-  const metric = useMemo(
-    () => (footprint ? bboxToMetric(footprint) : null),
+  // The render boxes the boundary covers: one free box within the cap, a grid of
+  // tiles past it (`src/map/grid.ts`). Every keep fans out across them.
+  const tiles = useMemo(
+    () => (footprint ? mosaicTiles(footprint) : []),
     [footprint],
   );
+  const metrics = useMemo(() => tiles.map(bboxToMetric), [tiles]);
 
   const offer = useMemo(
     () =>
-      metric && items && offered
+      metrics.length > 0 && items && offered
         ? {
             spec: offered,
-            kept: items.some((rec) => evidenceMatches(rec, offered, metric)),
+            // Kept only once every tile is covered; a half-filled mosaic still
+            // offers the keep that completes it.
+            kept: metrics.every((m) =>
+              items.some((rec) => evidenceMatches(rec, offered, m)),
+            ),
           }
         : null,
-    [offered, items, metric],
+    [offered, items, metrics],
   );
 
   const discard = useCallback(
@@ -152,12 +165,11 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
   );
 
   const render = useCallback(
-    (rec: EvidenceRecord, onRefused?: () => void) => {
-      if (!footprint) return;
+    (rec: EvidenceRecord, bbox4326: Bbox, onRefused?: () => void) => {
       enqueueRender({
         rec,
         onRefused,
-        bbox4326: footprint,
+        bbox4326,
         // Composed here: only the client knows the reader's language, and only
         // a sun loop's band is typeset by the sidecar.
         legend:
@@ -165,38 +177,52 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
         onDone: upsert,
       });
     },
-    [footprint, spot, language, upsert],
+    [spot, language, upsert],
   );
 
   const keep = useCallback(
     (spec: EvidenceSpec) => {
-      if (!user || !footprint) return;
+      if (!user || tiles.length === 0) return;
       setFailed(false);
-      createEvidence(
-        { spot: spotId, kind: spec.kind, meta: metaOf(spec) },
-        user.id,
-      )
-        .then((rec) => {
-          upsert(rec);
-          // A refused handover leaves no `meta.job`, and a row with neither
-          // pixels nor job reads as a render still on its way for as long as
-          // it stands — jamming every order chip behind it. Nothing was kept,
-          // so the row goes with it.
-          render(rec, () => {
-            discard(rec.id);
+      tiles.forEach((tile, i) => {
+        const metric = metrics[i];
+        // Only the tiles not yet covered: re-keeping fills the gaps a failed or
+        // interrupted mosaic left rather than doubling the ones that landed.
+        if (items?.some((rec) => evidenceMatches(rec, spec, metric))) return;
+        createEvidence(
+          // The tile's box is stamped up front so the kept check and a retry
+          // both know which tile this row is, before any pixels land. The render
+          // overwrites it with the box it achieved, the same tile within
+          // `BBOX_TOLERANCE_M`.
+          {
+            spot: spotId,
+            kind: spec.kind,
+            meta: { ...metaOf(spec), bbox25833: metric },
+          },
+          user.id,
+        )
+          .then((rec) => {
+            upsert(rec);
+            // A refused handover leaves no `meta.job`, and a row with neither
+            // pixels nor job reads as a render still on its way for as long as
+            // it stands — jamming every order chip behind it. Nothing was kept,
+            // so the row goes with it.
+            render(rec, tile, () => {
+              discard(rec.id);
+              setFailed(true);
+            });
+          })
+          .catch((err) => {
+            console.warn(
+              '[evidence] keep failed',
+              err,
+              (err as { response?: { data?: unknown } })?.response?.data,
+            );
             setFailed(true);
           });
-        })
-        .catch((err) => {
-          console.warn(
-            '[evidence] keep failed',
-            err,
-            (err as { response?: { data?: unknown } })?.response?.data,
-          );
-          setFailed(true);
-        });
+      });
     },
-    [user, footprint, spotId, upsert, render, discard],
+    [user, tiles, metrics, items, spotId, upsert, render, discard],
   );
 
   const keepProduced = useCallback(
@@ -237,6 +263,18 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
       }
     },
     [user, footprint, spotId, upsert, discard],
+  );
+
+  // Over the row's own tile, not the spot's boundary: a mosaic row remembers
+  // which tile it is in `meta.bbox25833`. Legacy single-box rows with no stamp
+  // fall back to the footprint, which is their tile.
+  const retry = useCallback(
+    (rec: EvidenceRecord) => {
+      const box = evidenceBbox(rec);
+      const bbox4326 = box ? bboxFromMetric(box) : footprint;
+      if (bbox4326) render(rec, bbox4326);
+    },
+    [render, footprint],
   );
 
   const reorder = useCallback(
@@ -287,7 +325,7 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
     offer,
     keep,
     keepProduced,
-    retry: render,
+    retry,
     remove,
     reorder,
     stateOf: useCallback(

@@ -16,6 +16,7 @@ import {
 import type { SpotEvidence } from '../evidence/useSpotEvidence';
 import { mapAtom } from '../map/atoms';
 import { bboxToMetric, bringBboxIntoView, type Bbox } from '../map/bbox';
+import { mosaicTiles } from '../map/grid';
 import { fetchFlyfotoProjectsForBbox } from '../map/layers/config/backgroundLayers/flyfotoProjects';
 
 type FlyfotoSpec = Extract<EvidenceSpec, { kind: 'flyfoto' }>;
@@ -123,7 +124,10 @@ export const useFlyfotoRun = (
   const start = useCallback(() => {
     const { footprint: bbox, evidence: held } = now.current;
     const items = held.items;
-    if (!bbox || !items) return;
+    // Proposed over the first render tile, not the whole boundary: a preview is
+    // for judging the acquisition, and keeping fans it out across every tile.
+    const box = bbox ? mosaicTiles(bbox)[0] : null;
+    if (!box || !items) return;
 
     finish();
     const ac = new AbortController();
@@ -131,10 +135,10 @@ export const useFlyfotoRun = (
     setPhase('listing');
     // The proposals are laid in this rectangle. Out only, never in: a view
     // already holding the footprint is the one the reader chose.
-    bringBboxIntoView(map, bbox);
+    bringBboxIntoView(map, box);
 
-    const metric = bboxToMetric(bbox);
-    fetchFlyfotoProjectsForBbox(bbox, ac.signal)
+    const metric = bboxToMetric(box);
+    fetchFlyfotoProjectsForBbox(box, ac.signal)
       .then((projects) => {
         if (ac.signal.aborted) return;
         const fresh: RunCard[] = [];
@@ -170,14 +174,15 @@ export const useFlyfotoRun = (
   useEffect(() => {
     const ac = alive.current;
     const bbox = now.current.footprint;
-    if (phase !== 'walking' || !ac || !bbox) return;
+    const box = bbox ? mosaicTiles(bbox)[0] : null;
+    if (phase !== 'walking' || !ac || !box) return;
 
     for (const card of cards.slice(0, PREVIEW_LANES + 1)) {
       const projectId = card.spec.projectId;
       if (card.state !== 'waiting' || started.current.has(projectId)) continue;
       started.current.add(projectId);
       patch(projectId, { state: 'rendering' });
-      enqueuePreview(card.spec, bbox, ac.signal)
+      enqueuePreview(card.spec, box, ac.signal)
         .then((produced) => {
           if (ac.signal.aborted) return;
           if (!produced) {
@@ -225,6 +230,18 @@ export const useFlyfotoRun = (
     const front = now.current.cards[0];
     const produced = front?.produced;
     if (!front || !produced || keepingNow.current) return;
+    const bbox = now.current.footprint;
+
+    // A boundary larger than one tile keeps the whole mosaic: the previewed tile
+    // was only the acquisition's audition, so `keep` re-renders every tile rather
+    // than storing the single previewed one.
+    if (bbox && mosaicTiles(bbox).length > 1) {
+      now.current.evidence.keep(front.spec);
+      drop();
+      setTally((prev) => ({ ...prev, kept: prev.kept + 1 }));
+      return;
+    }
+
     keepingNow.current = true;
     setKeeping(true);
     void now.current.evidence

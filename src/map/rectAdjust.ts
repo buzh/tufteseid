@@ -78,6 +78,11 @@ type RectAdjustOptions = {
   activeAtom: Atom<boolean>;
   /** Names the layer for the debug inspector. */
   layerId: string;
+  /** The square's largest side, in metres. Default `MAX_SIDE_M`. */
+  maxSideM?: number;
+  /** Run on the committed metric extent before it is written, e.g. to snap a
+   *  boundary to the tile grid. Default identity. */
+  snap?: (extent: Metric) => Metric;
 };
 
 /** Mount once per rectangle. Adds nothing to the map while it stands still. */
@@ -85,6 +90,8 @@ export const useRectangleAdjust = ({
   rectAtom,
   activeAtom,
   layerId,
+  maxSideM = MAX_SIDE_M,
+  snap,
 }: RectAdjustOptions) => {
   const map = useAtomValue(mapAtom);
   const adjusting = useAtomValue(activeAtom);
@@ -197,7 +204,7 @@ export const useRectangleAdjust = ({
         // The longer of the two reaches, so the corner stays under the hand on
         // one axis.
         const reach = Math.max(Math.abs(here[0] - ax), Math.abs(here[1] - ay));
-        const side = Math.min(Math.max(reach, MIN_SIDE_M), MAX_SIDE_M);
+        const side = Math.min(Math.max(reach, MIN_SIDE_M), maxSideM);
         const bx = ax + drag.sx * side;
         const by = ay + drag.sy * side;
         next = [
@@ -211,6 +218,10 @@ export const useRectangleAdjust = ({
     };
 
     const handleUpEvent = (): boolean => {
+      // Snapped on release, not per frame: the box drags freely and settles onto
+      // the grid when the hand lets go.
+      const extent = snap ? extentNow() : null;
+      if (extent && snap) store.set(rectAtom, bboxFromMetric(snap(extent)));
       drag = null;
       return false;
     };
@@ -249,5 +260,5 @@ export const useRectangleAdjust = ({
       source.dispose();
       cursor.release();
     };
-  }, [map, adjusting, store, rectAtom, layerId]);
+  }, [map, adjusting, store, rectAtom, layerId, maxSideM, snap]);
 };

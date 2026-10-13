@@ -33,6 +33,7 @@ import {
 } from '../evidence/spec';
 import type { SpotEvidence } from '../evidence/useSpotEvidence';
 import { bboxToMetric, type Bbox } from '../map/bbox';
+import { mosaicTiles } from '../map/grid';
 import {
   demProjectFacts,
   fetchDemProjects,
@@ -344,7 +345,17 @@ export const SpotRenders = ({
   const { t } = useTranslation();
   const [sun, setSun] = useState<SunLoopSettings>(SUN_LOOP_DEFAULTS);
   const [sources, setSources] = useState<Record<string, string>>({});
-  const catalogue = useDemProjects(spot.footprint);
+  // The sidecar renders over one box read from the spot row and refuses anything
+  // past the cap, so a multi-tile boundary is blocked here until the sidecar
+  // learns to fan out (`docs/render-sidecar.md`). The catalogue and matching use
+  // the first tile, which for a single-tile site is the whole footprint.
+  const tiles = useMemo(
+    () => (spot.footprint ? mosaicTiles(spot.footprint) : []),
+    [spot.footprint],
+  );
+  const multiTile = tiles.length > 1;
+  const renderBox = tiles[0] ?? null;
+  const catalogue = useDemProjects(renderBox);
 
   const ordered = (evidence.items ?? []).filter((rec) =>
     rendersOnServer(rec.kind),
@@ -360,7 +371,7 @@ export const SpotRenders = ({
   // say it is being made.
   const outstanding = ordered.some(onItsWay);
 
-  const metric = spot.footprint ? bboxToMetric(spot.footprint) : null;
+  const metric = renderBox ? bboxToMetric(renderBox) : null;
   const matching = (spec: EvidenceSpec) =>
     metric != null
       ? ordered.filter((rec) => evidenceMatches(rec, spec, metric))
@@ -391,22 +402,26 @@ export const SpotRenders = ({
         const mine = matching(line.spec);
         const state = !spot.footprint
           ? 'blocked'
-          : mine.some(onItsWay)
-            ? 'rendering'
-            : mine.length > 0
-              ? 'kept'
-              : outstanding
-                ? 'blocked'
-                : 'ready';
+          : multiTile
+            ? 'blocked'
+            : mine.some(onItsWay)
+              ? 'rendering'
+              : mine.length > 0
+                ? 'kept'
+                : outstanding
+                  ? 'blocked'
+                  : 'ready';
         const note = !spot.footprint
           ? t('acquire.noFootprint')
-          : state === 'rendering'
-            ? t('evidence.rendering')
-            : state === 'kept'
-              ? t('evidence.kept')
-              : state === 'blocked'
-                ? t('renders.busy')
-                : t('renders.play');
+          : multiTile
+            ? t('renders.largeSite')
+            : state === 'rendering'
+              ? t('evidence.rendering')
+              : state === 'kept'
+                ? t('evidence.kept')
+                : state === 'blocked'
+                  ? t('renders.busy')
+                  : t('renders.play');
 
         return (
           <RenderLine

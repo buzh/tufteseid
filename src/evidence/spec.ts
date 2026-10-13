@@ -328,6 +328,33 @@ export const loopStepDeg = (rec: EvidenceRecord): number => {
   return spec?.kind === 'sunloop' ? spec.stepDeg : SUNLOOP_STEP_DEG;
 };
 
+// A picture's identity independent of the ground it covers — the fields
+// `evidenceMatches` compares minus the bbox, so tiles of one mosaic (same spec,
+// different tile) share a key. Terrain's floats are stringified raw rather than
+// to a tolerance: every tile of one keep is made from the same spec, so they are
+// bit-identical, and two keeps a hair apart are deliberately two pictures.
+export const specKey = (spec: EvidenceSpec): string => {
+  switch (spec.kind) {
+    case 'lidar':
+      return `lidar:${spec.sourceKey}:${spec.style}:${spec.model}`;
+    case 'terrain':
+      return `terrain:${spec.vis}:${spec.model}:${spec.azimuth}:${spec.altitude}:${spec.zFactor}:${spec.radius}`;
+    case 'flyfoto':
+      return `flyfoto:${spec.projectId}`;
+    case 'sunloop':
+      return `sunloop:${spec.model}:${spec.source}:${spec.altitude}:${spec.zFactor}:${spec.stepDeg}:${spec.fps}`;
+    case 'rvt':
+      return `rvt:${spec.vis}:${spec.model}:${spec.source}`;
+  }
+};
+
+/** The group a row belongs to — its spec's key, or the row's own id when the
+ *  meta no longer parses, so an orphan stands alone rather than merging. */
+export const evidenceGroupKey = (rec: EvidenceRecord): string => {
+  const spec = specOf(rec);
+  return spec ? specKey(spec) : rec.id;
+};
+
 // Metres; absorbs a JSON round trip, and a sub-metre nudge is the same ground.
 const BBOX_TOLERANCE_M = 1;
 

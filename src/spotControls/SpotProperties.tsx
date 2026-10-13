@@ -136,7 +136,12 @@ export const SpotProperties = ({ spot }: { spot: SpotDraftController }) => {
           {framing
             ? t('spots.footprintHint')
             : sided
-              ? t('spots.footprintSide', { metres: spot.footprintSideMetres })
+              ? spot.footprintTiles > 1
+                ? t('spots.footprintTiles', {
+                    metres: spot.footprintSideMetres,
+                    tiles: spot.footprintTiles,
+                  })
+                : t('spots.footprintSide', { metres: spot.footprintSideMetres })
               : // A new spot has none until its first write derives one, which
                 // is the whole life of this box.
                 t('spots.footprintPending')}

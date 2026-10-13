@@ -3,7 +3,9 @@ import { mapAtom } from '../map/atoms';
 import {
   bboxEquals,
   bboxOverlaps,
+  bboxWidthMetres,
   bringBboxIntoView,
+  MAX_SIDE_M,
   squareBboxWithin,
   viewportBbox,
   type Bbox,
@@ -33,10 +35,14 @@ export const openTerrainWindowAtom = atom(null, (get, set): boolean => {
  *  starts at once with nothing to place. Left alone if it is already the
  *  rectangle being read, whose grid would otherwise be fetched twice. */
 export const readTerrainWindowAtom = atom(null, (get, set, bbox: Bbox) => {
+  // A spot's boundary may be larger than the cap; the window is a single ≤cap
+  // box centred in it, which the reader drags elsewhere in the site.
+  const window =
+    bboxWidthMetres(bbox) > MAX_SIDE_M ? squareBboxWithin(bbox) : bbox;
   const current = get(terrainWindowAtom);
-  if (!current || !bboxEquals(current, bbox)) set(terrainWindowAtom, bbox);
+  if (!current || !bboxEquals(current, window)) set(terrainWindowAtom, window);
   set(terrainAdjustingAtom, false);
-  bringBboxIntoView(get(mapAtom), bbox);
+  bringBboxIntoView(get(mapAtom), window);
 });
 
 /** Take hold of the rectangle again; reframed only if it is off screen. */

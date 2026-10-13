@@ -7,6 +7,7 @@ import {
   useEvidenceLoopOverlay,
   useEvidenceOverlay,
 } from '../evidence/evidenceOverlay';
+import { maxBoundaryMetres, snapBoundaryMetric } from '../map/grid';
 import { useRectangleAdjust } from '../map/rectAdjust';
 import { uiContextAtom } from '../shared/uiContext';
 import { useAllSketchesLayer } from '../sketch/allSketches';
@@ -110,6 +111,10 @@ export const SpotSurface = () => {
     rectAtom: spotFootprintAtom,
     activeAtom: spotFootprintAdjustingAtom,
     layerId: 'spotFootprintAdjustLayer',
+    // A spot's rectangle may grow past the cap into a boundary, snapped to whole
+    // render tiles; the terrain window stays a single ≤cap box (`src/map/grid.ts`).
+    maxSideM: maxBoundaryMetres(),
+    snap: snapBoundaryMetric,
   });
   useSketchSession(draft?.stage === 'sketch');
   useSketchOverlay(shown);
