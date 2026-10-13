@@ -190,9 +190,11 @@ const mapLayer = (layer: Layer): string =>
   pipe(layer.renderer) +
   '<blendMode>0</blendMode><legend/></maplayer>';
 
+// Collapsed: a spot can hold a dozen pictures, and each expanded node spends
+// a row on a colour swatch that says nothing about which reading it is.
 const treeEntry = (layer: Layer): string =>
   `<layer-tree-layer checked="Qt::${layer.checked ? 'Checked' : 'Unchecked'}" ` +
-  `expanded="1" id="${esc(layer.id)}" legend_exp="" legend_split_behavior="0" ` +
+  `expanded="0" id="${esc(layer.id)}" legend_exp="" legend_split_behavior="0" ` +
   `name="${esc(layer.name)}" patch_size="-1,-1" ` +
   `providerKey="${layer.provider}" source="${esc(layer.source)}">` +
   '<customproperties><Option/></customproperties></layer-tree-layer>';
