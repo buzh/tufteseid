@@ -57,6 +57,18 @@ export const downloadLabel = (state: {
         : 'evidence.download',
   );
 
+export const exportLabel = (state: {
+  running: boolean;
+  failed: boolean;
+}): string =>
+  t(
+    state.failed
+      ? 'export.failed'
+      : state.running
+        ? 'export.running'
+        : 'export.label',
+  );
+
 /** Where the row stands, or what it came out at once it stands nowhere. */
 export const renderNote = (
   rec: EvidenceRecord,

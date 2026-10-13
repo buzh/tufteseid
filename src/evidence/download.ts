@@ -22,7 +22,7 @@ const EXTENSIONS: Record<string, string> = {
   'video/webm': 'webm',
 };
 
-const extensionOf = (type: string): string => EXTENSIONS[type] ?? 'png';
+export const extensionOf = (type: string): string => EXTENSIONS[type] ?? 'png';
 
 const decodeToCanvas = async (
   blob: Blob,
@@ -81,7 +81,7 @@ const stampEvidence = async (
   }
 };
 
-const save = (blob: Blob, filename: string) => {
+export const saveBlob = (blob: Blob, filename: string) => {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
@@ -121,7 +121,7 @@ export const useEvidenceDownload = (spot: SpotRecord): EvidenceDownload => {
           const name = sanitizeFilename(
             [spot.name, spec && evidenceTitle(spec)].filter(Boolean).join(' '),
           );
-          save(stamped, `${name}.${extensionOf(stamped.type)}`);
+          saveBlob(stamped, `${name}.${extensionOf(stamped.type)}`);
         } catch (e) {
           console.warn('[evidence] download failed', e);
           setFailedId(rec.id);
