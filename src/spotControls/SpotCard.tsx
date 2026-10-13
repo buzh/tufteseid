@@ -10,11 +10,13 @@ import { useTranslation } from 'react-i18next';
 import { updateSpot, type SpotRecord } from '../api/spots';
 import { useHasFeature } from '../auth/features';
 import { EvidenceGallery } from '../evidence/EvidenceGallery';
+import { exportLabel } from '../evidence/labels';
 import { isReadable } from '../evidence/spec';
 import {
   useSpotEvidence,
   type SpotEvidence,
 } from '../evidence/useSpotEvidence';
+import { useSpotExport } from '../export/useSpotExport';
 import { serviceOn } from '../services';
 import { sketchOf } from '../sketch/scene';
 import { SketchFade } from '../sketch/SketchFade';
@@ -78,6 +80,10 @@ const SpotUnits = ({
   const keepLabel = t(offer?.kept ? 'evidence.kept' : 'evidence.keep');
 
   const hasSketch = hold ? hold.hasSketch : sketchOf(spot.sketch) !== null;
+
+  // What is written, not what a draft is holding: the bundle is built out of
+  // the record and its rows, which a stage in progress has not committed yet.
+  const bundle = useSpotExport(spot, evidence.items);
 
   const flyfotoHint = !spot.footprint
     ? t('acquire.noFootprint')
@@ -164,6 +170,20 @@ const SpotUnits = ({
               />
             </Tooltip>
           )}
+          {/* Last on the row: everything before it asks for a picture, and
+              this one takes the spot away. */}
+          <Tooltip
+            label={exportLabel({ running: bundle.busy, failed: bundle.failed })}
+          >
+            <ControlButton
+              icon={bundle.busy ? 'hourglass_top' : 'folder_zip'}
+              aria-label={t('export.label')}
+              // The rows are what is bundled, and a draft is in the middle of
+              // moving the rectangle they are all registered to.
+              disabled={bundle.busy || hold != null || !evidence.items}
+              onClick={bundle.run}
+            />
+          </Tooltip>
         </div>
       )}
 

@@ -131,6 +131,22 @@
       }
     }
   },
+  "export": {
+    "label": "Eksporter til QGIS",
+    "running": "Pakker eksporten …",
+    "failed": "Fikk ikke eksportert lokaliteten.",
+    "readme": {
+      "heading": "{{name}} — eksport fra {{app}}",
+      "project": "{{file}} åpner alt i QGIS på én gang: bildene stablet i rekkefølge med dekkbildet øverst, og kulturminner og topografisk referanse rett fra Riksantikvaren og Kartverket.",
+      "raster": "Bildene ligger i bilder/. Verdensfila (.pgw/.jgw) og .prj ved siden av hvert bilde gir det plass og projeksjon: EPSG:25833, samme utsnitt som bildet ble laget over.",
+      "vector": "{{file}} er punktet, i EPSG:4326.",
+      "footprint": "{{file}} er utsnittet, i EPSG:4326. Hjørnene er utsnittets egne, så firkanten følger bildene og ikke lengde- og breddegradene.",
+      "sketch": "{{file}} er tegningen, georeferert som bildene.",
+      "video": "Solrunder er video og har ingen verdensfil — QGIS leser dem ikke.",
+      "pictures": "BILDER",
+      "noPictures": "Lokaliteten har ingen ferdige bilder ennå."
+    }
+  },
   "flyfotoControls": {
     "mosaic": "Nyeste",
     "mosaicShort": "Mosaikk · nyeste",

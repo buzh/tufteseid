@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 
 import { evidenceFileUrl } from '../api/evidence';
 import type { SpotRecord } from '../api/spots';
+import { useSpotExport } from '../export/useSpotExport';
 import { mapAtom } from '../map/atoms';
 import { sketchOf } from '../sketch/scene';
 import { SketchFade } from '../sketch/SketchFade';
@@ -29,6 +30,7 @@ import {
   downloadLabel,
   evidenceFacts,
   evidenceLabel,
+  exportLabel,
   KIND_ICON,
 } from './labels';
 import {
@@ -63,6 +65,7 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
   const { items } = useSpotEvidence(spot);
   const box = useFloatingPanel();
   const file = useEvidenceDownload(spot);
+  const bundle = useSpotExport(spot, items);
 
   const readable = useMemo(() => (items ?? []).filter(isReadable), [items]);
 
@@ -207,6 +210,26 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
                 </ActionIcon>
               </Tooltip>
             )}
+            <Tooltip
+              label={exportLabel({
+                running: bundle.busy,
+                failed: bundle.failed,
+              })}
+            >
+              <ActionIcon
+                variant="subtle"
+                color="gray"
+                size="sm"
+                aria-label={t('export.label')}
+                disabled={bundle.busy || items === null}
+                onClick={bundle.run}
+              >
+                <Icon
+                  icon={bundle.busy ? 'hourglass_top' : 'folder_zip'}
+                  size={18}
+                />
+              </ActionIcon>
+            </Tooltip>
             {mayEdit && (
               <Tooltip label={t('spots.edit')}>
                 <ActionIcon
