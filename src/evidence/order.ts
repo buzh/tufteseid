@@ -14,9 +14,12 @@ export const moved = <T>(list: readonly T[], from: number, to: number): T[] => {
 
 type SortWrite = { id: string; sort: number };
 
-// Evenly spaced keys ending on the list's current greatest, so none moves ahead
-// of `Date.now()` and a picture kept after still lands last.
-const renumbered = (list: readonly EvidenceRecord[]): SortWrite[] => {
+// The `sort` writes for a list reshuffled whole — a mosaic moves as a block, so
+// there is no single row to slip between two neighbours. Evenly spaced keys
+// ending on the list's current greatest, so none moves ahead of `Date.now()`
+// and a picture kept after still lands last. A key belongs to a slot rather
+// than to a row, so once a list is spaced only what changed slots is written.
+export const evenSorts = (list: readonly EvidenceRecord[]): SortWrite[] => {
   const last = Math.max(...list.map((rec) => rec.sort));
   return list
     .map((rec, i) => ({
@@ -25,9 +28,3 @@ const renumbered = (list: readonly EvidenceRecord[]): SortWrite[] => {
     }))
     .filter((write, i) => write.sort !== list[i].sort);
 };
-
-// The `sort` writes for a list reshuffled whole — a mosaic moves as a block, so
-// there is no single row to slip between two neighbours. Only the rows whose key
-// actually changes are written.
-export const evenSorts = (list: readonly EvidenceRecord[]): SortWrite[] =>
-  renumbered(list);

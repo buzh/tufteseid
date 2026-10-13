@@ -222,8 +222,10 @@ stars on them:
   the unique-index 400), `name`, `description`, `credit` (the author's name,
   denormalized because `users` is closed to guests), `visibility`
   (private | public), `point` (json, `[lon, lat]` EPSG:4326), `footprint` (json,
-  `[west, south, east, north]` EPSG:4326 or null — the square every piece of
-  evidence is rendered over, ≤500 m on a side), `sketch` (json ≤5 MB: an
+  `[west, south, east, north]` EPSG:4326 or null — the square the spot's
+  evidence covers: one render box up to 500 m on a side, or past that a
+  boundary snapped to whole grid tiles and tiled into render boxes each within
+  the cap, one row apiece), `sketch` (json ≤5 MB: an
   Excalidraw scene plus the frame that georeferences it, or null), `mapSketch`
   (which drawing stands on the shared drawing layer; empty means the `sketch`
   column, which is the only drawing a spot can hold today).

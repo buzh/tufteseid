@@ -22,6 +22,7 @@ import { Icon } from '../ui/Icon';
 import { draftGroundAtom } from './draftGround';
 import { useEvidenceDownload } from './download';
 import styles from './EvidenceGallery.module.css';
+import type { OverlayTile } from './evidenceOverlay';
 import { EvidenceThumb } from './EvidenceThumb';
 import { groupEvidence, type EvidenceGroup } from './groups';
 import { downloadLabel, evidenceLabel, KIND_ICON, renderNote } from './labels';
@@ -36,7 +37,6 @@ import {
   isVideoEvidence,
   rendersOnServer,
 } from './spec';
-import type { OverlayTile } from './evidenceOverlay';
 import type { SpotEvidence } from './useSpotEvidence';
 
 type Drag = {
@@ -214,16 +214,16 @@ export const EvidenceGallery = ({
   // redoing — must not leave its ground on the map.
   useEffect(() => {
     if (!ground || items === null) return;
-    const group = groupEvidence(items).find((g) => g.key === ground.id);
+    const group = groups.find((g) => g.key === ground.id);
     if (!group || !group.rows.some((rec) => rec.file)) setGround(null);
-  }, [ground, items, setGround]);
+  }, [ground, groups, items, setGround]);
 
   // The list goes when the spot is closed or the reading opens, and the picture
   // is the list's: nothing else is left to take it off the map.
   useEffect(() => () => setGround(null), [setGround]);
 
-  // A group's state for the one slot that shows it: a retryable tile so the group
-  // offers a redo, else working, else nothing (every tile has pixels).
+  // A group's state for the one slot that shows it: a retryable tile so the
+  // group offers a redo, else working, else nothing (every tile has pixels).
   const groupStateOf = (group: EvidenceGroup): RenderState | undefined => {
     const states = group.rows.map((rec) => evidence.stateOf(rec));
     if (states.some((s) => mayRetry(s))) return 'failed';
@@ -288,8 +288,8 @@ export const EvidenceGallery = ({
       evidence.reorderGroup(key, to);
     };
 
-  // Lays the whole picture: a mosaic's tiles, or the one box — a loop to its own
-  // overlay, stills to the other.
+  // Lays the whole picture: a mosaic's tiles, or the one box — a loop to its
+  // own overlay, stills to the other.
   const pick = (group: EvidenceGroup) => {
     if (ground?.id === group.key) {
       setGround(null);

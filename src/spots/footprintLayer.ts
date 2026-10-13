@@ -22,7 +22,9 @@ const frameStyle = [
 
 // Thinner, so the render tiles read as a grid inside the boundary rather than
 // competing with it.
-const cellStyle = [new Style({ stroke: new Stroke({ color: FRAME, width: 0.5 }) })];
+const cellStyle = [
+  new Style({ stroke: new Stroke({ color: FRAME, width: 0.5 }) }),
+];
 
 export const spotFootprintLayerEffect = atomEffect((get) => {
   const bbox = get(standingSpotFootprintAtom);

@@ -9,8 +9,8 @@ import { getWMSTileGrid } from './layers/wmsTileGrid';
 
 // A boundary past MAX_SIDE_M is tiled into render boxes on the app's own tile
 // grid (wmsTileGrid.ts), the same grid MapProxy's `tufteseid25833` and the cvat
-// MBTiles stand on (mapproxy/mapproxy.yaml, vat-cache/build_tiles.py): change the
-// ladder in one and the mosaic stops lining up with the tiles behind it.
+// MBTiles stand on (mapproxy/mapproxy.yaml, vat-cache/build_tiles.py): change
+// the ladder in one and the mosaic stops lining up with the tiles behind it.
 
 // ≈338.5 m, the deepest level whose tile is under MAX_SIDE_M.
 export const TILE_Z = 15;
@@ -33,7 +33,9 @@ const gridParams = (): GridParams | null => {
   const px = grid?.getTileSize(TILE_Z);
   const side = typeof px === 'number' ? px : px?.[0];
   cached =
-    origin && res && side ? { ox: origin[0], oy: origin[1], size: res * side } : null;
+    origin && res && side
+      ? { ox: origin[0], oy: origin[1], size: res * side }
+      : null;
   return cached;
 };
 
@@ -46,19 +48,25 @@ export const maxBoundaryMetres = (): number => {
   return size ? (MOSAIC_MAX_TILES_PER_SIDE - 1) * size : MAX_SIDE_M;
 };
 
-// Grid lines sit at origin + k·size on both axes; the north-west origin counts y
-// downward, but oy − k·size is the same lattice as oy + m·size, so a plain
+// Grid lines sit at origin + k·size on both axes; the north-west origin counts
+// y downward, but oy − k·size is the same lattice as oy + m·size, so a plain
 // floor/ceil snaps either axis.
 const snapExtent = (m: Metric, g: GridParams): Metric => {
   const below = (v: number, origin: number) =>
     origin + Math.floor((v - origin) / g.size) * g.size;
   const above = (v: number, origin: number) =>
     origin + Math.ceil((v - origin) / g.size) * g.size;
-  return [below(m[0], g.ox), below(m[1], g.oy), above(m[2], g.ox), above(m[3], g.oy)];
+  return [
+    below(m[0], g.ox),
+    below(m[1], g.oy),
+    above(m[2], g.ox),
+    above(m[3], g.oy),
+  ];
 };
 
-/** Expand a metric extent out to whole tiles, but only once it is past the cap —
- *  a box within the cap stays exactly as drawn. For `useRectangleAdjust`'s snap. */
+/** Expand a metric extent out to whole tiles, but only once it is past the
+ *  cap — a box within the cap stays exactly as drawn. For
+ *  `useRectangleAdjust`'s snap. */
 export const snapBoundaryMetric = (m: Metric): Metric => {
   const side = Math.max(m[2] - m[0], m[3] - m[1]);
   const g = gridParams();

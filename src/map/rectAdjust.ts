@@ -218,8 +218,8 @@ export const useRectangleAdjust = ({
     };
 
     const handleUpEvent = (): boolean => {
-      // Snapped on release, not per frame: the box drags freely and settles onto
-      // the grid when the hand lets go.
+      // Snapped on release, not per frame: the box drags freely and settles
+      // onto the grid when the hand lets go.
       const extent = snap ? extentNow() : null;
       if (extent && snap) store.set(rectAtom, bboxFromMetric(snap(extent)));
       drag = null;

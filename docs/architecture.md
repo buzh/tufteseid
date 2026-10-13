@@ -92,7 +92,7 @@ A `Halves` suffix means a pair (see below). Each pair's `live*` sibling is
 | `favouriteSpotsAtom` | same | Derived: what the reader has starred, resolved against the records, most recently starred first. A spot since made private is in no readable record list and drops out. |
 | `terrainOfferAtom` | `evidence/offer.ts` | What the terrain analysis would keep, published by `useTerrainControls` because its settings are component state. |
 | `keepOfferAtom` | same | Derived: the terrain's offer when an analysis is running, otherwise the ground's (off the A half). Null where the view cannot be re-rendered. |
-| `draftGroundAtom` | `evidence/draftGround.ts` | A picture laid on the map at the extent it was rendered over: a kept row to trace a drawing onto, published by `EvidenceGallery`, or a flyfoto proposal under review, published by `useFlyfotoRun`. Never both — the card and the acquisition box do not stand at once. `loop` says the file is a WebM, and so which overlay draws it. |
+| `draftGroundAtom` | `evidence/draftGround.ts` | A picture laid on the map at the extent it was rendered over: a kept picture to trace a drawing onto, published by `EvidenceGallery`, or a flyfoto proposal under review, published by `useFlyfotoRun`. Never both — the card and the acquisition box do not stand at once. `tiles` is the whole picture — a mosaic's grid, or the one box — and `id` the group it came off, so the list drops the ground when the last of its tiles goes. `loop` says the file is a WebM instead, always a single tile, and so which overlay draws it. `draftGroundExtent` is the bounds over whatever is laid, which is what the sketch frame fits to. |
 | the floating panel's layout and placement | `ui/useFloatingPanel.ts` | Which way round the box is laid out, where it was dragged to, how big it may get and which wall it is docked against. Module-private, reached through `useFloatingPanel`: held outside the component, which remounts per spot — and so only one floating panel at a time. `EvidenceReader` is the one caller. |
 | `sketchSessionAtom` | `sketch/session.ts` | Non-null exactly while the map is frozen and Excalidraw has it. |
 | `uiContextAtom` | `shared/uiContext.ts` | Derived: `map` or `draw`, off the session above. Which surface is in front (*The context in front*). |
@@ -405,15 +405,24 @@ the `fx` button and the aeroplane, which are where the pictures nobody can take
 from the view are ordered. `EvidenceReader` flips through the same rows full
 size and changes none of them.
 
+- **A row is a tile; the picture is the group.** Past the cap one picture is
+  several rows, so both surfaces gather them by `evidenceGroupKey`
+  (`evidence/groups.ts`) and work in groups: one slot per picture, carrying the
+  tile count where there is more than one, and its tiles grounded, redone,
+  deleted and moved together. A spot within the cap is a group of one, which is
+  the same code taking the ordinary path.
 - **The cover is the first readable row.** Nothing marks one: the reading opens
   on it, so dragging a picture to the top is how a cover is chosen, and the star
-  says which one is. `coverOf` (`evidence/spec.ts`) is the single authority
-  both surfaces ask, and a sun loop passes — both surfaces ground a loop as
-  readily as a still.
-- A drop writes one row. `sortForMove` (`evidence/order.ts`) takes the midpoint
-  between the row's new neighbours, so nothing else moves; a row dropped last
-  takes the current time instead, or a picture kept a moment later would sort
-  in front of it. The write is optimistic and puts the row back on a refusal.
+  stands against the group holding it. `coverOf` (`evidence/spec.ts`) is the
+  single authority both surfaces ask — of a group's own rows for the row that
+  stands for it, and of the whole list for the spot's cover — and a sun loop
+  passes: both surfaces ground a loop as readily as a still.
+- A drop renumbers. A mosaic moves as a block, so there is no one row to slip
+  between two neighbours: `evenSorts` (`evidence/order.ts`) spaces the whole
+  reshuffled list evenly, ending on its current greatest key so nothing moves
+  ahead of `Date.now()` and a picture kept a moment later still lands last. A
+  key belongs to a slot rather than to a row, so a spaced list only writes what
+  changed slots. The writes are optimistic and put every row back on a refusal.
 - The rows are one height, so a drag measures every slot's middle once at the
   press and then takes the nearest one to the pointer: the preview moves rows
   between slots, and the slots themselves do not move. The handle answers ↑ and
@@ -530,20 +539,22 @@ size and changes none of them.
   a video on hover and at thumbnail size that toggle is the whole picture: the
   press opened a floating window instead of reaching the button behind it.
 - **Clicking a picture lays it on the map**, opaque, through `draftGroundAtom`,
-  driven from `SpotSurface`. That is the ground the pen draws over, and it
-  rides the map element, so a sketch session's transform carries it along. A
-  sun loop grounds like anything else and plays while it is there; which
+  driven from `SpotSurface` — the whole picture, so a mosaic's tiles go down as
+  one grid. That is the ground the pen draws over, and it rides the map
+  element, so a sketch session's transform carries it along. A sun loop
+  grounds like anything else and plays while it is there; which
   overlay carries it is the only difference, and `draftGround.loop` is what
   says so — `useEvidenceOverlay` for a still, `useEvidenceLoopOverlay` for a
   loop, in a leaf component of its own because that hook's transport changes
   with every frame and the surface renders the whole card. The card drives no
   transport; play, pause and seek belong to the reading.
 - Entering the draw stage with a picture chosen fits the view to that picture's
-  own rectangle before `captureFrame`, so the frame holds the ground the
-  picture does and the strokes register to every other picture of the spot as
-  well. Strokes already made keep their own frame — nothing may move it.
-  Switching pictures inside a session swaps the overlay and leaves the frame
-  alone, which is the whole point: every row covers the same rectangle.
+  own rectangle before `captureFrame` — `draftGroundExtent`, which spans a
+  mosaic's tiles — so the frame holds the ground the picture does and the
+  strokes register to every other picture of the spot as well. Strokes already
+  made keep their own frame — nothing may move it. Switching pictures inside a
+  session swaps the overlay and leaves the frame alone, which is the whole
+  point: every row covers the same rectangle.
 
 ## Reading a spot
 
@@ -555,9 +566,9 @@ that buys: it stands in for the card, fits the map to the footprint, and groups
 the rows by picture (`groups.ts`, `evidenceGroupKey`) so a mosaic is one thing to
 flip to. Flipping lays that picture's tiles — one for an ordinary spot, the whole
 grid for a boundary — back on the ground they were made over (`evidenceOverlay.ts`
-takes a set), holding the ground still and changing only how it was seen. (The
-author's gallery and traced ground still work a row at a time; grouping them is a
-later pass.)
+takes a set), holding the ground still and changing only how it was seen. The
+author's gallery groups the same way, so a mosaic is one slot to drag, to ground
+and to delete.
 
 - The overlay is at z 1.25: over the terrain render, **under the B half**, so a
   curtain reads a kept render against a live ground. The transparency slider
@@ -722,10 +733,13 @@ queue ran.
 
 The download is the only door, and a visitor reading somebody else's public spot
 is exactly who wants a citable figure out of it — so the reader has one too.
-`useEvidenceDownload` (`download.ts`) is shared by the gallery's per-row button
-and the reader's, which downloads the picture on the ground. One at a time —
-decoding, stamping and re-encoding a multi-megapixel raster is about a second
-of main-thread work.
+`useEvidenceDownload` (`download.ts`) is shared by the gallery's per-picture
+button and the reader's, which downloads the picture on the ground. One at a
+time — decoding, stamping and re-encoding a multi-megapixel raster is about a
+second of main-thread work. A download is one file, so a mosaic's is its cover
+tile, stamped with that tile's own rectangle; the whole of a boundary comes out
+of the export bundle, which carries every row georeferenced (*The export
+bundle*).
 
 `withLegend` in `legend.ts` composes it onto a canvas of its own: the capture
 unchanged at the top, the band appended underneath, every dimension derived from
@@ -1174,6 +1188,10 @@ that is a last resort rather than the design.
   back, so a browser that refused the autoplay shows a play button rather than
   a lie. No speed, no frame-by-frame step, and a scrub decodes forward from the
   file's one keyframe.
+- **A mosaic has no single file.** Both surfaces read and ground a boundary's
+  tiles as one picture, but the download button is one file and hands over the
+  cover tile; stitching the grid into one stamped raster is what a whole-picture
+  download would cost. The export bundle is the way out with every tile in it.
 - **A render is not a cache.** Upstreams re-fly and reprocess, so the same spec
   re-rendered later may not be the picture its author read. `meta.renderedAt`
   says when the file was made; nothing re-renders on its own.

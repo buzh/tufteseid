@@ -331,8 +331,8 @@ export const loopStepDeg = (rec: EvidenceRecord): number => {
 // A picture's identity independent of the ground it covers — the fields
 // `evidenceMatches` compares minus the bbox, so tiles of one mosaic (same spec,
 // different tile) share a key. Terrain's floats are stringified raw rather than
-// to a tolerance: every tile of one keep is made from the same spec, so they are
-// bit-identical, and two keeps a hair apart are deliberately two pictures.
+// to a tolerance: every tile of one keep is made from the same spec, so they
+// are bit-identical, and two keeps a hair apart are deliberately two pictures.
 export const specKey = (spec: EvidenceSpec): string => {
   switch (spec.kind) {
     case 'lidar':

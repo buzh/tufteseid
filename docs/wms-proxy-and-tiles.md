@@ -479,12 +479,22 @@ ceiling and its own bounded retry.
   which go `PREVIEW_LANES` at a time — there the reader is sitting in front of
   one upstream with nothing else asked for, and the wait is the render's own
   length. Two lanes is 8 requests in flight, the ceiling for this app.
-- **A 500 m footprint is the cap** (`MAX_SIDE_M`, `src/map/bbox.ts`). LiDAR and
-  terrain bottom out at their own 0.25–0.5 m grids, a few hundred pixels a side.
-  Flyfoto asks for the acquisition's own pixel size, which for a recent flight
-  is 0.1 m or finer, and the store's 40 MP budget (`storeLimit`,
+- **A 500 m render box is the cap** (`MAX_SIDE_M`, `src/map/bbox.ts`), not a
+  500 m spot: past it a spot's rectangle is a boundary snapped to whole tiles of
+  the app's own grid and tiled into render boxes each within the cap
+  (`src/map/grid.ts`), and no single render ever asks for more than one box.
+  LiDAR and terrain bottom out at their own 0.25–0.5 m grids, a few hundred
+  pixels a side. Flyfoto asks for the acquisition's own pixel size, which for a
+  recent flight is 0.1 m or finer, and the store's 40 MP budget (`storeLimit`,
   `src/evidence/flyfotoRaster.ts`) holds it at 0.08 m/px there — 6300 px a side
   and sixteen tiles, the most any one render asks for.
+- **Keeping a picture of a boundary is one render per box.** They are separate
+  rows and go through the same serial queue, so a 3×3 boundary is nine renders
+  of the shape above back to back — nine times the requests of a single-box
+  spot, spread over nine times the wait, with nothing more in flight at once.
+  `MOSAIC_MAX_TILES_PER_SIDE` (`src/map/grid.ts`) bounds the total at 6×6
+  boxes, so the worst one keep can ask of an upstream is 36 flyfoto renders of
+  sixteen tiles each.
 
 ### `guardTileSource` (`src/upstream/tileGuard.ts`)
 

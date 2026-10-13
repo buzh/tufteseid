@@ -233,9 +233,9 @@ export const useFlyfotoRun = (
     if (!front || !produced || keepingNow.current) return;
     const bbox = now.current.footprint;
 
-    // A boundary larger than one tile keeps the whole mosaic: the previewed tile
-    // was only the acquisition's audition, so `keep` re-renders every tile rather
-    // than storing the single previewed one.
+    // A boundary larger than one tile keeps the whole mosaic: the previewed
+    // tile was only the acquisition's audition, so `keep` re-renders every
+    // tile rather than storing the single previewed one.
     if (bbox && mosaicTiles(bbox).length > 1) {
       now.current.evidence.keep(front.spec);
       drop();

@@ -133,8 +133,8 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
 
   const footprint = spot.footprint;
 
-  // The render boxes the boundary covers: one free box within the cap, a grid of
-  // tiles past it (`src/map/grid.ts`). Every keep fans out across them.
+  // The render boxes the boundary covers: one free box within the cap, a grid
+  // of tiles past it (`src/map/grid.ts`). Every keep fans out across them.
   const tiles = useMemo(
     () => (footprint ? mosaicTiles(footprint) : []),
     [footprint],
@@ -192,9 +192,9 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
         if (items?.some((rec) => evidenceMatches(rec, spec, metric))) return;
         createEvidence(
           // The tile's box is stamped up front so the kept check and a retry
-          // both know which tile this row is, before any pixels land. The render
-          // overwrites it with the box it achieved, the same tile within
-          // `BBOX_TOLERANCE_M`.
+          // both know which tile this row is, before any pixels land. The
+          // render overwrites it with the box it achieved, the same tile
+          // within `BBOX_TOLERANCE_M`.
           {
             spot: spotId,
             kind: spec.kind,

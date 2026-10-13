@@ -345,10 +345,11 @@ export const SpotRenders = ({
   const { t } = useTranslation();
   const [sun, setSun] = useState<SunLoopSettings>(SUN_LOOP_DEFAULTS);
   const [sources, setSources] = useState<Record<string, string>>({});
-  // The sidecar renders over one box read from the spot row and refuses anything
-  // past the cap, so a multi-tile boundary is blocked here until the sidecar
-  // learns to fan out (`docs/render-sidecar.md`). The catalogue and matching use
-  // the first tile, which for a single-tile site is the whole footprint.
+  // The sidecar renders over one box read from the spot row and refuses
+  // anything past the cap, so a multi-tile boundary is blocked here until the
+  // sidecar learns to fan out (`docs/render-sidecar.md`). The catalogue and
+  // matching use the first tile, which for a single-tile site is the whole
+  // footprint.
   const tiles = useMemo(
     () => (spot.footprint ? mosaicTiles(spot.footprint) : []),
     [spot.footprint],

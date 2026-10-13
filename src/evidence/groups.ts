@@ -9,8 +9,9 @@ export type EvidenceGroup = {
   cover: EvidenceRecord;
 };
 
-/** Rows gathered by `evidenceGroupKey` — the tiles of one mosaic in one group —
- *  in first-seen order, each group keeping its rows in the order they arrived. */
+/** Rows gathered by `evidenceGroupKey` — the tiles of one mosaic in one
+ *  group — in first-seen order, each group keeping its rows in the order they
+ *  arrived. */
 export const groupEvidence = (
   rows: readonly EvidenceRecord[],
 ): EvidenceGroup[] => {

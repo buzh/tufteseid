@@ -109,8 +109,9 @@ export const SpotSurface = () => {
     rectAtom: spotFootprintAtom,
     activeAtom: spotFootprintAdjustingAtom,
     layerId: 'spotFootprintAdjustLayer',
-    // A spot's rectangle may grow past the cap into a boundary, snapped to whole
-    // render tiles; the terrain window stays a single ≤cap box (`src/map/grid.ts`).
+    // A spot's rectangle may grow past the cap into a boundary, snapped to
+    // whole render tiles; the terrain window stays a single ≤cap box
+    // (`src/map/grid.ts`).
     maxSideM: maxBoundaryMetres(),
     snap: snapBoundaryMetric,
   });
