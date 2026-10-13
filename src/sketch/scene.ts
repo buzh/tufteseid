@@ -11,18 +11,13 @@ export type SceneElement = NonNullable<
   ExcalidrawInitialDataState['elements']
 >[number];
 
-/** `SpotSketch` with its `unknown[]` resolved, after checking. */
 export type Sketch = {
   frame: SketchFrame;
   elements: readonly SceneElement[];
 };
 
-// Change on every pointer sample, so keeping them makes an unchanged drawing
-// look dirty. `seed` is *not* stripped: it is what keeps a hand-drawn stroke
-// deterministic between renders.
 const VOLATILE = ['version', 'versionNonce', 'updated'] as const;
 
-/** Editor elements → the stored form; `isDeleted` tombstones are dropped. */
 export const storableScene = (
   elements: readonly SceneElement[],
 ): SceneElement[] =>
@@ -34,17 +29,11 @@ export const storableScene = (
       return copy as unknown as SceneElement;
     });
 
-// Inside the server's ceiling: `spots.sketch` is capped at 5 MB
-// (`pb_migrations/1700001100_spots.js`).
 export const SKETCH_BUDGET_BYTES = 4000000;
 
-// UTF-8 bytes, not `String.length`: the server cap is in bytes and æ/ø/å cost
-// two apiece.
 export const sketchBytes = (sketch: SpotSketch | null): number =>
   sketch ? new TextEncoder().encode(JSON.stringify(sketch)).length : 0;
 
-/** A stored sketch, re-checked field by field: it is a free-form JSON column,
- *  and a bad frame draws the right strokes over the wrong ground. */
 export const sketchOf = (
   value: SpotSketch | null | undefined,
 ): Sketch | null => {
@@ -83,12 +72,6 @@ export const sketchOf = (
   };
 };
 
-/** The drawing a spot stands on the shared layer. A spot holds one today, so
- *  `mapSketch` is empty or names the column; an id this build cannot resolve
- *  draws nothing rather than falling back, which would put a drawing the
- *  author took off the map back on it. Unset rather than empty means the
- *  migration has not run — read as the column, so a forgotten
- *  `docker compose restart pocketbase` does not empty the layer. */
 export const mapSketchOf = (spot: SpotRecord): Sketch | null => {
   const chosen = spot.mapSketch;
   if (chosen != null && chosen !== '' && chosen !== MAP_SKETCH_COLUMN) {

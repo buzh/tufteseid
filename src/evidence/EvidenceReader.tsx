@@ -47,8 +47,6 @@ import {
 } from './spec';
 import { useSpotEvidence } from './useSpotEvidence';
 
-// Room for the band above and for wherever the box starts out, so the
-// footprint lands in the open ground rather than under either.
 const FIT_PADDING: Record<PanelLayout, number[]> = {
   wide: [80, 40, 200, 40],
   tall: [80, 360, 40, 40],
@@ -73,16 +71,9 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
 
   const readable = useMemo(() => (items ?? []).filter(isReadable), [items]);
 
-  // One entry per picture, its tiles gathered: a mosaic reads as one thing to
-  // flip to and lays all its tiles at once.
   const groups = useMemo(() => groupEvidence(readable), [readable]);
 
-  // Held by key, not by index: a render landing or a row being deleted
-  // reshuffles the list under the reader.
   const [shownKey, setShownKey] = useState<string | null>(null);
-  // Nothing flipped to yet, or the group that was is gone: fall back to the
-  // first, which holds the cover. The strip marks the group being read, not
-  // the key asked for, or a dead key would leave nothing pressed.
   const index = Math.max(
     0,
     groups.findIndex((group) => group.key === shownKey),
@@ -93,8 +84,6 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
 
   const [transparency, setTransparency] = useState(0);
 
-  // Two overlays, one at a time: an `ImageStatic` cannot carry a WebM, and a
-  // loop is always a single tile (the sidecar does not fan out yet).
   const loop = current && isVideoEvidence(current) ? current : null;
   const stillTiles = useMemo<OverlayTile[]>(() => {
     if (!group || isVideoEvidence(group.cover)) return [];
@@ -123,10 +112,6 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
     [index, groups],
   );
 
-  // Arrow keys flip, not pan: OL's `keyboardEventTarget` is the document, so
-  // capture phase on the document gets in front of its pan. Up/down are
-  // swallowed too, or half the cluster would slide the ground out from under
-  // the pictures.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (!ARROWS.includes(event.key)) return;
@@ -147,8 +132,6 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
     return () => document.removeEventListener('keydown', onKey, true);
   }, [step]);
 
-  // Back to the card when there is nothing to read — but only for an editor,
-  // who has one. For anybody else this box is the spot's whole UI.
   useEffect(() => {
     if (mayEdit && items !== null && readable.length === 0) setReading(false);
   }, [mayEdit, items, readable.length, setReading]);
@@ -157,15 +140,11 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
     const footprint = spot.footprint;
     if (!footprint) return;
     const view = map.getView();
-    // The share link's own centring may still be running, and two animations
-    // on one view fight rather than replace.
     view.cancelAnimations();
     view.fit(
       transformExtent(footprint, 'EPSG:4326', view.getProjection().getCode()),
       { padding: FIT_PADDING[box.layout], duration: FIT_MS },
     );
-    // Once, on entering the reading: a later realtime update or a moved box
-    // must not yank back a reader who has zoomed in to look at something.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map]);
 
@@ -397,8 +376,6 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
         )}
       </Panel>
 
-      {/* Pointer-only. The box opens at a size its layout already thought
-          about, so there is nothing to miss without one. */}
       <div aria-hidden="true" className={styles.grip} {...box.resizeHandle} />
     </div>
   );

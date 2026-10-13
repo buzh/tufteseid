@@ -1,4 +1,3 @@
-/* Matches the width of a Menu.Item's check, so rows without one line up. */
 .gutter {
   display: block;
   width: calc(18px * var(--ui-scale));

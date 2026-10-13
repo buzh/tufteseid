@@ -50,8 +50,6 @@
   color: var(--mantine-primary-color-contrast);
 }
 
-/* Both after the hovers above, or the seat either takes is painted over the
-   moment the pointer crosses it: equal specificity, source order decides. */
 .chipOn:hover {
   background: var(--mantine-primary-color-filled-hover);
 }
@@ -60,9 +58,6 @@
   background: var(--mantine-primary-color-filled);
 }
 
-/* After the hovers, same rule and same reason as `ControlButton`: equal
-   specificity, so a seat taken first would be painted over the moment the
-   pointer crossed it. */
 .chip:disabled,
 .chip:disabled:hover {
   background: var(--mantine-color-default);

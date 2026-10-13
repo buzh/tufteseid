@@ -18,8 +18,6 @@ export interface LayerFeatureInfo {
   fieldConfigs?: FieldConfig[];
 }
 
-/** What every queryable layer answered about one point. `coordinate` is the
- *  snapped one that was asked about, not the pointer's own. */
 export interface FeatureInfoReading {
   coordinate: [number, number];
   layers: LayerFeatureInfo[];

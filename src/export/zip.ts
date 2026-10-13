@@ -1,7 +1,3 @@
-// Store-only. Every byte a bundle carries is already compressed — PNG, JPEG,
-// WebM — so deflating would be a pass over fifty megabytes to save nothing,
-// and a zip library is a dependency this repo has to buy on the server.
-
 const LOCAL_SIG = 0x04034b50;
 const CENTRAL_SIG = 0x02014b50;
 const EOCD_SIG = 0x06054b50;
@@ -9,8 +5,6 @@ const EOCD_SIG = 0x06054b50;
 const STORED = 0;
 const VERSION = 20;
 
-// Bit 11: the entry name is UTF-8 rather than CP437. Spot names reach the
-// names through `sanitizeFilename`, which keeps every letter, so æøå do.
 const UTF8_FLAG = 0x0800;
 
 const LOCAL_HEADER_BYTES = 30;
@@ -18,7 +12,6 @@ const CENTRAL_HEADER_BYTES = 46;
 const EOCD_BYTES = 22;
 
 export type ZipEntry = {
-  /** Forward slashes, no leading one. */
   path: string;
   body: Blob;
 };
@@ -48,7 +41,6 @@ export const crc32 = (bytes: Uint8Array): number => {
 
 type Stamp = { time: number; date: number };
 
-// MS-DOS: two-second resolution, epoch 1980, local time with no zone to carry.
 const dosStamp = (d: Date): Stamp => ({
   time: (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1),
   date:
@@ -57,9 +49,6 @@ const dosStamp = (d: Date): Stamp => ({
     d.getDate(),
 });
 
-// `BlobPart` takes a view onto a plain `ArrayBuffer`, and the bare
-// `Uint8Array` alias widens to `ArrayBufferLike` — which admits a
-// `SharedArrayBuffer` and so is refused.
 type Bytes = Uint8Array<ArrayBuffer>;
 
 const encode = (s: string): Bytes => new TextEncoder().encode(s);
@@ -127,12 +116,6 @@ const eocd = (count: number, size: number, offset: number): Bytes => {
   return bytes;
 };
 
-/**
- * One entry's bytes are held at a time: the CRC needs them and the archive
- * does not, so the parts array keeps the caller's `Blob` and lets the browser
- * spill it to disk. Peak memory is the largest single entry, which matters —
- * an evidence row runs to fifty megabytes.
- */
 export const zip = async (entries: readonly ZipEntry[]): Promise<Blob> => {
   const stamp = dosStamp(new Date());
   const parts: BlobPart[] = [];

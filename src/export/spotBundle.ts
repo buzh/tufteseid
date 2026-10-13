@@ -1,7 +1,3 @@
-// A spot as files a GIS can open: the stored rasters with a world file each,
-// the pin and the rectangle as vectors, the drawing, and the provenance the
-// legend cannot carry through this door (`docs/architecture.md`).
-
 import type { Feature, FeatureCollection, Point, Polygon } from 'geojson';
 import { t } from 'i18next';
 import { transform } from 'ol/proj';
@@ -31,11 +27,8 @@ const PICTURES_DIR = 'bilder';
 const SKETCH_NAME = 'tegning';
 const README_NAME = 'LESMEG.txt';
 
-/** The drawing's layer name in the project; the file keeps its own stem. */
 const SKETCH_LAYER = 'Tegning';
 
-/** The drawing at the resolution it was drawn; the overlay's own scaling is a
- *  function of the view, which an export has not got. */
 const SKETCH_SCALE = 1;
 
 const text = (body: string): Blob =>
@@ -46,13 +39,6 @@ const json = (body: unknown): Blob =>
     type: 'application/geo+json',
   });
 
-/**
- * The metric rectangle's own corners carried back, not the stored lon/lat box
- * drawn as a rectangle. UTM 33's grid north leans up to nine degrees off true
- * north over Norway (`src/map/bbox.ts`), and `bbox25833` is the ground every
- * raster actually covers — an axis-aligned polygon would sit visibly off the
- * pictures it is drawn to frame.
- */
 const footprintRing = (footprint: SpotFootprint): number[][] => {
   const [minX, minY, maxX, maxY] = bboxToMetric(footprint);
   return (
@@ -66,9 +52,6 @@ const footprintRing = (footprint: SpotFootprint): number[][] => {
   ).map((corner) => transform(corner, EXPORT_CRS, 'EPSG:4326'));
 };
 
-// Field names mirror the collection's own columns rather than the reader's
-// language: an attribute table is a schema, and one that changed with the
-// locale could not be joined to another export.
 const spotProperties = (spot: SpotRecord) => ({
   code: spot.code,
   name: spot.name,
@@ -117,7 +100,6 @@ const imageSize = async (
   }
 };
 
-/** One raster plus the two sidecars that place it, where it can be placed. */
 const georeferenced = async (
   path: string,
   extension: string,
@@ -137,10 +119,7 @@ const georeferenced = async (
 
 type Picture = {
   entries: ZipEntry[];
-  /** The provenance block this picture contributes to the readme. */
   credit: string[];
-  /** Null for anything the project cannot place — a loop, or a raster whose
-   *  frame is not all ground. */
   layer: ProjectRaster | null;
 };
 
@@ -155,9 +134,6 @@ const pictureOf = async (
 
   const response = await fetch(url);
   if (!response.ok) throw new Error(`file ${response.status}`);
-  // The stored bytes, never the stamped ones: `stampEvidence` insets the
-  // capture under its band and mats a narrow one sideways, so a stamped file
-  // is no longer registered to its rectangle (`docs/architecture.md`).
   const blob = await response.blob();
 
   const spec = specOf(rec);
@@ -167,8 +143,6 @@ const pictureOf = async (
   const extension = extensionOf(blob.type);
   const bbox = evidenceBbox(rec);
 
-  // A loop is video, which no GIS reads; a burnt-in band means only part of
-  // the raster is the ground, so neither takes a world file.
   const ground =
     !isVideoEvidence(rec) && evidenceBandTop(rec) === 1 ? bbox : null;
 
@@ -194,9 +168,6 @@ const pictureOf = async (
         name: stem,
         path: `${PICTURES_DIR}/${stem}.${extension}`,
         bbox25833: ground,
-        // Every PNG the app stores carries alpha and every JPEG does not,
-        // the sidecar's renders included — checked against what QGIS itself
-        // wrote for each kind.
         alpha: extension === 'png',
       }
     : null;
@@ -233,8 +204,6 @@ const sketchEntries = async (
   };
 };
 
-/** Only what the bundle really holds: a spot written before the footprint rule
- *  may still have none, and not every spot has a drawing. */
 type Held = { footprint: boolean; sketch: boolean };
 
 const readme = (
@@ -276,10 +245,6 @@ const readme = (
 
 export type SpotBundle = { blob: Blob; filename: string };
 
-/**
- * `rows` is the gallery's own order, so the numbering a reader sees in the
- * card is the numbering the layer list comes up in.
- */
 export const buildSpotBundle = async (
   spot: SpotRecord,
   rows: readonly EvidenceRecord[],
@@ -303,7 +268,6 @@ export const buildSpotBundle = async (
   const sketch = await sketchEntries(spot, slug);
   entries.push(...sketch.entries);
 
-  // Above the pictures, as it is on the map: the drawing is traced over them.
   const layers = sketch.layer ? [sketch.layer, ...pictures] : pictures;
   entries.push({
     path: `${slug}/${slug}.qgs`,

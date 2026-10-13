@@ -1,10 +1,3 @@
-/* Excalidraw re-pointed at the Mantine theme. Every `:global(...)` selector
- * below is a library-internal class name that can move in a version bump. */
-
-/* The map's own rectangle: Excalidraw's islands place themselves inside this
- * box, and the scene is scrolled to compensate (`initialSceneView`).
- * `isolation` contains Excalidraw's z-ladder, which climbs past 1000 and would
- * otherwise paint its popovers over the band. */
 .surface {
   position: absolute;
   inset: 0;
@@ -13,7 +6,6 @@
 }
 
 .surface :global(.excalidraw) {
-  /* Surfaces and text. */
   --island-bg-color: var(--mantine-color-body);
   --default-bg-color: var(--mantine-color-body);
   --popup-bg-color: var(--mantine-color-body);
@@ -23,7 +15,6 @@
   --icon-fill-color: var(--mantine-color-text);
   --dialog-border-color: var(--mantine-color-default-border);
 
-  /* Accent. */
   --color-primary: var(--mantine-color-papaya-5);
   --color-primary-hover: var(--mantine-color-papaya-4);
   --color-primary-darker: var(--mantine-color-papaya-6);
@@ -31,7 +22,6 @@
   --color-primary-light: var(--mantine-color-papaya-9);
   --color-primary-light-darker: var(--mantine-color-papaya-8);
 
-  /* Controls. */
   --button-color: var(--mantine-color-text);
   --button-bg: transparent;
   --button-border: transparent;
@@ -47,11 +37,6 @@
   --input-hover-bg-color: var(--mantine-color-dark-5);
   --input-label-color: var(--mantine-color-dimmed);
 
-  /* Excalidraw's second, newer palette. The islands along the bottom — the
-   * zoom steps and undo/redo — paint their faces from these rather than from
-   * `--island-bg-color`, and the scene is held on the *light* theme on
-   * purpose (see `theme` below), so left alone they come out light under the
-   * text colour above. */
   --color-surface-lowest: var(--mantine-color-default-border);
   --color-surface-low: var(--mantine-color-default);
   --color-surface-mid: var(--mantine-color-body);
@@ -65,12 +50,6 @@
   --shadow-island: var(--mantine-shadow-md);
 }
 
-/* Hidden: the hamburger, whose verbs `UIOptions.canvasActions` empties while
- * still rendering the button; the shape library, which is excalidraw.com
- * content `connect-src` would have to be widened for — its button and the
- * sidebar it slides in, both rendered as internal fallbacks with no prop to
- * take them off, and the sidebar carries nothing else this app offers; and
- * help. */
 .surface :global(.main-menu-trigger),
 .surface :global(.default-sidebar-trigger),
 .surface :global(.default-sidebar),
@@ -78,17 +57,6 @@
   display: none;
 }
 
-/* The toolbar and the properties island, both replaced by `SketchTools` —
- * Excalidraw has no prop for either and no slot to put a button in, so the way
- * to a toolbox of our own is to hide its own and drive it through the
- * imperative API. `.App-mobile-menu` is where the same properties go on a
- * narrow viewport.
- *
- * What goes with them: the laser and frame tools, which have no use over a map
- * — the hand does and is on the strip; the layer order, the alignment and the
- * actions, which the canvas's own
- * context menu still carries; and the property defaults the strip does not
- * offer, which `buildInitialData` sets instead. */
 .surface :global(.App-toolbar-container),
 .surface :global(.App-menu__left),
 .surface :global(.App-mobile-menu) {

@@ -8,8 +8,6 @@ import { Stroke, Style } from 'ol/style';
 import { mapAtom } from '../map/atoms';
 import { terrainAdjustingAtom, terrainWindowAtom } from './window';
 
-// The frame of a standing analysis. `map/rectAdjust.ts` draws the same
-// rectangle while it is being placed; only ever one of the two is up.
 const CASING = 'rgba(255, 255, 255, 0.4)';
 const FRAME = 'rgba(255, 106, 0, 0.55)';
 
@@ -38,7 +36,6 @@ export const terrainWindowLayerEffect = atomEffect((get) => {
       }),
     ],
   });
-  // Over the render, which is at zIndex 1.
   const layer = new VectorLayer({
     zIndex: 4,
     source,

@@ -3,7 +3,6 @@ import BaseLayer from 'ol/layer/Base';
 import ImageLayer from 'ol/layer/Image';
 import Layer from 'ol/layer/Layer';
 import TileLayer from 'ol/layer/Tile';
-// Aliased: OpenLayers' `Map` would shadow the global one the memo below uses.
 import type OLMap from 'ol/Map';
 import { ImageWMS, TileWMS } from 'ol/source';
 import { fetchWithin } from '../../shared/utils/deadline';
@@ -18,14 +17,9 @@ import { DEFAULT_INFO_FORMAT } from './types';
 
 export type QueryableWMSLayer = TileLayer | ImageLayer<ImageWMS>;
 
-// Not `getVisible()`, which is only the checkbox: a layer with a `minZoom`
-// still reports visible below it. `isVisible` folds in the zoom, resolution and
-// extent limits.
 const isRendering = (layer: BaseLayer, map: OLMap): boolean =>
   layer instanceof Layer && layer.isVisible(map.getView());
 
-/** The WMS layers a click can be put to: queryable, drawing at this zoom, and
- *  among `ids`. */
 export const getQueryableWMSLayers = (
   map: OLMap,
   ids: ReadonlySet<string>,
@@ -344,9 +338,6 @@ const parseFeatureInfo = (
   return parseJsonFeatureInfo(data);
 };
 
-// Keyed by the GetFeatureInfo URL, which carries the sublayers, styles, tile
-// bbox and pixel, so nothing needs invalidating. Eviction is by age, not use: a
-// `Map` iterates in insertion order.
 const MEMO_LIMIT = 400;
 const memo = new Map<string, FeatureInfoFeature[]>();
 
@@ -358,7 +349,6 @@ const remember = (key: string, features: FeatureInfoFeature[]) => {
   memo.set(key, features);
 };
 
-/** Well under wmscache's 30 s read timeout. */
 const FEATURE_INFO_DEADLINE_MS = 12_000;
 
 export const fetchLayerFeatureInfo = async (
@@ -393,15 +383,11 @@ export const fetchLayerFeatureInfo = async (
     ? [preferredFormat]
     : ['application/json', 'application/vnd.ogc.gml', 'text/xml', 'text/plain'];
 
-  // The first format's URL is the memo key whichever format answers: they
-  // differ only in `INFO_FORMAT`.
   const key = buildFeatureInfoUrl(layer, coordinate, map, formatsToTry[0]);
   if (!key) return answer([], 'Could not build GetFeatureInfo URL');
   const remembered = memo.get(key);
   if (remembered) return answer(remembered);
 
-  // An empty answer is worth remembering, but only when every format was
-  // actually asked: a failed request would otherwise cache a hole.
   let failed = false;
 
   for (const format of formatsToTry) {
@@ -409,8 +395,6 @@ export const fetchLayerFeatureInfo = async (
     if (!url) return answer([], 'Could not build GetFeatureInfo URL');
 
     try {
-      // `fetchWithin`, not `fetch`: a non-tile request to an external origin is
-      // the breaker's to admit or refuse.
       const { contentType, data } = await fetchWithin(
         url,
         {
@@ -436,8 +420,6 @@ export const fetchLayerFeatureInfo = async (
         return answer(features);
       }
 
-      // JSON is structured enough that an empty answer is the answer; the text
-      // formats are not, so a parse that found nothing tries the next one.
       if (contentType.includes('json')) {
         remember(key, features);
         return answer(features);

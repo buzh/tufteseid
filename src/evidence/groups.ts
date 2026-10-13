@@ -4,14 +4,9 @@ import { coverOf, evidenceGroupKey } from './spec';
 export type EvidenceGroup = {
   key: string;
   rows: EvidenceRecord[];
-  /** The row that stands for the group where only one can: its cover, else the
-   *  first row. */
   cover: EvidenceRecord;
 };
 
-/** Rows gathered by `evidenceGroupKey` — the tiles of one mosaic in one
- *  group — in first-seen order, each group keeping its rows in the order they
- *  arrived. */
 export const groupEvidence = (
   rows: readonly EvidenceRecord[],
 ): EvidenceGroup[] => {

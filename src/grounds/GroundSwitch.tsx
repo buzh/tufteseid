@@ -1,6 +1,3 @@
-// No button lit is `?backgroundLayer=empty`, the one background belonging to no
-// ground.
-
 import { Tooltip } from '@mantine/core';
 import { useAtomValue } from 'jotai';
 import { useTranslation } from 'react-i18next';
@@ -23,8 +20,6 @@ const GROUND_ICON: Record<GroundMode, MaterialSymbol> = {
 
 export const GroundSwitch = ({ ground }: { ground: GroundControls }) => {
   const { t } = useTranslation();
-  // The view is read at the click rather than followed: the switch has no
-  // reason to re-render on every pan.
   const map = useAtomValue(mapAtom);
   const { mode, select, mayFlyfoto } = ground;
 
@@ -44,7 +39,6 @@ export const GroundSwitch = ({ ground }: { ground: GroundControls }) => {
               icon={GROUND_ICON[candidate]}
               on={candidate === mode}
               aria-label={label}
-              // Not a toggle when it leaves the app.
               aria-pressed={away ? undefined : candidate === mode}
               onClick={() =>
                 away

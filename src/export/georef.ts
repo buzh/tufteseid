@@ -1,10 +1,5 @@
-// What makes a bare raster land in the right place: a world file for the
-// ground it covers and a `.prj` for the projection that ground is stated in.
-
 import type { Metric } from '../map/bbox';
 
-/** Every stored render records its ground in EPSG:25833 (`meta.bbox25833`), so
- *  that is what a bundle is written in. */
 export const EXPORT_CRS = 'EPSG:25833';
 
 export const CRS_WKT =
@@ -26,26 +21,13 @@ export const CRS_WKT =
   'AXIS["Easting",EAST],AXIS["Northing",NORTH],' +
   'AUTHORITY["EPSG","25833"]]\n';
 
-/** The sidecar GDAL looks for beside each raster type. `.wld` is read for any
- *  of them, but a reader opening the folder expects the specific one. */
 const WORLD_EXTENSIONS: Record<string, string> = { png: 'pgw', jpg: 'jgw' };
 
 export const worldExtension = (extension: string): string =>
   WORLD_EXTENSIONS[extension] ?? 'wld';
 
-// Enough for a millimetre at UTM 33 eastings, which run to seven figures.
 const DECIMALS = 10;
 
-/**
- * Six lines: pixel width, two rotation terms, pixel height negated because
- * image rows run down and northings run up, then the **centre** of the
- * top-left pixel rather than its corner.
- *
- * The pixel size is measured off the decoded image, never `meta.metresPerPx`:
- * that figure is what the producer aimed at and the fit may have coarsened it
- * (`src/evidence/fit.ts`). `src/evidence/download.ts` measures its scale bar
- * the same way and for the same reason.
- */
 export const worldFile = (
   bbox25833: Metric,
   widthPx: number,

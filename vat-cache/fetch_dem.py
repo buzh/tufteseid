@@ -45,8 +45,6 @@ def read_tiff_f32(buf: bytes) -> np.ndarray:
         else:
             (off,) = struct.unpack(en + "I", buf[p + 8 : p + 12])
             raw = buf[off : off + size]
-        # A no-coverage answer is a ~1.6 kB stub whose string tags point past the
-        # end of the body.
         if len(raw) < size:
             continue
         tags[tag] = struct.unpack(en + fmt * cnt, raw)
@@ -63,7 +61,7 @@ def read_tiff_f32(buf: bytes) -> np.ndarray:
     across = (width + tile_w - 1) // tile_w
     for k, (off, cnt) in enumerate(zip(offsets, counts)):
         if off == 0 or cnt == 0:
-            continue  # absent tile: no coverage here
+            continue
         tile = np.frombuffer(
             buf[off : off + cnt], dtype=en + "f4", count=tile_w * tile_h
         ).reshape(tile_h, tile_w)

@@ -1,16 +1,10 @@
 import type { Metric } from '../map/bbox';
 
-// Pixel budget is the rule, byte budget a measured backstop (encoded size
-// spreads ~250× across content). The byte cap is `evidence.file`'s: PocketBase
-// answers 400 over it, and every retry of the same blob fails the same way.
 export const MAX_STORED_PIXELS = 40000000;
 const MAX_STORED_BYTES = 50000000;
 
-// The geometric step converges in one pass; the cap stops a pathological
-// encoder spinning the queue.
 const MAX_FIT_PASSES = 3;
 
-/** Pixels and the ground they cover, EPSG:25833. */
 export type Raster = {
   canvas: HTMLCanvasElement;
   metresPerPx: number;
@@ -25,7 +19,6 @@ const scaleCanvas = (
   out.width = Math.max(1, Math.round(src.width * factor));
   out.height = Math.max(1, Math.round(src.height * factor));
   const ctx = out.getContext('2d');
-  // Too large to store beats gone, and the byte check reports on what it gets.
   if (!ctx) return src;
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
@@ -40,8 +33,6 @@ export const canvasBlob = (
 ): Promise<Blob | null> =>
   new Promise((resolve) => canvas.toBlob(resolve, type, quality));
 
-// The returned `metresPerPx` is the one achieved, not the one passed in, when
-// the fit had to downscale.
 export const fitImageBlob = async (
   image: HTMLCanvasElement,
   metresPerPx: number,
@@ -59,14 +50,9 @@ export const fitImageBlob = async (
     const blob = await canvasBlob(source, type, quality);
     if (!blob) return null;
     if (blob.size <= MAX_STORED_BYTES) {
-      // Ratio of widths, not the factor applied, to include `scaleCanvas`'s
-      // rounding.
       return { blob, metresPerPx: (metresPerPx * image.width) / source.width };
     }
-    // Fails closed: an oversized blob is a 400 on every retry, so null records
-    // the row as empty and stops asking.
     if (pass === MAX_FIT_PASSES) return null;
-    // Bytes do not fall as fast as pixels, so the step takes a margin.
     source = scaleCanvas(
       source,
       Math.sqrt(MAX_STORED_BYTES / blob.size) * 0.95,

@@ -301,7 +301,7 @@ calls `slope_aspect` without `output_units`, so the bottom layer is radians
 normalized over 0..55 — an all-but-flat dark red, which is where the blend's
 colour comes from. Passing degrees instead, which is RVT's own default
 elsewhere, produces a plausible picture that is not e4MSTP. The transcription
-keeps the radians and says so in a comment.
+keeps the radians, and this paragraph is the only place that says so.
 
 The output is an **RGBA PNG, alpha 0 where the ground is absent** — the dilated
 hole mask, plus any pixel the blend itself left non-finite. `meta` is

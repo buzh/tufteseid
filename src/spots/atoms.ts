@@ -20,15 +20,10 @@ import { DEFAULT_FOOTPRINT_SIDE_M } from './footprint';
 import { mayEditSpotAtom } from './mayEdit';
 
 export type SpotDraft = {
-  /** New per draft; surfaces key off it to remount. */
   id: string;
   recordId: string | null;
   point: SpotPoint;
-  /** `idle` is the box resting: nothing on the map is in the reader's hand. */
   stage: 'idle' | 'pin' | 'footprint' | 'sketch';
-  /** Which box the reader is looking at. A `card` draft exists only to hold the
-   *  map while the rectangle is dragged or the drawing is edited, so it opens
-   *  in a stage and is let go rather than resting at `idle`. */
   box: 'card' | 'editor';
 };
 
@@ -40,9 +35,6 @@ export const spotFormAtom = atom<SpotForm>({ name: '', description: '' });
 
 export const spotSketchAtom = atom<SpotSketch | null>(null);
 
-/** Where a rectangle starts: around the drawing if one is on screen, else the
- *  middle of the view. A drawing nowhere near the viewport is not what the
- *  reader is looking at, so it is passed over. */
 const seedFootprint = (
   map: Map,
   drawing: SpotSketch | null,
@@ -59,11 +51,8 @@ const seedFootprint = (
   );
 };
 
-/** The draft's footprint, same shape as `SpotFootprint`. */
 export const spotFootprintAtom = atom<Bbox | null>(null);
 
-/** Read by `useRectangleAdjust`: the stage is the only record of who has hold
- *  of the map. */
 export const spotFootprintAdjustingAtom = atom(
   (get) => get(spotDraftAtom)?.stage === 'footprint',
 );
@@ -72,8 +61,6 @@ const readingSpotIdAtom = atom<string | null>(null);
 
 const openSpotAtom = atom<SpotRecord | null>(null);
 
-/** The open spot. Opening a different one — or none — ends the reading of the
- *  last, so no caller has to remember to. */
 export const activeSpotAtom = atom(
   (get) => get(openSpotAtom),
   (get, set, next: SpotRecord | null) => {
@@ -82,10 +69,6 @@ export const activeSpotAtom = atom(
   },
 );
 
-/** The open spot's evidence is being read on the map; a draft suspends the
- *  reading rather than ending it. True regardless for a reader who may not
- *  edit the spot — writing it false does nothing, and they leave by closing
- *  the spot (`docs/architecture.md`). */
 export const spotReadingAtom = atom(
   (get) => {
     const active = get(activeSpotAtom);
@@ -98,8 +81,6 @@ export const spotReadingAtom = atom(
   },
 );
 
-/** Derived rather than read apart: a pin drag writes the draft every frame, and
- *  a subscriber on the draft would rebuild the layer behind it. */
 export const standingSpotFootprintAtom = atom((get): Bbox | null => {
   if (get(spotFootprintAdjustingAtom)) return null;
   if (get(sketchSessionAtom)) return null;
@@ -108,14 +89,6 @@ export const standingSpotFootprintAtom = atom((get): Bbox | null => {
     : (get(activeSpotAtom)?.footprint ?? null);
 });
 
-/** The one spot the pin layer leaves undrawn: a draft, whose pin is
- *  `pinAdjust.ts`'s to draw, or an open spot whose footprint frame stands in
- *  the pin's place. A row from before the rectangle rule has no frame and
- *  nobody repairs one for a reader who may not edit it, so its pin stays or
- *  the spot is marked by nothing at all.
- *
- *  Derived, so the pin drag writing the draft every frame only restyles the
- *  layer when the id changes. */
 export const unpinnedSpotIdAtom = atom((get): string | null => {
   const draft = get(spotDraftAtom);
   if (draft) return draft.recordId;
@@ -123,8 +96,6 @@ export const unpinnedSpotIdAtom = atom((get): string | null => {
   return active?.footprint ? active.id : null;
 });
 
-/** The `+` is armed: the next click on the map places the pin. Exclusive with
- *  `spotDraftAtom` — every writer of the draft clears this. */
 export const spotPlacingAtom = atom(false);
 
 let draftCounter = 0;
@@ -180,9 +151,6 @@ export const setSpotStageAtom = atom(
     const draft = get(spotDraftAtom);
     if (!draft || draft.stage === stage) return;
     if (stage === 'footprint' || stage === 'sketch') {
-      // The terrain rectangle lets go of the map: only one
-      // `useRectangleAdjust` may be live, or neither frame can be grabbed, and
-      // the sketch canvas freezes the map's interactions under it.
       set(terrainAdjustingAtom, false);
     }
     if (stage === 'footprint') {
@@ -191,17 +159,12 @@ export const setSpotStageAtom = atom(
         get(spotFootprintAtom) ??
         seedFootprint(map, get(spotSketchAtom), draft.point);
       set(spotFootprintAtom, rect);
-      // A rectangle nobody can see is a rectangle nobody can drag.
       bringBboxIntoView(map, rect);
     }
     set(spotDraftAtom, { ...draft, stage });
   },
 );
 
-/** Let go of the map without losing the rectangle — the other side of the
- *  one-at-a-time rule `setSpotStageAtom` keeps. The editor keeps its box and
- *  rests; a card draft is nothing but the hold, so it goes, and its unmount
- *  writes what was dragged. */
 export const releaseSpotFootprintAtom = atom(null, (get, set) => {
   const draft = get(spotDraftAtom);
   if (draft?.stage !== 'footprint') return;
@@ -209,7 +172,6 @@ export const releaseSpotFootprintAtom = atom(null, (get, set) => {
   else set(spotDraftAtom, { ...draft, stage: 'idle' });
 });
 
-/** Take hold of the map from the card, which stays on screen. */
 export const adjustSpotDraftAtom = atom(
   null,
   (_get, set, record: SpotRecord, stage: 'footprint' | 'sketch') => {

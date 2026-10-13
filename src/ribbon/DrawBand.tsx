@@ -1,8 +1,3 @@
-// The band while a drawing is open. The map's own sections are away with the
-// boxes: nothing here may change the ground under strokes already registered
-// to it, so all the band carries is whose drawing this is and the two ways
-// out. The tools themselves are on the canvas (`sketch/SketchTools`).
-
 import { Button } from '@mantine/core';
 import { useAtomValue } from 'jotai';
 import { useTranslation } from 'react-i18next';

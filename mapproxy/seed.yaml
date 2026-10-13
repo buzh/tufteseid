@@ -1,12 +1,3 @@
-# Run by hand, never on a schedule:
-#
-#   docker compose exec mapproxy mapproxy-seed -c 4 \
-#     -f /mapproxy/config/mapproxy.yaml -s /mapproxy/config/seed.yaml \
-#     --seed ALL
-#
-# No `refresh_before` anywhere: MBTiles stores no per-tile timestamp, so any
-# refresh time rebuilds every tile in the task rather than the stale ones.
-
 coverages:
   lidar:
     bbox: [-100275, 6399725, 1150255, 8000275]

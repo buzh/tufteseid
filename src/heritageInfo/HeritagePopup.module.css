@@ -1,4 +1,3 @@
-/* The overlay element is `pointer-events: none`; this box takes it back. */
 .popup {
   box-sizing: border-box;
   width: 90vw;

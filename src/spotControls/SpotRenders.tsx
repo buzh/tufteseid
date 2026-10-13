@@ -1,8 +1,3 @@
-// The pictures the sidecar makes, one line each: what it is, which acquisition
-// to read it off, what it is lit by, and the press that orders it. Work
-// ordered, not kept — the card's camera keeps the view as it stands, these are
-// computed over the footprint instead (`docs/render-sidecar.md`).
-
 import {
   Alert,
   Menu,
@@ -46,8 +41,6 @@ import { Icon } from '../ui/Icon';
 import { useConfirm } from '../ui/useConfirm';
 import styles from './SpotBox.module.css';
 
-// Degrees between frames. Every one divides 360, which the sidecar insists on
-// — a step that does not leaves a jump where the loop closes.
 const STEP_CHOICES = [5, 10, 15] as const;
 
 type Catalogue = {
@@ -62,8 +55,6 @@ const useDemProjects = (footprint: Bbox | null): Catalogue => {
   const key = footprint?.join(',') ?? '';
   const bbox = useMemo(
     () => footprint,
-    // The record is a fresh object on every write to the spot, and the
-    // rectangle is the only part of it this asks about.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [key],
   );
@@ -107,8 +98,6 @@ const SourceMenu = ({
   const { projects, loading, failed } = catalogue;
   const chosen = projects.find((p) => p.name === value) ?? null;
 
-  // The name the reader picked outlives the list: a footprint moved off the
-  // acquisition still has to say what the next render would read.
   const short = chosen
     ? demProjectFacts(chosen) || chosen.name
     : value === AUTO_SOURCE
@@ -272,9 +261,6 @@ const SunLoopMenu = ({
   );
 };
 
-/** One picture: the name, the acquisition, its settings where it has any, and
- *  the press. The press is armed first — a render is two CPU-minutes of
- *  somebody's server, so it is never one stray click away. */
 const RenderLine = ({
   spec,
   about,
@@ -345,11 +331,6 @@ export const SpotRenders = ({
   const { t } = useTranslation();
   const [sun, setSun] = useState<SunLoopSettings>(SUN_LOOP_DEFAULTS);
   const [sources, setSources] = useState<Record<string, string>>({});
-  // The sidecar renders over one box read from the spot row and refuses
-  // anything past the cap, so a multi-tile boundary is blocked here until the
-  // sidecar learns to fan out (`docs/render-sidecar.md`). The catalogue and
-  // matching use the first tile, which for a single-tile site is the whole
-  // footprint.
   const tiles = useMemo(
     () => (spot.footprint ? mosaicTiles(spot.footprint) : []),
     [spot.footprint],
@@ -362,18 +343,11 @@ export const SpotRenders = ({
     rendersOnServer(rec.kind),
   );
 
-  // A row with no pixels that nobody has settled is a render on its way. A
-  // settled one is left to the gallery's retry, as every other kind is.
   const onItsWay = (rec: EvidenceRecord) =>
     !rec.file && !mayRetry(evidence.stateOf(rec));
 
-  // Pixels, not a row: the row stands from the moment the line is pressed, so
-  // a line whose render failed must be orderable again.
   const landed = (rec: EvidenceRecord) => rec.file !== '';
 
-  // The sidecar takes one job per caller, whichever line asked for it, so one
-  // render closes every line here — but only the line whose picture it is may
-  // say it is being made.
   const outstanding = ordered.some(onItsWay);
 
   const metric = renderBox ? bboxToMetric(renderBox) : null;

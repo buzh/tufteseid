@@ -5,14 +5,10 @@ import path from 'path';
 import type { Plugin } from 'vite';
 import { defineConfig } from 'vitest/config';
 
-// Serves Excalidraw's fonts from this origin. Every subset, Xiaolai included:
-// Excalidraw lists esm.sh after our URL in each FontFace, so a subset we do not
-// serve becomes a cross-origin request that `font-src 'self'` blocks.
 function excalidrawFonts(): Plugin {
   const [devRoot, prodRoot] = ['dist/dev/fonts', 'dist/prod/fonts'].map((rel) =>
     path.resolve('node_modules/@excalidraw/excalidraw', rel),
   );
-  // The package ships both sets; production must come first when building.
   const serveRoots = [devRoot, prodRoot];
   const buildRoots = [prodRoot, devRoot];
   let outDir = 'dist';
@@ -29,8 +25,6 @@ function excalidrawFonts(): Plugin {
         const rel = path.normalize(
           decodeURIComponent(url.slice('/fonts/'.length)),
         );
-        // path.normalize collapses inner '..', so a leading one is the only
-        // remaining escape from the font directory.
         if (rel.startsWith('..')) return next();
         const root = serveRoots.find((dir) => existsSync(path.join(dir, rel)));
         if (!root) return next();

@@ -30,16 +30,10 @@ import {
 
 export const activeThemeLayersAtom = atom<Set<ThemeLayerName>>(new Set([]));
 
-// Module-level for a stable identity: a fresh `new Set()` per read re-runs
-// every effect below.
 const NO_THEME_LAYERS: ReadonlySet<ThemeLayerName> = new Set();
 
-// The one theme layer whose WMS request can be reshaped; the other four RA
-// services publish a single style each.
 export const RESHAPEABLE_THEME_LAYER: ThemeLayerName = 'heritageSites';
 
-// The order a link lists them in, and the vocabulary an incoming one is
-// filtered against.
 const THEME_LAYER_ORDER: readonly ThemeLayerName[] = [
   'heritageSites',
   'culturalEnvironments',
@@ -48,12 +42,8 @@ const THEME_LAYER_ORDER: readonly ThemeLayerName[] = [
   'userReportedHeritage',
 ];
 
-// Ticked when `themeLayers` is absent: the register is what the terrain is
-// read against, so it is up before the reader asks.
 const DEFAULT_THEME_LAYERS: readonly ThemeLayerName[] = ['heritageSites'];
 
-// getUrlParameter, not a list helper: absent is the default set and empty is
-// none, and the two must not read alike (same trade as `heritageDetails`).
 export const readThemeLayers = (): Set<ThemeLayerName> => {
   const fromUrl = getUrlParameter('themeLayers');
   if (fromUrl === null) return new Set(DEFAULT_THEME_LAYERS);
@@ -66,9 +56,6 @@ export const readThemeLayers = (): Set<ThemeLayerName> => {
   );
 };
 
-// Written from what reached the map, not from what was asked for: a layer
-// whose config or construction failed would otherwise go into the URL and
-// survive every reload.
 const writeThemeLayersUrlParameter = (
   layers: ReadonlySet<ThemeLayerName>,
 ): void => {
@@ -96,8 +83,6 @@ const themeLayersOnMap = (map: OlMap): Set<ThemeLayerName> =>
       .map((id) => id.substring(6) as ThemeLayerName),
   );
 
-// Drops one source's features rather than the whole reading, so a card stands
-// when one of several ticked registers is turned off underneath it.
 const forgetReadingsFrom = (layerId: string) => {
   const store = getDefaultStore();
   for (const readingAtom of [heritageTipAtom, heritagePopupAtom]) {
@@ -126,9 +111,6 @@ type ThemeLayerSettings = {
   heritageHidden: boolean;
 };
 
-// Takes a map rather than reading `mapAtom`: an OL layer belongs to one map at
-// a time, so the split view's two panes each get their own instances. Touches
-// nothing outside the map — the URL and the open readings are the caller's.
 const syncThemeLayers = (
   map: OlMap,
   {
@@ -167,8 +149,6 @@ const syncThemeLayers = (
     }
 
     const params = paramsFor(layerName, heritageDetails, heritageRender);
-    // A pooled layer still holds its tiles; the reshape below corrects its
-    // registers if they moved on while it was off the map.
     const layerToAdd =
       takePooledLayer(themeLayerPoolKey(layerName, mapProjection)) ??
       createThemeLayerFromConfig(
@@ -196,7 +176,6 @@ const syncThemeLayers = (
     if (layer) retireLayer(map, layer);
   });
 
-  // Reshape whatever is on the map now, including the layers just added.
   map
     .getLayers()
     .getArray()
@@ -207,9 +186,6 @@ const syncThemeLayers = (
 
       const layerName = id.substring(6) as ThemeLayerName;
       const params = paramsFor(layerName, heritageDetails, heritageRender);
-      // With no register ticked the source can only answer a transparent tile.
-      // Hidden rather than removed keeps the tile cache, and featureInfo's
-      // `isRendering` stops a click asking RA about an unseen register.
       const empty = layerName === RESHAPEABLE_THEME_LAYER && params === null;
       layer.setVisible(!heritageHidden && !empty);
       if (!params) return;
@@ -217,7 +193,6 @@ const syncThemeLayers = (
       const source = (layer as { getSource?: () => unknown }).getSource?.();
       if (!isWmsSource(source)) return;
       const current = source.getParams();
-      // updateParams invalidates the tile cache and re-requests the screen.
       if (current.LAYERS === params.LAYERS && current.STYLES === params.STYLES)
         return;
       source.updateParams(params);
@@ -227,7 +202,6 @@ const syncThemeLayers = (
 };
 
 export const themeLayerEffect = atomEffect((get) => {
-  // Read for the subscription: any of these changing reshapes the map.
   const settings: ThemeLayerSettings = {
     themeLayers: get(activeThemeLayersAtom),
     heritageDetails: get(heritageDetailsAtom),
@@ -240,9 +214,6 @@ export const themeLayerEffect = atomEffect((get) => {
 
   const { onMap, removed } = syncThemeLayers(store.get(mapAtom), settings);
 
-  // A ticked register draws over both panes of a split. Created here rather
-  // than waited for: this effect mounts ahead of the one that builds the B
-  // ground, so the new pane would otherwise stay bare until the next change.
   const pane = mode === 'split' ? getSplitMap() : peekSplitMap();
   if (pane) {
     syncThemeLayers(pane, {
@@ -251,13 +222,11 @@ export const themeLayerEffect = atomEffect((get) => {
     });
   }
 
-  // Off the main map's result alone; the second pane is a mirror.
   writeThemeLayersUrlParameter(onMap);
   for (const layerName of removed) {
     forgetReadingsFrom(`theme.${layerName}`);
   }
 
-  // Only the blind clears the readings: what a reshape hides is still recorded.
   if (settings.heritageHidden) {
     store.set(heritageTipAtom, null);
     store.set(heritagePopupAtom, null);

@@ -1,33 +1,24 @@
-// Tiles a bbox into WMS-sized sub-requests over the same-origin
-// /wms/geonorge/* handlers, so wmscache picks them up.
-
 import { fetchWithin } from '../shared/utils/deadline';
 import { LidarSource } from './sources';
 
-// A cold 2048² GetMap through wmscache can take tens of seconds; callers retry.
 const TILE_TIMEOUT_MS = 45_000;
 
-// Kartverket's WMS caps GetMap around 4096 px per side.
 export const MAX_TILE_PX = 2048;
 
-// Caps the canvas, so a large fine-resolution selection cannot eat hundreds
-// of megabytes.
 export const MAX_CANVAS_PX_PER_SIDE = 12000;
 
 export type TilePlan = {
   widthPx: number;
   heightPx: number;
   tiles: Array<{
-    dx: number; // canvas x offset
-    dy: number; // canvas y offset
-    w: number; // pixel width
-    h: number; // pixel height
+    dx: number;
+    dy: number;
+    w: number;
+    h: number;
     bbox25833: [number, number, number, number];
   }>;
 };
 
-// EPSG:25833. `maxSidePx` overrides the canvas cap for a caller painting
-// somewhere else — the terrain tool fills a Float32Array.
 export function planTiles(
   bbox: [number, number, number, number],
   metresPerPx: number,
@@ -40,7 +31,6 @@ export function planTiles(
   let widthPx = Math.max(1, Math.round(worldWidthM / metresPerPx));
   let heightPx = Math.max(1, Math.round(worldHeightM / metresPerPx));
 
-  // Both axes scale together: effective resolution is metresPerPx / scale.
   const scale = Math.min(1, maxSidePx / Math.max(widthPx, heightPx));
   widthPx = Math.max(1, Math.round(widthPx * scale));
   heightPx = Math.max(1, Math.round(heightPx * scale));
@@ -59,7 +49,6 @@ export function planTiles(
       const dy = r * baseTileH;
       const w = Math.min(baseTileW, widthPx - dx);
       const h = Math.min(baseTileH, heightPx - dy);
-      // Canvas y grows downward, northing upward, so the bbox flips.
       const tileMinX = minX + dx * effectiveMetresPerPx;
       const tileMaxX = tileMinX + w * effectiveMetresPerPx;
       const tileMaxY = maxY - dy * effectiveMetresPerPx;
@@ -83,7 +72,6 @@ export function buildGetMapUrl(
   widthPx: number,
   heightPx: number,
 ): string {
-  // 25833 is a projected CRS so BBOX order is minX,minY,maxX,maxY (E/N).
   const params = new URLSearchParams({
     SERVICE: 'WMS',
     VERSION: '1.3.0',
@@ -113,9 +101,7 @@ export async function runWithConcurrency<T>(
         if (!next) return;
         try {
           await worker(next.item, next.index);
-        } catch {
-          // The worker surfaces its own errors.
-        }
+        } catch {}
       }
     })(),
   );
@@ -124,8 +110,6 @@ export async function runWithConcurrency<T>(
 
 export type TileResult = 'painted' | 'blank';
 
-// Outside coverage Kartverket's WMS returns a valid full-size PNG of one
-// colour that a byte-size heuristic misses, so test pixel variance instead.
 export async function fetchAndPaint(
   url: string,
   ctx: CanvasRenderingContext2D,
@@ -161,7 +145,6 @@ function loadImage(url: string): Promise<HTMLImageElement> {
 }
 
 function isUniformImage(img: HTMLImageElement): boolean {
-  // 16×16 is cheap to read back and still varies on any real terrain detail.
   const sampleSize = 16;
   const oc = document.createElement('canvas');
   oc.width = sampleSize;

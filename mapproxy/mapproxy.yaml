@@ -1,12 +1,9 @@
 services:
   tms:
-    # Honoured only on /tiles/ requests; a /tms/ request hard-codes 'sw'.
     origin: 'nw'
     use_grid_names: true
 
 grids:
-  # Mirrors src/map/layers/wmsTileGrid.ts level for level: min_res 21664.0
-  # halves to z16 = 0.331 m/px. Level z holds 2**(z-1) tiles per side.
   tufteseid25833:
     srs: 'EPSG:25833'
     bbox: [-2500000.0, 3500000.0, 3045984.0, 9045984.0]
@@ -38,8 +35,6 @@ caches:
       type: mbtiles
       filename: /mapproxy/config/cache_data/lidar-dom.mbtiles
 
-  # Read-only second views of the same two MBTiles files: `sources: []` never
-  # fetches, and answers a blank tile for ground the store does not hold.
   lidar-dtm-held:
     grids: [tufteseid25833]
     sources: []
@@ -97,12 +92,6 @@ caches:
       filename: /mapproxy/config/cache_data/flyfoto.mbtiles
 
 sources:
-  # No `on_error` anywhere: a shed response must reach the browser as a 500 so
-  # src/upstream/ trips, rather than being stored as a blank tile.
-  # The land-only DTM, not the topobathy sibling: that one folds seabed rasters
-  # into its overviews from ~80 m/px out, so z8 and coarser came back with the
-  # sea hillshaded as if it were terrain. The two are pixel-identical on land at
-  # 10 m/px and finer.
   lidar_dtm_wms:
     type: wms
     req:
@@ -112,8 +101,6 @@ sources:
     concurrent_requests: 4
     http:
       client_timeout: 60
-    # The service's declared EPSG:25833 bounds; same numbers as the layer
-    # configs' `coverageExtent`.
     coverage:
       bbox: [-100275, 6399725, 1150255, 8000275]
       srs: 'EPSG:25833'
@@ -131,8 +118,6 @@ sources:
       bbox: [-100275, 6399725, 1150255, 8000275]
       srs: 'EPSG:25833'
 
-  # kd_* groups stop around 1:25 000 where fkb_* take over; asking for both
-  # families lets the server pick per scale.
   topo_ref_wms:
     type: wms
     req:
@@ -147,7 +132,6 @@ sources:
       bbox: [-127998, 6377920, 1145510, 7976800]
       srs: 'EPSG:25833'
 
-  # hoydekurver_1m and _5m come back empty from this service; not asked for.
   topo_ref_contours_wms:
     type: wms
     req:
@@ -176,8 +160,6 @@ sources:
       bbox: [-127998, 6377920, 1145510, 7976800]
       srs: 'EPSG:25833'
 
-  # Via nib-proxy: NiB's anonymous token is bound to the IP and referer that
-  # minted it, so it has to be injected server-side.
   flyfoto_wms:
     type: wms
     req:
@@ -193,7 +175,6 @@ sources:
       srs: 'EPSG:25833'
 
 layers:
-  # Each name is the `/cache/<name>/` segment the browser asks for.
   - name: lidar-dtm
     title: LiDAR DTM skyggerelieff, nasjonal mosaikk
     sources: [lidar-dtm]
@@ -221,9 +202,6 @@ layers:
 
 globals:
   cache:
-    # Bind-mounted; MapProxy takes locks here at startup, so a directory not
-    # writable by the image's mapproxy user (uid 100, gid 101) fails the
-    # service outright.
     base_dir: /mapproxy/config/cache_data
   image:
     formats:
@@ -233,8 +211,6 @@ globals:
         colors: 256
         encoding_options:
           quantizer: fastoctree
-      # `transparent` decides the blank tile synthesized for ground the store
-      # does not hold; without it that blank is opaque white.
       relief_png_held:
         format: image/png
         mode: P

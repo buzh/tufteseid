@@ -1,16 +1,10 @@
 /// <reference path="../pb_data/types.d.ts" />
-//
-// `fields.add()` with an existing id replaces the field; an omitted
-// property is a property removed.
 
 migrate(
   (app) => {
     const localities = app.findCollectionByNameOrId('localities');
     const attachments = app.findCollectionByNameOrId('attachments');
 
-    // A required unique field cannot be added to a populated table: existing
-    // rows all get SQLite's empty-string default and collide. So the column
-    // goes on optional, is backfilled, and is tightened last.
     localities.fields.add(
       new TextField({
         id: 'loc_code',
@@ -21,7 +15,6 @@ migrate(
     );
     app.save(localities);
 
-    // Crockford base32: digits and consonants, minus I, L, O and U.
     const ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
     const newCode = () => {
       if (
@@ -37,8 +30,6 @@ migrate(
       return out;
     };
 
-    // Raw UPDATEs rather than record saves, so the backfill leaves `updated`
-    // alone — it is the sort key for the reader's own list.
     const rows = app.findAllRecords('localities');
     const taken = {};
     for (let i = 0; i < rows.length; i++) {
@@ -62,7 +53,6 @@ migrate(
       }),
     );
 
-    // No COLLATE: the client upper-cases codes on the way in and on lookup.
     const localityIndexes = [];
     for (let i = 0; i < localities.indexes.length; i++) {
       localityIndexes.push(localities.indexes[i]);
@@ -120,8 +110,6 @@ migrate(
     const localities = app.findCollectionByNameOrId('localities');
     const attachments = app.findCollectionByNameOrId('attachments');
 
-    // Index first: PocketBase will not save a collection whose index
-    // references a field that is gone.
     const localityIndexes = [];
     for (let i = 0; i < localities.indexes.length; i++) {
       const sql = localities.indexes[i];

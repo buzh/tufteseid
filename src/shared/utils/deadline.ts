@@ -13,7 +13,6 @@ export class DeadlineError extends Error {
   }
 }
 
-/** Settles on time whether or not `run` honours the signal. */
 export const withDeadline = async <T>(
   ms: number,
   label: string,
@@ -36,9 +35,6 @@ export const withDeadline = async <T>(
   }
 };
 
-// The body is read through `read` inside the deadline: `fetch` resolves on the
-// headers, so ending there would leave the transfer unbounded. Also the
-// admission point for the upstream breaker (`src/upstream/`).
 export const fetchWithin = async <T>(
   url: string,
   { ms, what, signal }: { ms: number; what: string; signal?: AbortSignal },
@@ -52,8 +48,6 @@ export const fetchWithin = async <T>(
   if (signal?.aborted) relay();
   signal?.addEventListener('abort', relay);
   const timer = setTimeout(() => ac.abort(new DeadlineError(what, ms)), ms);
-  // Once a status line is in, that is the verdict; a later throw must not
-  // report the origin a second time.
   let answered = false;
   try {
     const res = await fetch(url, { signal: ac.signal });
@@ -62,8 +56,6 @@ export const fetchWithin = async <T>(
     if (!res.ok) throw new Error(`${what} HTTP ${res.status}`);
     return await read(res);
   } catch (err) {
-    // A caller-side abort is not evidence about the service; our own deadline
-    // and a network error are.
     if (origin && !answered && !signal?.aborted) reportFailure(origin);
     throw err;
   } finally {

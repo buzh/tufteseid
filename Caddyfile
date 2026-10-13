@@ -2,18 +2,14 @@
         servers {
                 metrics
 
-                # Trusts X-Forwarded-For; do not publish :3000 beyond 127.0.0.1.
                 trusted_proxies static private_ranges
         }
 
-        # Admin API has no authentication: keep it off the compose network.
         admin localhost:2019
 }
 
 :3000
 
-# /var/log/caddy is a host bind mount (mkdir -p on first run); JSON is the
-# format scripts/usage-report.sh parses.
 log {
         output file /var/log/caddy/access.log {
                 roll_size 20mb
@@ -23,12 +19,6 @@ log {
 }
 
 route {
-        # Above the app's CSP: GoAccess writes one self-contained HTML whose
-        # script and style are inline, and its template engine compiles with
-        # `new Function`, so the report needs 'unsafe-eval' too or it hangs on
-        # the loading screen. Served open, hence noindex. Empty bind mount
-        # before the first usage-report.sh run, so 404 here means "no report
-        # yet".
         redir /stats /stats/
         handle_path /stats/* {
                 header X-Robots-Tag noindex
@@ -42,8 +32,6 @@ route {
         header Strict-Transport-Security max-age=31536000
         header X-Content-Type-Options nosniff
         header Referrer-Policy strict-origin
-        # style-src-elem 'unsafe-inline' is required by MantineProvider's
-        # runtime <style>; a nonce is impossible behind a static file_server.
         header Content-Security-Policy "
                 default-src 'self';
                 script-src 'self';
@@ -57,8 +45,6 @@ route {
         "
         header Permissions-Policy "geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=(), accelerometer=(), camera=()"
 
-        # Must stay a narrow redir: an SPA fallback here would answer every
-        # wrong path with a 200.
         @shortLink path_regexp shortLink ^/l/([0-9A-Za-z]+)$
         redir @shortLink /?lok={re.shortLink.1}
 
@@ -97,9 +83,6 @@ route {
                 reverse_proxy http://wmscache
         }
 
-        # /tiles, not /tms: a TMS request forces origin 'sw', flipping every
-        # row, which renders as a blank map rather than a wrong one.
-        # Port 80 is the 7.0.0 -nginx image's own; later tags moved it to 9090.
         @tileCache path_regexp tileCache ^/cache/([a-z0-9-]+)/(\d{1,2}/\d{1,7}/\d{1,7}\.(?:png|jpeg))$
         handle @tileCache {
                 rewrite * /mapproxy/tiles/{re.tileCache.1}/tufteseid25833/{re.tileCache.2}
@@ -116,9 +99,6 @@ route {
                 }
         }
 
-        # The render sidecar answers 202 and works in the background, so no
-        # long timeout is needed here. The result lands on the evidence row and
-        # reaches the app over PocketBase's realtime feed.
         handle_path /render/* {
                 reverse_proxy http://rendersvc:8080
         }

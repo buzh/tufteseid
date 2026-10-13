@@ -11,7 +11,7 @@ import { ProjectionIdentifier } from './projections/types';
 
 const DEFAULT_PROJECTION: ProjectionIdentifier = 'EPSG:25833';
 const DEFAULT_ZOOM_LEVEL = 3;
-const DEFAULT_CENTER = [396722, 7197860]; // EPSG:25833
+const DEFAULT_CENTER = [396722, 7197860];
 
 const getInitialMapView = () => {
   const projectionIdFromUrl = validateProjectionIdString(
@@ -32,7 +32,6 @@ const getInitialMapView = () => {
     const parsedLon = parseFloat(lon);
     const parsedLat = parseFloat(lat);
     if (!Number.isNaN(parsedLon) && !Number.isNaN(parsedLat)) {
-      // Despite the names, these are in the `projection` parameter's CRS.
       initialCenter = [parsedLon, parsedLat];
     }
   }
@@ -66,8 +65,6 @@ export const mapAtom = atom<Map>(() => {
       pinchRotate: false,
     }),
     keyboardEventTarget: document,
-    // The default 16 starves the topo base: a cold LiDAR tile takes 3-12 s and
-    // a screenful of them pins every slot.
     maxTilesLoading: 48,
   });
 

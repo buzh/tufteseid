@@ -22,20 +22,14 @@ import { fitImageBlob, type Raster } from './fit';
 import { fetchFlyfotoRaster } from './flyfotoRaster';
 import { NIB_MOSAIC, type EvidenceSpec } from './spec';
 
-/** `meta` is merged over the spec's own — never replacing it. */
 export type Produced = {
   blob: Blob;
   filename: string;
   meta: EvidenceMeta;
 };
 
-/** Everything the sidecar does not render, as a type so the switch stays
- *  exhaustive and the compiler refuses a server-side kind here. */
 export type BrowserSpec = Exclude<EvidenceSpec, { kind: 'sunloop' | 'rvt' }>;
 
-// The tail every arm shares: pixels fitted to the store, described by what came
-// out. The resolution recorded is the file's, not the grid's — the fit may have
-// coarsened it.
 const produce = async (
   raster: Raster,
   filename: string,
@@ -61,8 +55,6 @@ const produce = async (
   };
 };
 
-// Null means the source has nothing over this rectangle; a throw is a fault.
-// `queue.ts` tells the two apart on exactly that.
 export const renderEvidence = async (
   spec: BrowserSpec,
   bbox4326: Bbox,
@@ -70,13 +62,10 @@ export const renderEvidence = async (
 ): Promise<Produced | null> => {
   switch (spec.kind) {
     case 'lidar': {
-      // The one style with no service behind it: pixels in our own store, keyed
-      // by the same flight the WMS publishes.
       if (spec.style === CVAT_STYLE) {
         const acquisition = (await fetchCvatAcquisitions()).find(
           (a) => projectSourceKey(a.project.projectName) === spec.sourceKey,
         );
-        // Dropped from the store since, or never in it.
         if (!acquisition) return null;
         const raster = await fetchCvatRaster(bbox4326, acquisition, signal);
         if (!raster) return null;
@@ -92,8 +81,6 @@ export const renderEvidence = async (
 
       const sources = await enumerateLidarSources(bbox4326, spec.model);
       const source = sources.find((s) => s.key === spec.sourceKey);
-      // Retired, out of coverage, or no longer publishing this style — asking
-      // anyway answers 200 with a JSON body.
       if (!source?.styles.includes(spec.style)) return null;
       const raster = await extractCanvas(
         bboxToMetric(bbox4326),
@@ -116,8 +103,6 @@ export const renderEvidence = async (
         whole: true,
       });
       if (!dem) return null;
-      // Write the clamped radius back, or the duplicate guard never matches and
-      // the button offers to remake this same picture forever.
       const radius = clampRadius(spec.vis, dem, spec.radius);
       const staticField = terrainStaticField(dem, spec.vis, radius);
       const field = terrainField(
@@ -151,12 +136,9 @@ export const renderEvidence = async (
           : (await fetchFlyfotoProjectsForBbox(bbox4326, signal)).find(
               (p) => p.id === spec.projectId,
             );
-      // Named an acquisition the catalogue no longer lists over this ground.
       if (spec.projectId !== NIB_MOSAIC && !project) return null;
       const raster = await fetchFlyfotoRaster(bbox4326, { project, signal });
       if (!raster) return null;
-      // JPEG all the way through: a lossless copy of a lossy-sourced photograph
-      // is several times the bytes for nothing.
       return produce(
         raster,
         `flyfoto_${sanitizeFilename(spec.projectId)}.jpg`,

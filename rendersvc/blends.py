@@ -41,14 +41,10 @@ import dem as dem_source
 
 KIND = "rvt"
 
-# No band. A still is stamped in the reader's own tab at download time, so the
-# stored file stays bare — which is the one the map lays back over the ground.
 WANTS_LEGEND = False
 
-# The resolution RVT's pixel radii were calibrated at.
 CALIBRATION_M_PER_PX = 0.5
 
-# rvt.default.DefaultValues, which is what rvt.blend.e4mstp is handed.
 MSTP_LOCAL = (1, 5, 1)
 MSTP_MESO = (5, 50, 5)
 MSTP_BROAD = (50, 500, 50)
@@ -56,8 +52,6 @@ MSTP_LIGHTNESS = 0.9
 SVF_N_DIR = 16
 SVF_R_MAX = 10
 SVF_NOISE = 0
-# Stated in metres by e4mstp itself (`int(10 / resolution)`), not in pixels, so
-# this one is not scaled.
 FLAT_SVF_R_MAX_M = 10
 FLAT_SVF_NOISE = 3
 LD_MIN_RAD = 10
@@ -66,7 +60,6 @@ LD_RAD_INC = 1
 LD_ANGULAR_RES = 15
 LD_OBSERVER_H = 1.7
 
-# What each stage of e4MSTP reads outside the rectangle, in metres.
 E4MSTP_CONTEXT_M = MSTP_BROAD[1] * CALIBRATION_M_PER_PX
 E4MSTP_MARGIN_M = max(
     MSTP_MESO[1] * CALIBRATION_M_PER_PX,
@@ -74,23 +67,12 @@ E4MSTP_MARGIN_M = max(
     FLAT_SVF_R_MAX_M,
 )
 
-# A side, per fetch. `exportImage` is flaky above about this for an F32 grid —
-# it answers 500 under its own 60 s timeout, and more so under load. The
-# client's own ceiling (`MAX_DEM_PX_PER_SIDE`) is the same figure.
 MAX_FETCH_PX = 2200
 
-# The context grid's pixel size. Coarser than this and the broad scale's 25 m
-# step is no longer resolved; finer buys nothing a 50-500 px radius can see.
 COARSE_M_PER_PX = 0.5
 
-# Of the rectangle, after the rim around each hole is written off. Same trade as
-# `sunloop.MIN_COVERAGE`: below half, `empty` tells the reader more than a
-# picture of the holes would.
 MIN_COVERAGE = 0.5
 
-# What a blend is handed. `coarse` is None where the recipe asked for no
-# context; `margin_px` and `context_px` are the real ground around the
-# rectangle in each grid, to be cropped off once the reading is done.
 Grids = namedtuple(
     "Grids",
     "fine resolution margin_px coarse coarse_resolution context_px height width",
@@ -156,8 +138,6 @@ def _e4mstp(g, log):
         g.context_px : g.context_px + coarse_height,
         g.context_px : g.context_px + coarse_width,
     ]
-    # `rvt.vis.mstp`'s own composition, one scale at a time, because the three
-    # scales come off two different grids and it takes only one.
     mstp_arr = np.asarray(
         [
             np.clip(1 - np.exp(-MSTP_LIGHTNESS * np.abs(dev)), 0, 1)
@@ -214,10 +194,6 @@ def _e4mstp(g, log):
     )[crop]
     log(f"local dominance {time.perf_counter() - started:.1f} s")
 
-    # Radians, and normalized below over 0..55. That is what `rvt.blend.e4mstp`
-    # does — it calls `slope_aspect` without `output_units` — so the layer is
-    # all but a flat dark red, and the blend's colour comes from it. Handing it
-    # degrees would be a different picture under the same name.
     slope = slope_aspect(
         g.fine, resolution_x=g.resolution, resolution_y=g.resolution
     )["slope"][crop]
@@ -247,9 +223,6 @@ def _e4mstp(g, log):
     return out
 
 
-# Keyed by `meta.vis`. `margin_m` is real ground fetched around the rectangle at
-# the render's own resolution; `context_m` the same at `COARSE_M_PER_PX`, for a
-# scale too broad to fetch finely, and 0 for a recipe that needs no second grid.
 PRODUCERS = {
     "e4mstp": {
         "margin_m": E4MSTP_MARGIN_M,
@@ -305,25 +278,16 @@ def render(spec, bbox25833, legend_content, log):
     try:
         native = dem_source.probe_coverage(model, bbox25833, project)
     except Exception as e:
-        # A probe that fails is not an absence; fall through at the finest the
-        # services publish and let the pixels answer.
         log(f"coverage probe failed, assuming {dem_source.FINEST_M_PER_PX} m: {e}")
         native = dem_source.FINEST_M_PER_PX
     if native is None:
         return None
 
     margin_m = recipe["margin_m"]
-    # The margin is fetched too, so what the fetch ceiling bounds is the whole
-    # grid rather than the picture.
     metres_per_px = max(native, (max(width_m, height_m) + 2 * margin_m) / MAX_FETCH_PX)
     width = round(width_m / metres_per_px)
     if width < 2:
         return None
-    # What the pixels actually are, after the rounding. The height follows from
-    # that one figure rather than from its own rounding, and the rectangle is
-    # then trimmed to the grid about its centre: `slope_aspect` is told
-    # `resolution_x == resolution_y`, so square pixels have to be a fact rather
-    # than an assumption for a footprint whose two sides round differently.
     metres_per_px = width_m / width
     height = round(height_m / metres_per_px)
     if height < 2:
@@ -351,10 +315,6 @@ def render(spec, bbox25833, legend_content, log):
         project,
     )
     crop = (slice(margin_px, margin_px + height), slice(margin_px, margin_px + width))
-    # rvt restores the input's NaN mask onto its output, so a hole is never
-    # drawn larger than it is — but its derivative substitutes a pixel's own
-    # value for a NaN neighbour (`roll_fill_nans`), which halves the gradient
-    # all round the rim. Dilating writes that invented ring off with the hole.
     absent = binary_dilation(~np.isfinite(fine))[crop]
     coverage = 1 - float(absent.mean())
     log(
@@ -411,8 +371,6 @@ def render(spec, bbox25833, legend_content, log):
     )
     del fine, coarse
 
-    # Transparent where there is nothing to draw, the way the browser producers
-    # leave a hole: a PNG carries the alpha channel a WebM could not.
     absent |= ~np.isfinite(rgb).all(axis=0)
     pixels = np.moveaxis(
         np.clip(np.nan_to_num(rgb, nan=0.0) * 255, 0, 255).astype(np.uint8), 0, -1

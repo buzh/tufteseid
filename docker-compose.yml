@@ -7,25 +7,13 @@ services:
     ports:
       - "127.0.0.1:3030:3000"
     environment:
-      # The opt-in services, written into /var/www/services.js by the image's
-      # entrypoint so the SPA hides what this installation does not run. The
-      # same keys drive the `profiles:` below — change one, break three.
       - ENABLE_FLYFOTO=${ENABLE_FLYFOTO:-false}
       - ENABLE_CVAT=${ENABLE_CVAT:-false}
       - ENABLE_RENDER=${ENABLE_RENDER:-false}
     volumes:
       - ./config.js:/var/www/config.js:ro
-      # First run: sudo mkdir -p /site/tufteseid/data/{logs,stats}
       - /site/tufteseid/data/logs:/var/log/caddy
-      # Outside /var/www: under it the SPA's file_server would serve the
-      # report with the app's CSP, which blocks GoAccess's inline script.
       - /site/tufteseid/data/stats:/srv/stats:ro
-    # The opt-in three are left out. Naming a service a profile has switched
-    # off either aborts the `up` or drags the service back in, depending on
-    # the compose version, and neither is wanted. Nothing is lost: Caddy
-    # resolves an upstream when a request arrives rather than at boot, so a
-    # route to a container that is not there costs a 502 on a path the SPA no
-    # longer asks for.
     depends_on:
       - wmscache
       - mapproxy
@@ -48,26 +36,18 @@ services:
     volumes:
       - ./mapproxy/mapproxy.yaml:/mapproxy/config/mapproxy.yaml:ro
       - ./mapproxy/seed.yaml:/mapproxy/config/seed.yaml:ro
-      # Must be writable by uid 100 gid 101 (the image's mapproxy user) or
-      # uwsgi exits at import and every /cache/… answers 502.
       - /site/tufteseid/data/mapproxy:/mapproxy/config/cache_data
 
   pocketbase:
     build: ./pocketbase
     restart: unless-stopped
     environment:
-      # How many accounts hold a place; 0 or unset is no cap. Read by
-      # `pb_hooks/capacity.js` alone — the SPA asks /pb/api/capacity rather
-      # than being told at build time (docs/identity.md).
       - MAXUSERS=${MAXUSERS:-0}
     volumes:
       - pbdata:/pb_data
       - ./pocketbase/pb_migrations:/pb_migrations:ro
       - ./pocketbase/pb_hooks:/pb_hooks:ro
 
-  # Server-side renders. Holds no credentials: every PocketBase call carries the
-  # requesting reader's own token, so the collection rules decide what a job may
-  # touch. Capped so a render cannot starve Caddy or PocketBase.
   rendersvc:
     build:
       context: .
@@ -82,10 +62,6 @@ services:
         max-file: "3"
     environment:
       - POCKETBASE_URL=http://pocketbase:8090
-      # The origin printed in the provenance band burnt into a loop. Set it to
-      # the address readers visit: a spot's short link is composed here, out of
-      # the record, rather than taken from the request. Unset, a loop carries no
-      # link.
       - PUBLIC_ORIGIN=${PUBLIC_ORIGIN:-}
     depends_on:
       - pocketbase
@@ -102,10 +78,6 @@ services:
       - ./nginx/wms-proxy-common.conf:/etc/nginx/wms-proxy-common.conf:ro
       - wmscache:/var/cache/nginx/wms
 
-  # NiB tokens are bound to the minting IP and referer, so they are minted and
-  # used server-side only. Reachable from wmscache and mapproxy, not the host.
-  # Off, the ortofoto locations in `nginx/` and `mapproxy/` answer 502 and the
-  # SPA stops asking (`ENABLE_FLYFOTO`).
   nib-proxy:
     build: ./nib-proxy
     restart: unless-stopped

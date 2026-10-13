@@ -1,8 +1,3 @@
-// Excalidraw fetches its fonts from a CDN, which `font-src 'self'` in the
-// Caddyfile blocks; point it at our origin, where `vite.config.ts` copies the
-// package's font directory. Must be a module imported *before* Excalidraw — the
-// same assignment inside a component would run too late. '/' rather than
-// '/fonts/': Excalidraw's paths are './fonts/Family/…' against this base.
 declare global {
   interface Window {
     EXCALIDRAW_ASSET_PATH?: string | string[];
@@ -11,11 +6,6 @@ declare global {
 
 window.EXCALIDRAW_ASSET_PATH = '/';
 
-// The base is not enough: Excalidraw appends its CDN behind the local URL in
-// every font's src list, and the browser checks CSP against every source in
-// the list at FontFace construction rather than when one is chosen — ~400
-// blocked entries logged per drawing. The list is assembled inside the editor
-// bundle, so construction is the only place to strip it.
 const CDN_FALLBACK = '//esm.sh/';
 
 const withoutCdnFallback = (src: string): string => {
@@ -24,7 +14,6 @@ const withoutCdnFallback = (src: string): string => {
     .split(',')
     .map((entry) => entry.trim())
     .filter((entry) => !entry.includes(CDN_FALLBACK));
-  // A FontFace with an empty src throws.
   return kept.length > 0 ? kept.join(', ') : src;
 };
 

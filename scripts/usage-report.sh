@@ -1,9 +1,4 @@
 #!/usr/bin/env bash
-#
-#   scripts/usage-report.sh [report-dir]
-#
-# Server-only: reads the Caddy log off the host filesystem and the wmscache log
-# out of `docker compose logs`. Writes an HTML report and a size stamp.
 
 set -uo pipefail
 
@@ -12,10 +7,8 @@ ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 LOGDIR=${TUFTESEID_LOGS:-/site/tufteseid/data/logs}
 REPORT=${1:-${TUFTESEID_STATS:-/site/tufteseid/data/stats}}
 
-# The printed sections only; the HTML report covers every line Caddy still has.
 HOURS=${HOURS:-168}
 
-# Needs --log-format=CADDY, which GoAccess has had since 1.6.
 GOACCESS_IMAGE=${GOACCESS_IMAGE:-allinurl/goaccess:1.9.4}
 
 if [ -t 1 ]; then
@@ -30,8 +23,6 @@ warn() { printf '  %s%s%s\n' "$RED" "$1" "$OFF"; }
 
 CUTOFF=$(( $(date +%s) - HOURS * 3600 ))
 
-# Caddy gzips what it rolls, so both shapes are read; an unmatched glob stays
-# literal, which the `-f` tests reject.
 read_caddy() {
   local f
   for f in "$LOGDIR"/access.log "$LOGDIR"/access-*.log; do
@@ -56,8 +47,6 @@ mkdir -p -- "$REPORT" || exit 1
 
 section 'Visitors'
 
-# The proxy prefixes are most of the lines and none of them is a visit.
-# /assets/ stays, or the bandwidth total is a fiction.
 read_caddy \
   | grep -v -e '"uri":"/wms/' -e '"uri":"/wfs/' -e '"uri":"/kms/' \
              -e '"uri":"/arcgis/' -e '"uri":"/cache/' -e '"uri":"/cvat/' \
@@ -69,8 +58,6 @@ read_caddy \
       --no-progress \
       --html-report-title='Tufteseid' \
       --output=/report/index.html
-# The docker element, not the pipeline's: `grep -v` exits 1 when it passes
-# nothing through.
 rc=${PIPESTATUS[2]}
 
 if [ "$rc" -ne 0 ]; then
@@ -88,7 +75,6 @@ read_caddy | awk -v cutoff="$CUTOFF" '
     uri = ""; ip = ""
     if (match($0, /"uri":"[^"]*"/))       uri = substr($0, RSTART + 7, RLENGTH - 8)
     if (match($0, /"client_ip":"[^"]*"/)) ip  = substr($0, RSTART + 13, RLENGTH - 14)
-    # A page view is "/" or a short link; the rest is counted under Traffic.
     if (uri == "/" || uri ~ /^\/l\//) { pages++; if (ip != "") seen[ip] = 1 }
     total++
   }
@@ -113,7 +99,6 @@ read_caddy | awk -v cutoff="$CUTOFF" '
     q = index(uri, "?"); if (q) uri = substr(uri, 1, q - 1)
     n = split(uri, p, "/")
     key = (n >= 2 && p[2] != "") ? "/" p[2] : "/"
-    # One more segment where it picks the upstream: /wms/ra is not /wms/geonorge.
     if (key == "/wms" || key == "/arcgis" || key == "/wfs")
       key = key "/" (n >= 3 ? p[3] : "")
 
@@ -129,7 +114,6 @@ read_caddy | awk -v cutoff="$CUTOFF" '
 
 section 'Upstream load (wmscache)'
 
-# --no-log-prefix so the fields line up; the service name is in the header.
 docker compose --project-directory "$ROOT" logs \
   --no-log-prefix --since "${HOURS}h" wmscache 2>/dev/null | awk '
   function host(u) {
@@ -141,17 +125,12 @@ docker compose --project-directory "$ROOT" logs \
     if (u ~ /^\/hoydedata-arcgis\//) return "hoydedata.no"
     return "other"
   }
-  # Positional only for the first five fields: on a retry proxy_next_upstream
-  # turns the upstream fields into comma-and-space lists and shifts the rest.
   NF >= 5 && $3 != "" {
     h = host($5)
     lines++
     tot[h]++
-    # HIT and UPDATING are answered from disk; every other verdict, "-"
-    # included, asked the origin.
     if ($3 != "HIT" && $3 != "UPDATING") origin[h]++
     if ($2 + 0 >= 500) err[h]++
-    # A 200 carrying a ServiceException is the rate limit, not an error code.
     if ($0 ~ /ct=[^ ,]*se_xml/) shed[h]++
     if (match($0, /urt=[0-9.]+/)) { sum[h] += substr($0, RSTART + 4, RLENGTH - 4); n[h]++ }
   }
@@ -168,12 +147,9 @@ docker compose --project-directory "$ROOT" logs \
 
 section 'Stores'
 
-# MapProxy fetches directly rather than through wmscache and never evicts, so
-# growth of its store is the only measure of its outbound traffic.
 STAMP=$REPORT/.sizes
 : >"$STAMP.new"
 
-# KiB throughout: the wmscache figure comes from busybox du, which has no -b.
 size_of() {
   local label=$1 kib=$2 prev delta=''
   if [ -z "$kib" ]; then

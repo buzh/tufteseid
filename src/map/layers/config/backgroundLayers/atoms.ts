@@ -20,11 +20,6 @@ import {
 import { buildStack, LIDAR_LAYERS, resolveStack } from './stack';
 import { clearBackgroundLayer, swapBackgroundLayers } from './utils';
 
-// Startup values the URL parameter may name. Not `flyfotoProject`: its
-// acquisition atom starts null and only the user can fill it, so a cold load
-// into it would render nothing indefinitely. Both flight grounds are in it
-// because Automatisk derives their flight on every load, and `lidarRender`
-// then says which render it opens on.
 const VALID_STARTUP_LAYERS = new Set<BackgroundLayerName>([
   'topo',
   'topograatone',
@@ -38,8 +33,6 @@ const VALID_STARTUP_LAYERS = new Set<BackgroundLayerName>([
   'empty',
 ]);
 
-// A shared link can name a ground this installation does not serve, which
-// would render nothing indefinitely.
 const servedHere = (name: BackgroundLayerName): boolean => {
   if (name === 'flyfoto' || name === 'flyfotoProject') {
     return serviceOn('flyfoto');
@@ -62,8 +55,6 @@ const getDefaultBackgroundLayer = (): BackgroundLayerName => {
   return 'lidarHillshade';
 };
 
-// Keyed by URL rather than layer name: Kartverket's cache publishes all four
-// Kart variants in one capabilities document.
 export const backgroundLayerCapabilitiesCacheAtom = atom<
   Record<string, string>
 >({});
@@ -82,15 +73,11 @@ export const hybridContoursHalves = halved<boolean>(
   getUrlParameter('contours') === 'true',
 );
 
-// The build awaits and key-repeat outruns it, so a stale run must not install a
-// stack already cycled past.
 let swapGeneration = 0;
 
 export const backgroundLayerAtomEffect = atomEffect((get) => {
   const generation = ++swapGeneration;
-  // The A half throughout; the B half is `compareLayerAtomEffect`'s.
   const layerName = get(backgroundLayerHalves.a);
-  // Read for the subscription: any of these changing rebuilds the stack.
   const activeLidarProject = get(activeLidarProjectHalves.a);
   const activeLidarStyle = get(activeLidarStyleHalves.a);
   const activeLidarModel = get(activeLidarModelHalves.a);
@@ -108,7 +95,6 @@ export const backgroundLayerAtomEffect = atomEffect((get) => {
   const stack = resolveStack(layerName, {
     lidarProject: activeLidarProject,
     cvatAcquisition: activeCvatAcquisition,
-    // DOM publishes one style, so the model has the last word.
     lidarStyle: effectiveLidarStyle(activeLidarStyle, activeLidarModel),
     lidarModel: activeLidarModel,
     flyfotoProject: activeFlyfotoProject,
@@ -122,7 +108,6 @@ export const backgroundLayerAtomEffect = atomEffect((get) => {
       layerName === 'flyfotoProject' ||
       layerName === 'lidarCvat'
     ) {
-      // Nothing picked out of the archive yet: not an error.
       return;
     }
     console.warn(`No layer config found for layer name: ${layerName}`);
@@ -137,11 +122,9 @@ export const backgroundLayerAtomEffect = atomEffect((get) => {
 
       const built = await buildStack(stack, projection);
 
-      // Everything below mutates the shared layer collection and the URL.
       if (generation !== swapGeneration) return;
       if (!built) return;
 
-      // A reused layer still carries an earlier swap's fade and z-index.
       for (const { layer, opacity, zIndex } of [
         ...built.under,
         ...built.over,
@@ -155,7 +138,6 @@ export const backgroundLayerAtomEffect = atomEffect((get) => {
         built.over.map((e) => e.layer),
       );
       setUrlParameter('backgroundLayer', layerName);
-      // Keyed on the stack, not the atoms, so a shared URL reproduces the view.
       if (stack.hybrid) setUrlParameter('hybrid', true);
       else removeUrlParameter('hybrid');
       if (stack.contours) setUrlParameter('contours', true);
@@ -165,9 +147,6 @@ export const backgroundLayerAtomEffect = atomEffect((get) => {
       } else {
         removeUrlParameter('lidarModel');
       }
-      // Written even when it is the default, unlike every parameter above:
-      // absence is what tells the next load that nobody chose, and so that the
-      // cVAT upgrade may pick for them.
       if (LIDAR_LAYERS.has(layerName)) {
         setUrlParameter('lidarRender', activeLidarStyle);
       } else {

@@ -1,7 +1,3 @@
-// Which ground is up is derived from the half's background layer, never
-// stored: a second piece of state could disagree with the map. Entering one is
-// the arm's own business, hence the `enter` callbacks rather than a write here.
-
 import { useAtomValue } from 'jotai';
 import { useHasFeature } from '../auth/features';
 import type { CompareHalf } from '../map/compare/halves';
@@ -10,14 +6,10 @@ import { backgroundLayerHalves } from '../map/layers/config/backgroundLayers/ato
 import { isKartVariant } from '../map/layers/config/backgroundLayers/kartVariants';
 import { LIDAR_LAYERS } from '../map/layers/config/backgroundLayers/stack';
 
-/** Also the order the switch draws them in. All three are drawn on every
- *  installation: Flyfoto is a granted feature, and a reader without it gets
- *  the upstream viewer rather than no button (`GroundSwitch`). */
 export const GROUND_MODES = ['lidar', 'kart', 'flyfoto'] as const;
 
 export type GroundMode = (typeof GROUND_MODES)[number];
 
-/** Null for `empty`, the one background that belongs to no ground. */
 const groundOf = (name: BackgroundLayerName): GroundMode | null => {
   if (LIDAR_LAYERS.has(name)) return 'lidar';
   if (isKartVariant(name)) return 'kart';
@@ -36,9 +28,6 @@ export const useGroundControls = (
   return {
     mode,
     mayFlyfoto,
-    // Picking the ground already showing is not a re-entry: it would re-run
-    // Automatisk, or drop Flyfoto back to the mosaic, for a click that said
-    // nothing.
     select: (next: GroundMode) => {
       if (next === 'flyfoto' && !mayFlyfoto) return;
       if (next !== mode) enter[next]();

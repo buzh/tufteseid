@@ -1,7 +1,3 @@
-// One GetFeatureInfo per ticked register against `kart.ra.no`, so the hover
-// fires only from a pointer at rest. Touch is skipped: a tap is a click there,
-// and a tip with no pointer to leave with would never come down.
-
 import { getDefaultStore, useAtom, useAtomValue } from 'jotai';
 import { unByKey } from 'ol/Observable';
 import { useCallback, useEffect, useState } from 'react';
@@ -19,11 +15,8 @@ import { spotFootprintAdjustingAtom, spotPlacingAtom } from '../spots/atoms';
 import { spotsAtPixel } from '../spots/hitTest';
 import { terrainAdjustingAtom } from '../terrain/window';
 
-/** How long the pointer has to hold still before a hover asks. */
 const REST_MS = 220;
 
-/** Any gesture that has taken the map: the terrain rectangle, a spot's
- *  footprint, an armed pin, or an armed place lookup. */
 const placingOnMap = (): boolean => {
   const store = getDefaultStore();
   return (
@@ -37,7 +30,6 @@ const placingOnMap = (): boolean => {
 export interface HeritageInfo {
   tip: FeatureInfoReading | null;
   popup: FeatureInfoReading | null;
-  /** Map coordinate of a click still waiting on an answer. */
   pending: [number, number] | null;
   closePopup: () => void;
 }
@@ -51,10 +43,6 @@ export const useHeritageInfo = (): HeritageInfo => {
 
   const closePopup = useCallback(() => setPopup(null), [setPopup]);
 
-  // Both of these are OpenLayers overlays on the map element, which a drawing
-  // session wears a CSS transform on: left up they would be dragged and scaled
-  // with the ground rather than anchored to it. Closed rather than hidden —
-  // the reading belonged to the context that has gone.
   useEffect(() => {
     if (context === 'map') return;
     setTip(null);
@@ -68,7 +56,6 @@ export const useHeritageInfo = (): HeritageInfo => {
     let hoverQuery: AbortController | null = null;
     let clickQuery: AbortController | null = null;
 
-    // Leased, because the pin and the terrain rectangle write the cursor too.
     const cursor = cursorLease(viewport);
     const setHit = (hit: boolean) => {
       cursor.set(hit ? 'pointer' : null);
@@ -91,9 +78,6 @@ export const useHeritageInfo = (): HeritageInfo => {
       map.on('pointermove', (e) => {
         if (e.dragging) return;
         if ((e.originalEvent as PointerEvent).pointerType === 'touch') return;
-        // Placing a rectangle or a pin owns the pointer. Read from the store,
-        // not as a dependency, so turning one on does not rebind these
-        // listeners.
         if (placingOnMap()) {
           forget();
           return;
@@ -112,7 +96,6 @@ export const useHeritageInfo = (): HeritageInfo => {
             .then((reading) => {
               if (query.signal.aborted) return;
               setHit(reading !== null);
-              // No tip while the card for the same spot is open.
               const open = store.get(heritagePopupAtom);
               const sameSpot =
                 open !== null &&
@@ -129,8 +112,6 @@ export const useHeritageInfo = (): HeritageInfo => {
 
       map.on('singleclick', (e) => {
         if (!heritageIsQueryable(map)) return;
-        // A click placing a pin or a rectangle, or landing on a pin, belongs to
-        // whatever is being placed.
         if (placingOnMap()) return;
         if (spotsAtPixel(map, e.pixel)) return;
         stopHovering();
@@ -144,7 +125,6 @@ export const useHeritageInfo = (): HeritageInfo => {
           .then((reading) => {
             if (query.signal.aborted) return;
             setPending(null);
-            // A null reading closes what was open.
             setPopup(reading);
           })
           .catch(() => {

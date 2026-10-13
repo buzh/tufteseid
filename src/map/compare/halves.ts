@@ -1,14 +1,9 @@
 import { atom, type Getter, type PrimitiveAtom, type Setter } from 'jotai';
 
-// `a` is the left of the screen, and the whole of it while one ground is up;
-// `b` is the right (`docs/architecture.md`). Must import nothing but jotai:
-// half the background config imports this, so anything else is a cycle.
-
 export type CompareHalf = 'a' | 'b';
 
 const BOTH_HALVES = ['a', 'b'] as const;
 
-/** In the order the view control offers them. */
 export const VIEW_MODES = ['single', 'curtain', 'split'] as const;
 
 export type ViewMode = (typeof VIEW_MODES)[number];
@@ -17,7 +12,6 @@ export const viewModeAtom = atom<ViewMode>('single');
 
 export const compareOnAtom = atom((get) => get(viewModeAtom) !== 'single');
 
-/** The halves that are drawing, in screen order. */
 const liveHalvesAtom = atom<readonly CompareHalf[]>((get) =>
   get(compareOnAtom) ? BOTH_HALVES : ['a'],
 );
@@ -36,13 +30,9 @@ export const halved = <T>(initial: T): Halved<T> => {
   return { a, b };
 };
 
-/** One pair read across every half that is drawing. Every array this produces
- *  is indexed the same way, so a caller can zip two of them. */
 export const acrossHalves = <T>(pair: Halved<T>) =>
   atom<T[]>((get) => get(liveHalvesAtom).map((half) => get(pair[half])));
 
-/** Copy every pair's A value into its B value. The registry is appended to by
- *  `halved`, so a pair added later cannot open B on a `null`. */
 export const seedHalfB = (get: Getter, set: Setter): void => {
   for (const seed of SEEDERS) seed(get, set);
 };

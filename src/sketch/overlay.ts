@@ -1,4 +1,3 @@
-// One saved drawing on the map, re-exported at the view's own resolution.
 import { atom, useAtom, useAtomValue, useSetAtom } from 'jotai';
 import type { Extent } from 'ol/extent';
 import ImageLayer from 'ol/layer/Image';
@@ -12,43 +11,28 @@ import { metresPerScenePx } from './frame';
 import { paintRender, renderScene, type SceneRender } from './render';
 import type { Sketch } from './scene';
 
-// Over the terrain analysis (1), under its frame (4) and under the pin (6).
-// Inventory in docs/map-layers.md.
 const Z_INDEX = 2;
 
 export const sketchShownAtom = atom(true);
 
-/** 0–100, as the reader's slider is. */
 export const sketchFadeAtom = atom(0);
 
-/** There is a drawing for the toggle to act on. Written by the overlay rather
- *  than derived from the open spot: only the overlay knows what it mounted. */
 export const sketchOnGroundAtom = atom(false);
 
-/** `t` for tegning. */
 const TOGGLE_KEY = 't';
 
-// How far the view may drift from the export's resolution before a redraw.
-// `canvasFunction` runs on every frame of a pinch, so a tolerance near 1 queues
-// an Excalidraw render per frame; past half a zoom level the strokes soften.
 const RESCALE_TOLERANCE = 1.4;
 
 type Entry = {
   sketch: Sketch;
   out: HTMLCanvasElement | null;
   render: SceneRender | null;
-  /** Device pixels per scene unit `render` was made at. */
   renderedScale: number | null;
-  /** Non-null while an export is in flight, so only one ever is. */
   pending: number | null;
-  /** Cleared on unmount, so a late export cannot touch a layer taken off. */
   live: boolean;
   redraw: () => void;
 };
 
-// Called from inside `canvasFunction`, which cannot wait: the first frame draws
-// nothing and the export asks for a redraw when it lands. A failed export
-// records the scale anyway, so it is not retried every frame.
 const ensureRender = (entry: Entry, scale: number) => {
   if (entry.pending !== null) return;
   const have = entry.renderedScale;
@@ -70,8 +54,6 @@ const ensureRender = (entry: Entry, scale: number) => {
       entry.redraw();
     })
     .catch((e) => {
-      // `renderScene` promises not to throw; were it to, a `pending` left set
-      // would be a guard nothing clears and the drawing would stay blank.
       console.warn('[sketch] overlay render failed', e);
       if (!entry.live) return;
       entry.pending = null;
@@ -130,11 +112,9 @@ export const useSketchOverlay = (sketch: Sketch | null) => {
       renderedScale: null,
       pending: null,
       live: true,
-      // Assigned below: the source needs the entry and vice versa.
       redraw: () => {},
     };
     const source = new ImageCanvasSource({
-      // Fixed, so a view in another projection reprojects.
       projection: 'EPSG:25833',
       canvasFunction: drawEntry(entry),
     });
@@ -155,8 +135,6 @@ export const useSketchOverlay = (sketch: Sketch | null) => {
       layerRef.current = null;
       map.removeLayer(layer);
     };
-    // How it is shown is seeded here and kept in step by the effect below.
-    // Naming either would re-export the scene on every drag of the slider.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map, sketch]);
 
@@ -165,8 +143,6 @@ export const useSketchOverlay = (sketch: Sketch | null) => {
     layerRef.current?.setVisible(shown);
   }, [opacity, shown]);
 
-  // A hidden layer is never asked for a canvas, so taking the drawing off also
-  // stops the scene being re-exported.
   useEffect(() => {
     if (!sketch) return;
     const onKey = (event: KeyboardEvent) => {

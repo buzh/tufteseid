@@ -75,8 +75,13 @@ Each owns its subject; this file keeps only what is true across all of them.
   made.
 - **`icon="…"` props** are typed against the `MaterialSymbol` union from
   `material-symbols`, re-exported by `src/ui/Icon.tsx`. A plausible name that
-  isn't in the union fails the docker build; the comment on that re-export has
-  the procedure for checking one without local `node_modules`.
+  isn't in the union fails the docker build. Check one without local
+  `node_modules`:
+
+  ```
+  curl -sL https://registry.npmjs.org/material-symbols/-/material-symbols-0.47.2.tgz \
+    | tar xz -O package/index.d.ts | grep '"terrain"'
+  ```
 - **`t()` from day one, `nb` only.** User-visible strings go through `t()` into
   `src/locales/nb/translation.json`. `nn` and `en` are stubs — do not hold work
   up for them, and do not add English or Nynorsk guesses to make the files
@@ -84,23 +89,20 @@ Each owns its subject; this file keeps only what is true across all of them.
 - **Keep unused code out.** A helper with no live caller after a change gets
   deleted, not kept "for later". One exception is deliberate and recorded in
   `docs/architecture.md`: `src/search/`.
-- **Comments earn their place or go.** The code is the documentation; a comment
-  is for the one fact the code cannot carry. Keep only:
-  - an upstream or platform quirk (an opaque 400, an `<img>` error with no status);
-  - a CRS, axis-order, datum or units fact not in the identifier;
-  - a required ordering (import side effects, a call that must precede another);
-  - where a magic number came from, or a cross-config coupling ("change one,
-    break three");
-  - a constraint a maintainer would otherwise "fix" into a bug;
-  - a load-bearing directive and its reason (`eslint-disable-*`,
-    `/// <reference`), a locale-key or cross-repo coupling, a `docs/*.md`
-    cross-reference.
+- **No comments.** The code is the documentation. Source, scripts and config
+  carry no prose at all — no module headers, no quirk notes, no provenance for
+  a magic number, no `docs/*.md` pointers. Everything the code cannot carry
+  goes in the doc that owns the subject, and a name or a named constant carries
+  the rest.
 
-  Delete the rest: module-header essays, "why we chose X", and any line that
-  restates what the code does. When a real fact is wrapped in prose, keep the
-  fact as one terse line and drop the prose. Narrative and background belong in
-  `docs/`, not the source — a surface that needs a paragraph gets a line in the
-  doc that owns it, not a comment block.
+  The one exception is a **load-bearing directive**, which is machine-read and
+  not prose: `// eslint-disable-*`, `/// <reference`, `@ts-expect-error`,
+  `# noqa`, a shebang, a `/*! */` licence banner. Those stay, bare — no reason
+  appended.
+
+  The Python sidecars keep their module docstrings, which are strings rather
+  than comments and the only narrative left in the source. Everything else is
+  a paragraph in `docs/`, not a line above the statement.
 - **Commits**: short imperative subject; body explains the *why* when the diff
   doesn't. Write the `Co-Authored-By` trailer yourself — nothing adds it.
 - **Docs state the present tense.** A change that reverses an earlier decision

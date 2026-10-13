@@ -31,70 +31,34 @@ import sunloop
 
 PORT = int(os.environ.get("PORT", "8080"))
 
-# A producer is a module with `KIND`, `WANTS_LEGEND`, `spec_of` and `render`.
-# Nothing else here knows one from another.
 ROUTES = {"/sunloop": sunloop, "/rvt": blends}
 
-# The host the burnt-in share link names, `PUBLIC_ORIGIN` with its scheme taken
-# off the way `legendContentFor` takes it off client-side. Configured rather than
-# read off the request: `Host` is the caller's to set, and a link nobody can edit
-# out of the pixels afterwards is worth more to an attacker than the render is.
-# Unset, the band prints no link at all.
 SHARE_HOST = re.sub(
     r"^https?://", "", os.environ.get("PUBLIC_ORIGIN", "").strip()
 ).rstrip("/")
 
-# What Caddy's `/l/…` redirect matches. A code outside it resolves nowhere here,
-# and would be free path and query in a line the reader is invited to trust.
 SPOT_CODE = re.compile(r"[0-9A-Za-z]{1,32}")
 
 QUEUE_MAX = 8
-# Per caller, in flight or waiting. A reader who wants a second loop can have it
-# when the first one lands.
 PER_CALLER_MAX = 1
 
-# How often `job.at` is rewritten on every row that is queued or running, so
-# that a marker nobody has refreshed means nobody is working on the row. Each
-# beat is a PATCH and therefore a realtime event on a row an open gallery is
-# subscribed to, so it has to stay cheap: a minute is three orders below the
-# render it reports on and at most an hour's worth of events for a job that runs
-# an hour, while still letting the client call a dead container within
-# `STALE_JOB_MS` (five beats, `src/evidence/queue.ts`).
 BEAT_S = 60
 
-# `MAX_SIDE_M` in `src/map/bbox.ts` plus rounding slack. A footprint that
-# carries back over the cap is refused rather than trimmed: adjusting the
-# rectangle once is the reader's fix.
 MAX_SIDE_M = 505
 
 MAX_BODY_BYTES = 64 * 1024
 
-# A whole request, headers and body, from a browser posting well under 64 kB of
-# JSON: a second is generous and ten survives a stalled radio. `/render/*` is
-# public through a Caddy `reverse_proxy`, which streams rather than buffers, so
-# without this a client that announces a body and then dribbles parks a thread
-# per connection until the container's 2 GB is gone.
 REQUEST_TIMEOUT_S = 10
 
-# What a reader must hold to spend the sidecar's time. One of the names on
-# `users.features`, granted per account in PocketBase's admin UI
-# (`docs/identity.md`).
 RENDER_FEATURE = "render"
 
-# `meta` is capped at 10 kB by the collection, and a failure detail is the one
-# thing here that can run long.
 MAX_DETAIL_CHARS = 300
 
-# A rights line, before and after the credit is substituted into it.
 MAX_RIGHTS_CHARS = 300
 
 log = logging.getLogger("rendersvc")
 
 jobs = queue.Queue(maxsize=QUEUE_MAX)
-# Evidence id -> {caller, token, meta}, for the duplicate guard, the per-caller
-# count and the heartbeat. Who asked and not whose row it is: an admin and a
-# spot's author may both write somebody else's evidence, so the row's owner
-# names neither the reader to hold to one at a time nor the one to refuse.
 pending = {}
 lock = threading.Lock()
 
@@ -203,8 +167,6 @@ def accept(producer, token, body):
     if not isinstance(record_id, str) or not record_id:
         raise Refused(400, "no evidence id")
 
-    # Before the row is read: a reader whose membership does not carry renders
-    # is turned away without the service doing any work on their behalf.
     caller = admit(token)
 
     try:
@@ -221,9 +183,6 @@ def accept(producer, token, body):
         raise Refused(422, str(e)) from e
     spot = spot_of(record)
     bbox = bbox_of(spot)
-    # A retry reads back the marker the failed attempt left. Every write below
-    # is built from this, so drop it here or a successful second run lands a row
-    # whose meta still says it failed.
     meta = {k: v for k, v in meta.items() if k != "job"}
 
     with lock:
@@ -231,20 +190,13 @@ def accept(producer, token, body):
             raise Refused(409, "already queued")
         if sum(1 for p in pending.values() if p["caller"] == caller) >= PER_CALLER_MAX:
             raise Refused(429, "one render at a time")
-        # `pending` and not `jobs.full()`: it counts the running job too, so the
-        # queue can never be full when the put below happens and a request
-        # thread can never block on it.
         if len(pending) >= QUEUE_MAX:
             raise Refused(429, "the queue is full")
         pending[record_id] = {"caller": caller, "token": token, "meta": meta}
 
-    # Anything that goes wrong before the put has to give the slot back, or the
-    # caller is refused 429 for the life of the container.
     queued = False
     try:
         try:
-            # The claim is the write-permission gate: the view rule lets a guest
-            # read a public spot's evidence, so reading it proved nothing.
             pb.claim(
                 record_id, token, {**meta, "job": {"state": "queued", "at": now()}}
             )
@@ -289,10 +241,6 @@ class Heartbeat:
 
     def stop(self):
         self.done.set()
-        # Joined and not merely signalled: a beat still in flight when `attach`
-        # runs would put the pre-render meta back over the meta that describes
-        # the file. Bounded by one PocketBase call — `READ_TIMEOUT_S`, 30 s —
-        # onto a render that has already taken minutes.
         self.thread.join()
 
     def _run(self):
@@ -308,9 +256,6 @@ class Heartbeat:
                         record_id, token, {**meta, "job": {"state": state, "at": now()}}
                     )
                 except Exception as e:
-                    # A beat that fails is not a job that failed. The next one
-                    # tries again, and a row nothing can refresh is exactly what
-                    # the client's stale rule is for.
                     log.info("%s heartbeat failed: %s", record_id, e)
 
 
@@ -326,9 +271,6 @@ def run_job(producer, record_id, token, spec, bbox, meta, legend_content):
     finally:
         beat.stop()
     if produced is None:
-        # Too little laser data over this ground to be worth a picture. Recorded
-        # so a reload still explains the empty row, but not a verdict: the
-        # catalogue can be wrong for a morning, and the reader may ask again.
         pb.claim(record_id, token, {**meta, "job": {"state": "empty", "at": now()}})
         trace("no coverage")
         return
@@ -357,8 +299,6 @@ def worker():
                         },
                     },
                 )
-            # Anything at all: an exception out of here unwinds past `while True`
-            # and there is no second worker to take the next job.
             except Exception as write_failed:
                 log.warning("%s could not record the failure: %s", record_id, write_failed)
         finally:
@@ -373,11 +313,6 @@ worker_thread = threading.Thread(target=worker, daemon=True)
 class Handler(BaseHTTPRequestHandler):
     server_version = "rendersvc"
     sys_version = ""
-    # `StreamRequestHandler.setup` puts this on the connection, so it bounds the
-    # request line and the headers too. HTTP/1.0 and no keep-alive — the default
-    # `protocol_version` — is what makes it bound the whole connection: a
-    # connection carries one request and is closed, so no thread can be held
-    # open between requests.
     timeout = REQUEST_TIMEOUT_S
 
     def log_message(self, fmt, *args):
@@ -415,8 +350,6 @@ class Handler(BaseHTTPRequestHandler):
                 chunks.append(chunk)
                 remaining -= len(chunk)
         finally:
-            # The refusal still has to be written, and the last budget left on
-            # the socket may be all but spent.
             self.connection.settimeout(self.timeout)
         return b"".join(chunks)
 
@@ -426,8 +359,6 @@ class Handler(BaseHTTPRequestHandler):
             return
         with lock:
             depth = len(pending)
-        # A dead worker leaves the service answering every other request
-        # normally while nothing renders, so it is what `ok` means.
         alive = worker_thread.is_alive()
         self.reply(
             200 if alive else 503,
@@ -452,8 +383,6 @@ class Handler(BaseHTTPRequestHandler):
             return
         raw = self.read_body(length)
         if raw is None:
-            # Whatever the client is still dribbling is not a request, and the
-            # bytes already sent are not the start of the next one.
             self.close_connection = True
             self.reply(408, {"error": "the body did not arrive"})
             return

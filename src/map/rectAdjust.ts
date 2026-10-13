@@ -1,5 +1,3 @@
-// The square is kept square in EPSG:25833, not in the view's projection.
-
 import { useAtomValue, useStore, type Atom, type PrimitiveAtom } from 'jotai';
 import { Feature } from 'ol';
 import type { Coordinate } from 'ol/coordinate';
@@ -25,13 +23,11 @@ import {
 } from './bbox';
 import { cursorLease } from './cursorLease';
 
-/** How near a corner counts as taking hold of it. */
 const HANDLE_HIT_PX = 14;
 
 const FRAME = 'rgba(255, 106, 0, 0.95)';
 const CASING = 'rgba(255, 255, 255, 0.55)';
 
-// The near-invisible fill is a hit target, not a tint on the chosen ground.
 const adjustStyle = [
   new Style({
     stroke: new Stroke({ color: CASING, width: 4 }),
@@ -50,8 +46,6 @@ const handleStyle = [
   }),
 ];
 
-/** South-west, south-east, north-east, north-west: corner `i` is anchored by
- *  corner `i + 2`. */
 const cornersOf = (e: Metric): Coordinate[] => [
   [e[0], e[1]],
   [e[2], e[1]],
@@ -59,7 +53,6 @@ const cornersOf = (e: Metric): Coordinate[] => [
   [e[0], e[3]],
 ];
 
-// Indexed by corner, in `cornersOf` order.
 const RESIZE_CURSORS = [
   'nesw-resize',
   'nwse-resize',
@@ -72,20 +65,13 @@ type Drag =
   | { kind: 'resize'; anchor: Coordinate; sx: number; sy: number };
 
 type RectAdjustOptions = {
-  /** Written on every drag frame. */
   rectAtom: PrimitiveAtom<Bbox | null>;
-  /** The reader has hold of it; false takes the interaction back down. */
   activeAtom: Atom<boolean>;
-  /** Names the layer for the debug inspector. */
   layerId: string;
-  /** The square's largest side, in metres. Default `MAX_SIDE_M`. */
   maxSideM?: number;
-  /** Run on the committed metric extent before it is written, e.g. to snap a
-   *  boundary to the tile grid. Default identity. */
   snap?: (extent: Metric) => Metric;
 };
 
-/** Mount once per rectangle. Adds nothing to the map while it stands still. */
 export const useRectangleAdjust = ({
   rectAtom,
   activeAtom,
@@ -100,8 +86,6 @@ export const useRectangleAdjust = ({
   useEffect(() => {
     if (!adjusting) return;
     const view = map.getView().getProjection().getCode();
-    // Leased, not written: other surfaces set the same cursor property and may
-    // be live at the same time (`map/cursorLease.ts`).
     const cursor = cursorLease(map.getViewport());
 
     const toMetric = (c: Coordinate): Coordinate =>
@@ -109,7 +93,6 @@ export const useRectangleAdjust = ({
     const toView = (c: Coordinate): Coordinate =>
       transform(c, 'EPSG:25833', view);
 
-    /** The rectangle as it stands, in metres; null once it is taken down. */
     const extentNow = (): Metric | null => {
       const bbox = store.get(rectAtom);
       return bbox ? bboxToMetric(bbox) : null;
@@ -121,8 +104,6 @@ export const useRectangleAdjust = ({
       wrapX: false,
       features: [frame, ...handles],
     });
-    // The same level a standing frame draws at; a rectangle is never both
-    // standing and in hand.
     const layer = new VectorLayer({
       zIndex: 4,
       source,
@@ -142,7 +123,6 @@ export const useRectangleAdjust = ({
       );
     };
 
-    /** Which corner the pointer is over, or -1. Measured in screen pixels. */
     const cornerUnder = (event: MapBrowserEvent): number => {
       const extent = extentNow();
       if (!extent) return -1;
@@ -172,8 +152,6 @@ export const useRectangleAdjust = ({
       if (corner >= 0) {
         const [ax, ay] = cornersOf(extent)[(corner + 2) % 4];
         const [cx, cy] = cornersOf(extent)[corner];
-        // Direction fixed at grab time, not per frame: a hand dragged through
-        // the anchor collapses the square rather than flipping it inside out.
         drag = {
           kind: 'resize',
           anchor: [ax, ay],
@@ -193,16 +171,12 @@ export const useRectangleAdjust = ({
       const here = toMetric(event.coordinate);
       let next: Metric;
       if (drag.kind === 'move') {
-        // Against the rectangle as it was when the drag started, so a long drag
-        // does not accumulate the reprojection's rounding into a crawl.
         const dx = here[0] - drag.from[0];
         const dy = here[1] - drag.from[1];
         const [minX, minY, maxX, maxY] = drag.start;
         next = [minX + dx, minY + dy, maxX + dx, maxY + dy];
       } else {
         const [ax, ay] = drag.anchor;
-        // The longer of the two reaches, so the corner stays under the hand on
-        // one axis.
         const reach = Math.max(Math.abs(here[0] - ax), Math.abs(here[1] - ay));
         const side = Math.min(Math.max(reach, MIN_SIDE_M), maxSideM);
         const bx = ax + drag.sx * side;
@@ -218,8 +192,6 @@ export const useRectangleAdjust = ({
     };
 
     const handleUpEvent = (): boolean => {
-      // Snapped on release, not per frame: the box drags freely and settles
-      // onto the grid when the hand lets go.
       const extent = snap ? extentNow() : null;
       if (extent && snap) store.set(rectAtom, bboxFromMetric(snap(extent)));
       drag = null;
@@ -249,8 +221,6 @@ export const useRectangleAdjust = ({
     redraw();
     map.addLayer(layer);
     map.addInteraction(interaction);
-    // Subscribed rather than made a React dependency: the drag writes this atom
-    // on every frame, and rebuilding the layer to follow it would be expensive.
     const unsubscribe = store.sub(rectAtom, redraw);
 
     return () => {

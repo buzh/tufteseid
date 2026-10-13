@@ -1,6 +1,3 @@
-// Everything about a spot that is typed rather than dragged, plus the delete.
-// The pictures belong to `SpotCard`, which this box is reached from.
-
 import { Alert, Button, Group, Textarea, TextInput } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 
@@ -102,8 +99,6 @@ export const SpotProperties = ({ spot }: { spot: SpotDraftController }) => {
       <div className={cx(styles.unit, placing && styles.unitStep)}>
         <Icon icon="my_location" size={14} />
         <span className={styles.unitText}>{formatPoint(spot.draft.point)}</span>
-        {/* Both rows read "Endre", so each says which it changes. Only the row
-            holding the map reads "Ferdig", and only one ever does. */}
         <Button
           size="compact-xs"
           variant={placing ? 'filled' : 'default'}
@@ -114,9 +109,6 @@ export const SpotProperties = ({ spot }: { spot: SpotDraftController }) => {
         </Button>
       </div>
 
-      {/* No row for putting the pen down: the canvas takes the whole map and
-          this box is away behind it, so the band carries the two ways out
-          (`ribbon/DrawBand`). */}
       <div
         className={cx(styles.unit, spot.step === 'sketch' && styles.unitStep)}
       >
@@ -142,9 +134,7 @@ export const SpotProperties = ({ spot }: { spot: SpotDraftController }) => {
                     tiles: spot.footprintTiles,
                   })
                 : t('spots.footprintSide', { metres: spot.footprintSideMetres })
-              : // A new spot has none until its first write derives one, which
-                // is the whole life of this box.
-                t('spots.footprintPending')}
+              : t('spots.footprintPending')}
         </span>
         <Button
           size="compact-xs"

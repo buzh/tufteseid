@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next';
 import styles from './ErrorBoundary.module.css';
 
 interface ErrorBoundaryProps {
-  // Omit for the default chip; `null` for a subtree that should vanish.
   fallback?: React.ReactNode;
   children: React.ReactNode | React.ReactNode[];
   onError?: () => void;

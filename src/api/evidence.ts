@@ -2,15 +2,8 @@ import { pb } from './pocketbase';
 
 const COLLECTION = 'evidence';
 
-/** Which producer made the pixels. Mirrors the `kind` select values in
- *  `pb_migrations/1700001300_evidence.js`, plus `sunloop` from
- *  `1700001400_evidence_sunloop.js` and `rvt` from `1700001500_evidence_rvt.js`
- *  — the two rendered on the server. `rvt` is every RVT blend: which one is
- *  `meta.vis`. */
 export type EvidenceKind = 'lidar' | 'terrain' | 'flyfoto' | 'sunloop' | 'rvt';
 
-/** Free-form per kind, and read back through `src/evidence/spec.ts` rather than
- *  trusted. Server-side ceiling is 10 kB. */
 export type EvidenceMeta = Record<string, unknown>;
 
 export type EvidenceRecord = {
@@ -18,15 +11,12 @@ export type EvidenceRecord = {
   spot: string;
   owner: string;
   kind: EvidenceKind;
-  /** Empty between the ask and the render landing — test it, do not assume. */
   file: string;
   caption: string;
   meta: EvidenceMeta | null;
-  /** Opaque ordering key; see `nextEvidenceSort`. */
   sort: number;
   created: string;
   updated: string;
-  // Set by PocketBase on fetched records; `pb.files.getURL` needs one of them.
   collectionId?: string;
   collectionName?: string;
 };
@@ -38,12 +28,8 @@ type NewEvidenceInput = {
   meta?: EvidenceMeta;
 };
 
-// Epoch milliseconds, so a producer that does not hold the list still lands
-// last.
 const nextEvidenceSort = () => Date.now();
 
-// PocketBase parses a JSON field over REST but hands it back as a string over
-// realtime SSE. Same rule as `spots.ts`.
 const asJson = <T>(value: unknown): T | null => {
   if (value == null || value === '') return null;
   if (typeof value !== 'string') return value as T;
@@ -74,9 +60,6 @@ export const createEvidence = async (
     }),
   );
 
-/** `meta` goes up in the same request, so a record can never hold a file its
- *  meta does not describe. Pass the whole of it: PocketBase replaces a JSON
- *  field wholesale. */
 export const attachEvidenceFile = async (
   id: string,
   blob: Blob,
@@ -91,9 +74,6 @@ export const attachEvidenceFile = async (
   );
 };
 
-/** See `src/evidence/order.ts` for the key itself: a move writes the picture
- *  that moved and leaves the rest of the list standing, unless the gap it
- *  lands in has no room. */
 export const setEvidenceSort = async (
   id: string,
   sort: number,
@@ -104,9 +84,6 @@ export const deleteEvidence = async (id: string): Promise<void> => {
   await pb.collection(COLLECTION).delete(id);
 };
 
-// `created` makes the order total, so equal-`sort` rows cannot reshuffle.
-// `requestKey: null` opts out of the SDK's auto-cancel: opening a spot and a
-// realtime reload can ask at the same moment.
 export const listSpotEvidence = async (
   spotId: string,
 ): Promise<EvidenceRecord[]> =>
@@ -118,9 +95,6 @@ export const listSpotEvidence = async (
     })
   ).map(hydrate);
 
-/** `thumb` takes the sizes declared in the migration; omit it for the original.
- *  Synchronous: the file field is not `protected`, so there is no file token to
- *  fetch first. Empty string for a row whose render has not landed. */
 export const evidenceFileUrl = (
   rec: EvidenceRecord,
   thumb?: '200x200' | '800x0',

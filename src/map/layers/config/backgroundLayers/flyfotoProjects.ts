@@ -4,19 +4,14 @@ import { fetchWithin } from '../../../../shared/utils/deadline';
 
 const PROJECTS_TIMEOUT_MS = 20_000;
 
-// Layer 4, "Prosjektomriss prosessert": one row per acquisition.
 const PROJECTS_URL = '/arcgis/nib/prosjekter/MapServer/4/query';
 
-// "Satellittbilde": nationwide 10 m Sentinel-2 mosaics, which would list under
-// every rectangle.
 const SATELLITE_ORTOFOTOTYPE = 6;
 
 export type FlyfotoProject = {
-  // prosjektnavn, which is also the ImageServer's mosaic-rule selector.
   id: string;
   projectName: string;
   year: number | null;
-  // ISO from fotodato_date; sometimes disagrees with the year in the name.
   photoDate: string | null;
   metresPerPx: number | null;
   bboxLonLat: [number, number, number, number];
@@ -39,8 +34,6 @@ function toNumber(value: unknown): number | null {
   return typeof n === 'number' && Number.isFinite(n) ? n : null;
 }
 
-// Formatted in UTC: these are dates, not instants, and local formatting can
-// shift them a day.
 function toIsoDate(epochMs: number | null | undefined): string | null {
   if (typeof epochMs !== 'number' || !Number.isFinite(epochMs)) return null;
   const d = new Date(epochMs);
@@ -75,13 +68,7 @@ function toProject(attrs: QueryAttributes): FlyfotoProject | null {
   };
 }
 
-// The catalogue gains a row a handful of times a year, so one rectangle asked
-// for twice in a sitting is the same answer. Held because `renderEvidence`
-// re-reads it once per proposal to recover an acquisition's resolution, in
-// front of the tile burst rather than beside it.
 const CACHE_TTL_MS = 300_000;
-// The picker walks a new rectangle on every pan, so this is bounded rather
-// than complete. Oldest written out first — `Map` keeps insertion order.
 const CACHE_MAX = 32;
 
 const cache = new Map<string, { at: number; projects: FlyfotoProject[] }>();
@@ -93,12 +80,10 @@ function byNewest(a: FlyfotoProject, b: FlyfotoProject): number {
   return a.projectName.localeCompare(b.projectName, 'nb');
 }
 
-// The server filters against the real outlines, not their bounding boxes.
 async function queryProjects(
   bbox4326: Bbox,
   signal?: AbortSignal,
 ): Promise<FlyfotoProject[]> {
-  // The service wants a projected CRS.
   const bbox25833 = transformExtent(bbox4326, 'EPSG:4326', 'EPSG:25833');
 
   const params = new URLSearchParams({
@@ -110,7 +95,6 @@ async function queryProjects(
     spatialRel: 'esriSpatialRelIntersects',
     outFields:
       'prosjektnavn,aar,fotodato_date,ortofototype,pixelstorrelse,x_min,y_min,x_max,y_max',
-    // The bounds are plain attributes, so the outlines need not come back.
     returnGeometry: 'false',
   });
 
@@ -119,7 +103,6 @@ async function queryProjects(
     { ms: PROJECTS_TIMEOUT_MS, what: 'flyfoto projects', signal },
     (res) => res.json(),
   );
-  // ArcGIS reports failures as a 200 with an error envelope.
   if (body?.error) {
     throw new Error(
       `flyfoto projects: ${body.error.message ?? 'query failed'}`,
@@ -132,7 +115,6 @@ async function queryProjects(
   const projects: FlyfotoProject[] = [];
   for (const feature of features) {
     const project = toProject(feature.attributes ?? {});
-    // More than one outline row per acquisition happens.
     if (!project || seen.has(project.id)) continue;
     seen.add(project.id);
     projects.push(project);
@@ -148,10 +130,7 @@ export async function fetchFlyfotoProjectsForBbox(
   const hit = cache.get(key);
   if (hit && Date.now() - hit.at < CACHE_TTL_MS) return [...hit.projects];
 
-  // Only an answer is held. A failure is the upstream's mood rather than the
-  // catalogue's contents, and the caller asking again is how it is retried.
   const projects = await queryProjects(bbox4326, signal);
-  // Re-inserted, so the order is recency of write and not of first sight.
   cache.delete(key);
   if (cache.size >= CACHE_MAX) {
     const oldest = cache.keys().next().value;

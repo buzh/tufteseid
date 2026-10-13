@@ -1,8 +1,4 @@
-// Several pointer handlers write the viewport cursor at once; a lease only
-// clears it if it set it.
-
 export type CursorLease = {
-  /** Show `cursor`, or release the viewport when it is null. */
   set: (cursor: string | null) => void;
   release: () => void;
 };

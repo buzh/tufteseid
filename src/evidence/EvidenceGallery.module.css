@@ -33,9 +33,6 @@
   list-style: none;
 }
 
-/* Every row the same height, or the slots a drag measures at the press would
-   move under it. That is what keeps the thumbnail box fixed and the title on
-   one line. */
 .row {
   display: flex;
   align-items: center;
@@ -46,7 +43,6 @@
   opacity: 0.45;
 }
 
-/* `touch-action: none`, or a drag down the list scrolls the box instead. */
 .handle {
   display: flex;
   align-items: center;
@@ -85,8 +81,6 @@
   border-color: var(--mantine-color-papaya-6);
 }
 
-/* Fixed box so a row's height does not depend on whether its pixels have
-   landed. The thumbnail is square; a stitch of the footprint rarely is. */
 .thumb {
   flex: none;
   width: calc(36px * var(--ui-scale));
@@ -94,8 +88,6 @@
   border-radius: var(--mantine-radius-xs);
   background: var(--mantine-color-anthracite-6);
   object-fit: cover;
-  /* Decoration inside a button: the press belongs to the button, and a video
-     thumbnail would otherwise answer it with the browser's own overlay. */
   pointer-events: none;
 }
 

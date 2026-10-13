@@ -10,23 +10,16 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { mapAtom } from '../map/atoms';
 
-// Over the terrain-analysis render (1), under the B half (1.5) so the curtain
-// reads a kept render against a live ground, and under the drawing (2).
-// Inventory in docs/map-layers.md.
 const Z_INDEX = 1.25;
 
 const LAYER_ID = 'spotEvidenceOverlay';
 const LOOP_LAYER_ID = 'spotEvidenceLoop';
 
-/** A still laid over the ground it was rendered on. Extent is EPSG:25833
- *  whatever the view is in; `ImageStatic` reprojects. */
 export type OverlayTile = {
   url: string;
   extent: [number, number, number, number];
 };
 
-// Null before the map has a size or a resolved view, which the caller reads as
-// "cannot tell what is on screen" rather than as an empty screen.
 const viewExtent25833 = (map: Map): Extent | null => {
   const size = map.getSize();
   if (!size) return null;
@@ -39,16 +32,11 @@ const viewExtent25833 = (map: Map): Extent | null => {
   return extent.every(Number.isFinite) ? extent : null;
 };
 
-// A set, so a mosaic lays all its tiles under one overlay. One tile is the
-// ordinary case.
 export const useEvidenceOverlay = (tiles: OverlayTile[], opacity: number) => {
   const map = useAtomValue(mapAtom);
 
-  // Outlive their effect on purpose: the outgoing set comes off only once every
-  // incoming tile has pixels, so flipping between two renders never blinks.
   const shown = useRef<ImageLayer<Static>[]>([]);
 
-  // Rebuild only when the set changes, not on every render that re-derives it.
   const key = tiles.map((t) => `${t.url}@${t.extent.join(',')}`).join(';');
 
   useEffect(() => {
@@ -65,10 +53,6 @@ export const useEvidenceOverlay = (tiles: OverlayTile[], opacity: number) => {
     const outgoing = shown.current;
     const incoming: ImageLayer<Static>[] = [];
 
-    // `ImageStatic` is lazy: it requests nothing for a tile the view has not
-    // asked for, so an off-screen tile fires neither event and waiting on the
-    // whole mosaic would leave the outgoing set up for ever. Only the tiles on
-    // screen are waited for — off screen there is no flip to see.
     const seen = viewExtent25833(map);
     const awaited = new Set(
       seen ? tiles.filter((t) => intersects(t.extent, seen)) : tiles,
@@ -78,8 +62,6 @@ export const useEvidenceOverlay = (tiles: OverlayTile[], opacity: number) => {
       for (const old of outgoing) map.removeLayer(old);
       shown.current = shown.current.filter((l) => !outgoing.includes(l));
     };
-    // Dropped in one go once the last awaited tile lands, so a mosaic flips
-    // whole rather than tile by tile.
     let pending = awaited.size;
     const retireOutgoing = () => {
       pending -= 1;
@@ -102,18 +84,11 @@ export const useEvidenceOverlay = (tiles: OverlayTile[], opacity: number) => {
       incoming.push(layer);
       if (!awaited.has(tile)) continue;
       source.once('imageloadend', retireOutgoing);
-      // Or an image that never arrives leaves the previous set up for ever.
       source.once('imageloaderror', retireOutgoing);
     }
     shown.current = [...outgoing, ...incoming];
     if (pending === 0) dropOutgoing();
 
-    // No cleanup: the next set retires this one, and the unmount effect sweeps
-    // whatever is left.
-
-    // `opacity` seeded here, kept in step by the effect below: naming it would
-    // rebuild the layers on every slider drag and bring back the flash this
-    // avoids.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map, key]);
 
@@ -130,22 +105,14 @@ export const useEvidenceOverlay = (tiles: OverlayTile[], opacity: number) => {
   );
 };
 
-// Loop controls in the loop's own terms, not the element's: progress 0–1.
 export type LoopTransport = {
   playing: boolean;
   progress: number;
-  /** The element has read the loop's length; until then there is nothing to
-   *  seek over, and a browser that refused the file never gets there. */
   ready: boolean;
   toggle: () => void;
   seek: (progress: number) => void;
 };
 
-// Same ground, z and `opacity` as the still overlay; only one of the two is
-// ever up. `ImageStatic` takes only a still URL, so frames go through an
-// `ImageCanvas` as the terrain render does (`terrain/terrainLayer.ts`), with
-// the element as the only decoder. `bandTop` (0–1) is where the burnt-in legend
-// starts; below it the frame is caption, not ground, so it is left off the map.
 export const useEvidenceLoopOverlay = (
   url: string,
   extent: [number, number, number, number] | null,
@@ -155,7 +122,6 @@ export const useEvidenceLoopOverlay = (
   const map = useAtomValue(mapAtom);
   const [minX, minY, maxX, maxY] = extent ?? [NaN, NaN, NaN, NaN];
   const shown = useRef<ImageLayer<ImageCanvasSource> | null>(null);
-  // Owned by the effect, the only thing that may make or discard one.
   const element = useRef<HTMLVideoElement | null>(null);
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -166,32 +132,23 @@ export const useEvidenceLoopOverlay = (
 
     const video = document.createElement('video');
     video.loop = true;
-    // Autoplay needs a silent video; a sun loop has no audio track to lose.
     video.muted = true;
     video.playsInline = true;
     video.preload = 'auto';
     video.src = url;
-    // In the document and laid out, not detached or `display: none`: either
-    // lets a browser stop decoding what nobody sees, and the frames are wanted.
     video.style.cssText =
       'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0.01;pointer-events:none';
     document.body.append(video);
     element.current = video;
 
-    // The element is the state, read back rather than trusted: an autoplay may
-    // be refused, and a button trusting its own request would offer to pause a
-    // still.
     const onPlay = () => setPlaying(true);
     const onPause = () => setPlaying(false);
-    // A WebM whose header lost its Duration reads back as `Infinity`, which is
-    // a length nothing can be placed along.
     const onDuration = () =>
       setReady(Number.isFinite(video.duration) && video.duration > 0);
     video.addEventListener('play', onPlay);
     video.addEventListener('pause', onPause);
     video.addEventListener('durationchange', onDuration);
 
-    // One viewport-sized canvas, reused across frames.
     let out: HTMLCanvasElement | null = null;
 
     const drawFrame = (
@@ -210,15 +167,11 @@ export const useEvidenceLoopOverlay = (
       const ctx = out.getContext('2d');
       if (!ctx) return out;
       ctx.clearRect(0, 0, width, height);
-      // Below HAVE_CURRENT_DATA there is no frame or intrinsic size, and
-      // `drawImage` of such an element throws.
       if (video.readyState < 2) return out;
 
       const scale = pixelRatio / resolution;
       const w = (maxX - minX) * scale;
       const h = (maxY - minY) * scale;
-      // Nearest-neighbour on the way up: smoothing blurs the single-pixel step
-      // the shading exists to show.
       ctx.imageSmoothingEnabled = w < video.videoWidth;
       ctx.drawImage(
         video,
@@ -235,11 +188,7 @@ export const useEvidenceLoopOverlay = (
     };
 
     const source = new ImageCanvasSource({
-      // Fixed, so a view in another projection reprojects once per decoded
-      // frame.
       projection: 'EPSG:25833',
-      // No margin: the picture is redrawn at the loop's own rate regardless, so
-      // extra pixels buy nothing.
       ratio: 1,
       canvasFunction: drawFrame,
     });
@@ -252,25 +201,17 @@ export const useEvidenceLoopOverlay = (
     map.addLayer(layer);
     shown.current = layer;
 
-    // `ImageCanvas` caches one image, so `changed()` is the only repaint. Gated
-    // on the element's own time, not `requestVideoFrameCallback` (tied to the
-    // compositor, and this element is a transparent pixel), so a 24 fps loop
-    // does not repaint the map 60 times a second for the same picture.
     let handle = 0;
     let drawn = -1;
     const tick = () => {
       handle = requestAnimationFrame(tick);
       if (video.readyState < 2 || video.currentTime === drawn) return;
       drawn = video.currentTime;
-      // The seek bar says which azimuth is on the ground, so it tracks the
-      // frame.
       if (video.duration > 0) setProgress(video.currentTime / video.duration);
       source.changed();
     };
     tick();
 
-    // Refused where even a silent autoplay is blocked; then the ground holds
-    // the first frame.
     void video.play().catch(() => {});
 
     return () => {
@@ -279,8 +220,6 @@ export const useEvidenceLoopOverlay = (
       video.removeEventListener('pause', onPause);
       video.removeEventListener('durationchange', onDuration);
       video.pause();
-      // Or the element goes on holding the decoded loop after it leaves the
-      // map.
       video.removeAttribute('src');
       video.load();
       video.remove();
@@ -293,8 +232,6 @@ export const useEvidenceLoopOverlay = (
       setReady(false);
     };
 
-    // `opacity` seeded here, kept in step by the effect below: naming it would
-    // rebuild the element on every slider drag and restart the loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map, url, minX, minY, maxX, maxY, bandTop]);
 
@@ -314,8 +251,6 @@ export const useEvidenceLoopOverlay = (
     if (!video || !Number.isFinite(video.duration) || video.duration <= 0) {
       return;
     }
-    // Short of the end: the duration itself wraps a looping element to frame
-    // one.
     video.currentTime = Math.min(Math.max(next, 0), 0.999) * video.duration;
   }, []);
 

@@ -34,7 +34,6 @@ export const DatasetMenu = ({ lidar }: { lidar: LidarControls }) => {
     ? `${flight.projectName} · ${flightFacts(flight)}`
     : `${t('lidarControls.dataset.national')} · ${t('lidarControls.dataset.nationalHint')}`;
 
-  // Kartverket is not answering; the rows are the cVAT store's own.
   const held = viewport.status === 'held';
 
   const row = (entry: LidarViewportEntry) => {
@@ -57,8 +56,6 @@ export const DatasetMenu = ({ lidar }: { lidar: LidarControls }) => {
         <Group gap="xs" wrap="nowrap" justify="space-between">
           <div>
             <Text size="sm">{project.projectName}</Text>
-            {/* Held rows are ranked on the store's envelopes, so a coverage
-                percentage would be an upper bound rather than a measurement. */}
             <Text size="xs" c="dimmed">
               {held
                 ? flightFacts(project)

@@ -12,8 +12,6 @@ import { Icon, type MaterialSymbol } from './Icon';
 import styles from './Panel.module.css';
 import { useConfirm } from './useConfirm';
 
-/** Everything a pointer gesture needs on one element: the capture is taken on
- *  the element the press landed on, so the whole set goes to the same row. */
 type PointerHandlers = Pick<
   ComponentPropsWithoutRef<'div'>,
   'onPointerDown' | 'onPointerMove' | 'onPointerUp' | 'onPointerCancel'
@@ -22,21 +20,15 @@ type PointerHandlers = Pick<
 export type PanelProps = {
   icon?: MaterialSymbol;
   title: string;
-  /** One dimmed line under the title. Survives the fold. */
   status?: ReactNode;
-  /** Present: the title row is the box's drag handle, and looks like one. */
   handle?: PointerHandlers;
-  /** Buttons in the title row, before the fold and the close. */
   actions?: ReactNode;
   collapsible?: boolean;
   defaultOpen?: boolean;
-  /** Absent: the box has no close of its own. */
   onClose?: () => void;
-  /** Puts the close behind a two-press confirm. */
   unsaved?: boolean;
   footer?: ReactNode;
   className?: string;
-  /** What a `Hint` or a `Popover.Target` anchors on. */
   ref?: Ref<HTMLElement>;
   children: ReactNode;
 } & Omit<
@@ -69,9 +61,6 @@ export const Panel = ({
 
   return (
     <section
-      // Mantine's `Popover.Target` clones its child with `id` and the
-      // `aria-haspopup`/`aria-expanded`/`aria-controls` wiring; dropped, the
-      // tip is not announced as belonging to the box.
       {...rest}
       ref={ref}
       className={cx(styles.panel, className)}

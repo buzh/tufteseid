@@ -43,7 +43,6 @@ export const TerrainPanel = ({ terrain }: { terrain: TerrainControls }) => {
     setOpacity,
   } = terrain;
 
-  // The capped wording needs 5 % slack: inside `MAX_SIDE_M` the grid is exact.
   const status = adjusting
     ? t('terrainControls.placing', { side: sideMetres })
     : loading
@@ -63,8 +62,6 @@ export const TerrainPanel = ({ terrain }: { terrain: TerrainControls }) => {
             )
           : undefined;
 
-  // VAT holds a hillshade and a slope but takes no knobs: its sun and
-  // exaggeration are frozen (`VAT_PRESETS`) so two renders stay comparable.
   const sunDependent = vis === 'hillshade';
   const usesZFactor =
     vis === 'hillshade' || vis === 'multiHillshade' || vis === 'slope';
@@ -183,8 +180,6 @@ export const TerrainPanel = ({ terrain }: { terrain: TerrainControls }) => {
             onChange={terrain.setZFactor}
           />
         )}
-        {/* Keyed on the visualization and the ceiling, never on the value:
-            that would remount the slider on every commit and drop focus. */}
         {!adjusting && radiusLimits && (
           <SliderRow
             key={`${vis}-${radiusLimits.max}`}
@@ -202,8 +197,6 @@ export const TerrainPanel = ({ terrain }: { terrain: TerrainControls }) => {
             onChange={terrain.setRadius}
           />
         )}
-        {/* Transparency here — 0 % is fully covering — opacity in the
-            controller, which is what OpenLayers takes. */}
         {!adjusting && (
           <SliderRow
             label={t('terrainControls.transparency')}
@@ -220,8 +213,6 @@ export const TerrainPanel = ({ terrain }: { terrain: TerrainControls }) => {
   );
 };
 
-// With `deferred` the thumb tracks the drag but the caller hears only on
-// release, which keeps a multi-second recompute off every frame of it.
 const SliderRow = ({
   label,
   value,
@@ -241,8 +232,6 @@ const SliderRow = ({
   deferred?: boolean;
   onChange: (value: number) => void;
 }) => {
-  // Read only while deferred: the caller keys this component on whatever the
-  // value belongs to, so there is no outside change for the draft to miss.
   const [draft, setDraft] = useState(value);
   const shown = deferred ? draft : value;
 

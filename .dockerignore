@@ -7,10 +7,7 @@ dist
 *.log
 .DS_Store
 
-# Not build inputs. vat-cache in particular carries multi-megabyte .npz
-# coverage masks that would otherwise ride along in every build context.
 vat-cache
-# …except the one float-TIFF reader, which rendersvc's image copies in.
 !vat-cache/fetch_dem.py
 docs
 scripts

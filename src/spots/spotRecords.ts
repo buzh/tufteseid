@@ -4,13 +4,10 @@ import { useEffect } from 'react';
 import { listSpots, subscribeSpots, type SpotRecord } from '../api/spots';
 import { currentUserAtom } from '../auth/atoms';
 
-/** Every public one, and the reader's own on top of those when signed in.
- *  Null until the list lands; an empty array means none. */
 export const spotRecordsAtom = atom<SpotRecord[] | null>(null);
 
 export const spotsFailedAtom = atom(false);
 
-/** The reader's own, newest change first. */
 export const mySpotsAtom = atom((get): SpotRecord[] | null => {
   const user = get(currentUserAtom);
   const records = get(spotRecordsAtom);
@@ -20,15 +17,11 @@ export const mySpotsAtom = atom((get): SpotRecord[] | null => {
     .sort((a, b) => b.updated.localeCompare(a.updated));
 });
 
-/** Mounted once, by `SpotSurface`. */
 export const useSpotRecords = () => {
   const user = useAtomValue(currentUserAtom);
   const setRecords = useSetAtom(spotRecordsAtom);
   const setFailed = useSetAtom(spotsFailedAtom);
 
-  // Signed out as well: a public spot is readable with no account, so the
-  // shared drawing layer and the pins are there for a guest too. `user` stays
-  // a dependency — signing in adds the reader's own records to the list.
   useEffect(() => {
     setRecords(null);
     setFailed(false);

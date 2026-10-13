@@ -1,11 +1,4 @@
 #!/usr/bin/env bash
-#
-#   scripts/health-check.sh [base-url] [spot-code]
-#   */30 * * * * /site/tufteseid/scripts/health-check.sh
-#
-# Both arguments are passed through to live-check.sh and are optional.
-# Server-only: needs the host's log directory and the compose project. Silent
-# unless something is wrong, so cron mails only the problems.
 
 set -uo pipefail
 
@@ -14,8 +7,6 @@ ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 LOGDIR=${TUFTESEID_LOGS:-/site/tufteseid/data/logs}
 HOURS=${HOURS:-1}
 
-# MAX_SHED=1: $skip_cache_type keeps rate-limited answers out of the cache, so
-# each one is a tile a visitor did not get.
 DISK_PCT=${DISK_PCT:-90}
 MAX_5XX=${MAX_5XX:-50}
 MAX_SHED=${MAX_SHED:-1}
@@ -52,8 +43,6 @@ else
   fi
 fi
 
-# MapProxy never evicts onto this filesystem and a full disk stops PocketBase
-# writing.
 used=$(df --output=pcent "$(dirname -- "$LOGDIR")" 2>/dev/null | tail -1 | tr -dc '0-9')
 if [ -z "$used" ]; then
   bad "cannot stat the filesystem holding $LOGDIR"
@@ -83,8 +72,6 @@ wlog=$(dc logs --no-log-prefix --since "${HOURS}h" wmscache 2>/dev/null)
 if [ -z "$wlog" ]; then
   ok 'no wmscache traffic in the window'
 else
-  # application/vnd.ogc.se_xml is the ServiceException wms.geonorge.no answers
-  # with, at HTTP 200, past its per-IP budget. No status code shows it.
   shed=$(printf '%s\n' "$wlog" | grep -c 'ct=[^ ,]*se_xml')
   if [ "$shed" -ge "$MAX_SHED" ]; then
     bad "$shed × rate-limited by an upstream in ${HOURS}h — tiles were dropped"
@@ -92,8 +79,6 @@ else
     ok 'no rate-limited responses'
   fi
 
-  # max_fails=0 in wms-cache.conf makes this impossible, so it appearing means
-  # the container is not running the repo's config.
   if printf '%s\n' "$wlog" | grep -q 'no live upstreams'; then
     bad 'nginx logged "no live upstreams" — max_fails=0 is not in effect'
   else
@@ -101,7 +86,6 @@ else
   fi
 fi
 
-# Captured rather than streamed, so a passing run mails nothing.
 if ! out=$("$ROOT/scripts/live-check.sh" "$@" 2>&1); then
   bad 'live-check.sh failed'
   printf '%s\n' "$out"

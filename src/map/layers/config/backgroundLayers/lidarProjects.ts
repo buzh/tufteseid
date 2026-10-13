@@ -3,24 +3,21 @@ import { fetchWithin } from '../../../../shared/utils/deadline';
 import { getUrlParameter } from '../../../../shared/utils/urlUtils';
 import { acrossHalves, halved } from '../../../compare/halves';
 
-// The document is some 8 MB of XML the proxy may be fetching cold.
 const CAPS_TIMEOUT_MS = 60_000;
 
 export type LidarModel = 'dtm' | 'dom';
 
 export type LidarProject = {
-  // Full WMS layer-name prefix, e.g. "Vestfold 10pkt 2025".
   id: string;
   projectName: string;
   year: number | null;
   pointDensity: string | null;
-  bboxLonLat: [number, number, number, number]; // [minLon, minLat, maxLon, maxLat]
-  styles: string[]; // e.g. ["skyggerelieff", "helning_grader", ...]
+  bboxLonLat: [number, number, number, number];
+  styles: string[];
 };
 
 const CAPS_URL =
   '/wms/geonorge/wms.hoyde-dtm-prosjekt?SERVICE=WMS&REQUEST=GetCapabilities&VERSION=1.3.0';
-// Bump when the parser output shape or filtering changes.
 const STORAGE_KEY = 'lidarProjects.v4';
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -28,16 +25,8 @@ export const activeLidarProjectHalves = halved<LidarProject | null>(null);
 
 export const liveLidarProjectsAtom = acrossHalves(activeLidarProjectHalves);
 
-/** The render a link named, or null for a link that named none — which is what
- *  leaves `preferredLidarRender`'s cVAT upgrade free to run. Read at import,
- *  because the effect that mirrors the ground back to the URL rewrites this
- *  parameter and a later read would race it. Unvalidated: the vocabulary comes
- *  from a live GetCapabilities, so `resolveLidarStyle` clamping it to what the
- *  settled dataset publishes is the only check there can be. */
 export const linkedLidarRender = getUrlParameter('lidarRender');
 
-// The picked DTM style: `effectiveLidarStyle` overrides rather than overwrites,
-// so the DTM choice survives a trip through DOM.
 export const activeLidarStyleHalves = halved<string>(
   linkedLidarRender ?? 'skyggerelieff',
 );
@@ -51,19 +40,13 @@ export const LIDAR_PROJECT_WMS_URL: Record<LidarModel, string> = {
   dom: '/wms/geonorge/wms.hoyde-dom-prosjekt',
 };
 
-// The services' own `<BoundingBox CRS="EPSG:25833">`, handed to the layer as
-// `extent`: a TileWMS without one tiles the whole UTM zone.
 export const LIDAR_COVERAGE_EXTENT_25833: [number, number, number, number] = [
   -100275, 6399725, 1150255, 8000275,
 ];
 export const DEFAULT_LIDAR_PROJECT_STYLE = 'skyggerelieff';
 
-// Our own cached VAT as a member of the style vocabulary; no service publishes
-// it. `cvatGround.ts` owns the pixels.
 export const CVAT_STYLE = 'cvat';
 
-// Every DOM layer publishes skyggerelieff and the excluded
-// dynamisk_farget_hoyde, so a constant rather than a second caps fetch.
 const DOM_STYLES = [DEFAULT_LIDAR_PROJECT_STYLE];
 
 export const stylesForModel = (
@@ -71,15 +54,11 @@ export const stylesForModel = (
   model: LidarModel,
 ): string[] => (model === 'dom' ? DOM_STYLES : styles);
 
-// Asking a DOM layer for a style it does not publish fails silently (see
-// `resolveLidarStyle`), so the model wins.
 export const effectiveLidarStyle = (
   style: string,
   model: LidarModel,
 ): string => (model === 'dom' ? DOM_STYLES[0] : style);
 
-// The only namer of the two flight grounds; bypassing it can put `cvat` in a
-// GetMap.
 export const lidarFlightGround = (
   style: string,
   model: LidarModel,
@@ -88,11 +67,9 @@ export const lidarFlightGround = (
     ? 'lidarCvat'
     : 'lidarProject';
 
-// The style a WMS may be asked for: `cvat` has no service behind it.
 export const wmsLidarStyle = (style: string): string =>
   style === CVAT_STYLE ? DEFAULT_LIDAR_PROJECT_STYLE : style;
 
-// Shown first in the style pulldown; anything else sits behind its overflow.
 export const TIER_A_STYLES = [
   CVAT_STYLE,
   'skyggerelieff',
@@ -100,8 +77,6 @@ export const TIER_A_STYLES = [
   'helning_prosent',
 ];
 
-// Asking the national mosaic for a per-project style answers HTTP 200
-// image/png with a ~100 byte JSON error body, so clamp to a published style.
 export const resolveLidarStyle = (
   published: string[],
   preferred: string,
@@ -112,9 +87,6 @@ export const resolveLidarStyle = (
       published[0] ??
       DEFAULT_LIDAR_PROJECT_STYLE);
 
-// The clamp above, plus one upgrade: the default hillshade becomes `cvat` where
-// the store holds the flight. Kept out of `resolveLidarStyle`, which recreates
-// a recorded render and must not substitute one.
 export const preferredLidarRender = (
   published: string[],
   preferred: string,
@@ -123,12 +95,8 @@ export const preferredLidarRender = (
     ? CVAT_STYLE
     : resolveLidarStyle(published, preferred);
 
-// Advertised but unusable: `None` renders near-uniform, and
-// `dynamisk_farget_hoyde` ramps per tile, so neighbouring tiles disagree.
 const EXCLUDED_STYLES = new Set<string>(['None', 'dynamisk_farget_hoyde']);
 
-// GetCapabilities may list a style with no translation, so an unknown suffix is
-// prettified rather than dropped.
 export const lidarStyleLabel = (style: string): string => {
   const known = t(`lidar.style.${style}`, { defaultValue: '' });
   if (known) return known;
@@ -136,7 +104,6 @@ export const lidarStyleLabel = (style: string): string => {
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 };
 
-/** Chip-width form of {@link lidarStyleLabel}; the full label where none. */
 export const lidarStyleShort = (style: string): string =>
   t(`lidar.styleShort.${style}`, { defaultValue: '' }) ||
   lidarStyleLabel(style);
@@ -160,8 +127,6 @@ export function fetchLidarProjects(): Promise<LidarProject[]> {
       writeCache(projects);
       return projects;
     } catch (err) {
-      // Flights are appended to this document, never revised, so an expired
-      // copy is only missing the newest.
       const stale = readCache(true);
       if (!stale) throw err;
       console.warn('[lidar] catalogue unavailable; using the stale copy', err);
@@ -204,7 +169,6 @@ function parseCapabilities(xmlText: string): LidarProject[] {
   for (const [projectName, { styles, bboxes }] of grouped) {
     const bboxLonLat = unionBbox(bboxes);
     if (!bboxLonLat) continue;
-    // Photogrammetry DTMs: a lidar project's styles advertised, blank tiles.
     if (/^Bilde\b/i.test(projectName)) continue;
     out.push({
       id: projectName,
@@ -223,7 +187,6 @@ function parseCapabilities(xmlText: string): LidarProject[] {
 function readBboxFromLayerOrAncestor(
   layer: Element,
 ): [number, number, number, number] | null {
-  // WMS 1.3.0 lets a child <Layer> inherit EX_GeographicBoundingBox.
   let el: Element | null = layer;
   while (el && el.tagName === 'Layer') {
     const direct = Array.from(el.children).find(
@@ -288,12 +251,9 @@ function writeCache(projects: LidarProject[]) {
   try {
     const entry: CachedEntry = { ts: Date.now(), projects };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(entry));
-  } catch {
-    /* quota or unavailable storage */
-  }
+  } catch {}
 }
 
-// pointDensity is a string like "10pkt".
 export const densityValue = (d: string | null): number => {
   if (!d) return 0;
   const m = d.match(/^(\d+)/);
@@ -318,8 +278,6 @@ export const bboxIntersects = (
   b: [number, number, number, number],
 ): boolean => a[0] <= b[2] && a[2] >= b[0] && a[1] <= b[3] && a[3] >= b[1];
 
-// Fraction of `viewport` covered by `bbox`, both lon/lat; an upper bound, since
-// the catalogue knows only envelopes.
 export const bboxOverlapRatio = (
   bbox: [number, number, number, number],
   viewport: [number, number, number, number],
@@ -331,8 +289,6 @@ export const bboxOverlapRatio = (
   return area > 0 ? (w * h) / area : 0;
 };
 
-// One service per model under a fixed layer prefix. The DTM is the land-only
-// mosaic, not `-topobathy-`: that one shades the seabed from ~80 m/px out.
 export const NATIONAL_WMS: Record<LidarModel, { url: string; prefix: string }> =
   {
     dtm: {
@@ -345,9 +301,7 @@ export const NATIONAL_WMS: Record<LidarModel, { url: string; prefix: string }> =
     },
   };
 
-// Only the DTM mosaic's styles are discovered at runtime; DOM is DOM_STYLES.
 const NATIONAL_CAPS_URL = `${NATIONAL_WMS.dtm.url}?SERVICE=WMS&REQUEST=GetCapabilities&VERSION=1.3.0`;
-// Bump when the parser filter changes.
 const NATIONAL_STORAGE_KEY = 'lidarProjects.nationalStyles.v1';
 const NATIONAL_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -411,7 +365,5 @@ function writeNationalCache(styles: string[]) {
       NATIONAL_STORAGE_KEY,
       JSON.stringify({ ts: Date.now(), styles }),
     );
-  } catch {
-    /* quota or unavailable storage */
-  }
+  } catch {}
 }

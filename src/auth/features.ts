@@ -3,31 +3,13 @@ import { atom, useAtomValue } from 'jotai';
 import { serviceOn, type Service } from '../services';
 import { currentUserAtom, isAdminAtom } from './atoms';
 
-/**
- * What an account may spend, beyond what every signed-in reader may.
- *
- * Each name is a string on `users.features`, granted in PocketBase's admin UI
- * and nobody's to set over the API (`docs/identity.md`).
- *
- * Nothing gated here is enforced here, and only one of the two is enforced
- * anywhere. `render` is the sidecar's to refuse (`docs/render-sidecar.md`), so
- * hiding the controls that would ask is a courtesy to a reader who would only
- * meet a 403 — or, on an installation that does not run the sidecar at all, a
- * 502. `flyfoto` has no server end: the tiles carry the installation's own
- * Norge i bilder token rather than the reader's, so the gate is the control it
- * hides and nothing more (`docs/identity.md`).
- */
 export type Feature = 'render' | 'flyfoto';
 
-/** Which sidecar each one spends. Nobody holds a feature on an installation
- *  that does not run the service behind it (`src/services.ts`). */
 const SERVICE_OF: Record<Feature, Service> = {
   render: 'render',
   flyfoto: 'flyfoto',
 };
 
-/** An administrator holds every feature, the way they may edit every spot.
- *  `rendersvc` says the same, so the two ends cannot disagree. */
 const hasFeatureAtom = atom((get) => {
   const user = get(currentUserAtom);
   const isAdmin = get(isAdminAtom);

@@ -45,33 +45,19 @@ import {
 
 type KeepOffer = {
   spec: EvidenceSpec;
-  /** A row already covers this ground with these parameters. */
   kept: boolean;
 };
 
 export type SpotEvidence = {
-  /** Null until the list lands; an empty array means none. */
   items: EvidenceRecord[] | null;
   failed: boolean;
-  /** The view as it stands, or null where nothing on screen can be
-   *  re-rendered. */
   offer: KeepOffer | null;
   keep: (spec: EvidenceSpec) => void;
-  /** A row written from pixels already made, for a picker that renders before
-   *  it asks. False where nothing was written and the reader can press
-   *  again. */
   keepProduced: (spec: EvidenceSpec, produced: Produced) => Promise<boolean>;
   retry: (rec: EvidenceRecord) => void;
   remove: (id: string) => void;
-  /** Move a group (a mosaic's tiles, or a lone row) to group index `to`. The
-   *  reading opens on the cover (`coverOf`), so this also chooses a cover. */
   reorderGroup: (key: string, to: number) => void;
-  /** A row with pixels has no state; otherwise a job this browser still holds
-   *  wins, and past that the sidecar's `meta.job` outranks the local queue. */
   stateOf: (rec: EvidenceRecord) => RenderState | undefined;
-  /** Nothing left to ask for on this row: it has pixels, or a render on its
-   *  way. A row the render settled with neither is not covered — it is what
-   *  asking again renders onto. */
   covered: (rec: EvidenceRecord) => boolean;
 };
 
@@ -87,8 +73,6 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
   const [items, setItems] = useState<EvidenceRecord[] | null>(null);
   const [failed, setFailed] = useState(false);
 
-  // Shared by the fetch, the realtime feed and a finished render, all of which
-  // land out of order.
   const byId = useRef(new Map<string, EvidenceRecord>());
 
   const publish = useCallback(
@@ -104,8 +88,6 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
     [publish],
   );
 
-  // No reset for a second spot: the card keys on the record's id, so this hook
-  // only ever sees one.
   const spotId = spot.id;
   useEffect(() => {
     let live = true;
@@ -121,7 +103,6 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
         setFailed(true);
       });
 
-    // The feed is per collection, so rows belonging to another spot arrive too.
     const unsubscribe = subscribeEvidence((action, rec) => {
       if (!live || rec.spot !== spotId) return;
       if (action === 'delete') byId.current.delete(rec.id);
@@ -158,8 +139,6 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
 
   const footprint = spot.footprint;
 
-  // The render boxes the boundary covers: one free box within the cap, a grid
-  // of tiles past it (`src/map/grid.ts`). Every keep fans out across them.
   const tiles = useMemo(
     () => (footprint ? mosaicTiles(footprint) : []),
     [footprint],
@@ -171,8 +150,6 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
       metrics.length > 0 && items && offered
         ? {
             spec: offered,
-            // Kept only once every tile is covered; a half-filled mosaic, or
-            // one a render failed on, still offers the keep that completes it.
             kept: metrics.every((m) =>
               items.some(
                 (rec) => covered(rec) && evidenceMatches(rec, offered, m),
@@ -198,8 +175,6 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
         rec,
         onRefused,
         bbox4326,
-        // Composed here: only the client knows the reader's language, and only
-        // a sun loop's band is typeset by the sidecar.
         legend:
           rec.kind === 'sunloop' ? sunLoopLegend(rec, spot, language) : null,
         onDone: upsert,
@@ -215,18 +190,12 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
       const standing = metrics.map(
         (m) => items?.find((rec) => evidenceMatches(rec, spec, m)) ?? null,
       );
-      // One stamp for every row this press creates, so the tiles read as one
-      // picture (`evidenceGroupKey`). Filling the gaps an earlier mosaic left
-      // joins that picture rather than standing up a second one beside it.
       const keepId =
         standing.map((rec) => rec && keepIdOf(rec)).find(Boolean) ??
         newKeepId();
 
       tiles.forEach((tile, i) => {
         const already = standing[i];
-        // Re-keeping fills the gaps rather than doubling the tiles that
-        // landed: a tile whose render failed keeps the row it has and is
-        // rendered onto again.
         if (already) {
           if (!covered(already)) render(already, tile);
           return;
@@ -235,20 +204,12 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
           {
             spot: spotId,
             kind: spec.kind,
-            // The tile's box is stamped up front so the kept check and a retry
-            // both know which tile this row is, before any pixels land. The
-            // render overwrites it with the box it achieved, the same tile
-            // within `BBOX_TOLERANCE_M`.
             meta: { ...metaOf(spec), bbox25833: metrics[i], keep: keepId },
           },
           user.id,
         )
           .then((rec) => {
             upsert(rec);
-            // A refused handover leaves no `meta.job`, and a row with neither
-            // pixels nor job reads as a render still on its way for as long as
-            // it stands — jamming every order chip behind it. Nothing was kept,
-            // so the row goes with it.
             render(rec, tile, () => {
               discard(rec.id);
               setFailed(true);
@@ -272,8 +233,6 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
       if (!user || !footprint) return false;
       setFailed(false);
       let created: EvidenceRecord | null = null;
-      // Stamped on both writes: the file goes up with a meta of its own, not
-      // with the row's, so a stamp only on the create would not survive it.
       const keep = newKeepId();
       try {
         created = await createEvidence(
@@ -301,8 +260,6 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
           err,
           (err as { response?: { data?: unknown } })?.response?.data,
         );
-        // A row whose file never landed has nothing to retry — the pixels were
-        // the run's, and the run still holds them.
         if (created) discard(created.id);
         setFailed(true);
         return false;
@@ -311,9 +268,6 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
     [user, footprint, spotId, upsert, discard],
   );
 
-  // Over the row's own tile, not the spot's boundary: a mosaic row remembers
-  // which tile it is in `meta.bbox25833`. Legacy single-box rows with no stamp
-  // fall back to the footprint, which is their tile.
   const retry = useCallback(
     (rec: EvidenceRecord) => {
       const box = evidenceBbox(rec);
@@ -323,9 +277,6 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
     [render, footprint],
   );
 
-  // A whole mosaic moves as a block: its tiles stay contiguous and in order.
-  // Only the group that moved is written where the gap it lands in has room;
-  // past that the list renumbers.
   const reorderGroup = useCallback(
     (key: string, to: number) => {
       if (!items) return;
@@ -341,8 +292,6 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
       if (before.length !== writes.length) return;
 
       setFailed(false);
-      // Written first so the rows stay where the hand left them, not snapping
-      // back for the round trip.
       writes.forEach((write, i) => upsert({ ...before[i], sort: write.sort }));
       Promise.all(
         writes.map((write) => setEvidenceSort(write.id, write.sort)),
@@ -360,8 +309,6 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
       const was = byId.current.get(id);
       if (!was) return;
       setFailed(false);
-      // Dropped first: the realtime delete may never arrive for a row only this
-      // reader can see.
       byId.current.delete(id);
       publish();
       deleteEvidence(id).catch((err) => {

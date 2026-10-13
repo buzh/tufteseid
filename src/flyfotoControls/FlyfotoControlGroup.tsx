@@ -1,6 +1,3 @@
-// No hover-to-preview footprint as LiDAR has: the archive index is queried with
-// `returnGeometry=false`, so there is no outline to paint.
-
 import { Menu, ScrollArea, SegmentedControl, Text } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 import type { FlyfotoProject } from '../map/layers/config/backgroundLayers/flyfotoProjects';
@@ -17,8 +14,6 @@ const projectFacts = (p: FlyfotoProject): string =>
     .filter(Boolean)
     .join(' · ');
 
-// The project name carries only the year, so two flights over one town in one
-// year are told apart by `photoDate`.
 const projectMeta = (p: FlyfotoProject): string =>
   [
     p.photoDate ?? (p.year != null ? String(p.year) : null),

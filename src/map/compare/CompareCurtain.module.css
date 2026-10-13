@@ -8,7 +8,6 @@
   position: absolute;
   top: 0;
   bottom: 0;
-  /* Wider than the line, which is too thin to grab. */
   width: calc(24px * var(--ui-scale));
   margin-left: calc(-12px * var(--ui-scale));
   display: flex;

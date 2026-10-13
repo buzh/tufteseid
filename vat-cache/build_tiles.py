@@ -28,27 +28,17 @@ import cvat
 import fetch_dem
 from acquisitions import slug
 
-# The app's shared tile grid, from src/map/layers/wmsTileGrid.ts: resolution is
-# max(EPSG:25833 extent span) / 256 / 2**z, origin the extent's top-left corner,
-# tiles 512 px.
 GRID_ORIGIN = (-2500000.0, 9045984.0)
 MAX_RESOLUTION = 21664.0
 TILE_PX = 512
 
-# RVT's largest max_rad (flat, 20 px) plus the gradients' 3x3 window.
 OVERLAP_PX = 24
 
-# 4 x 512 + 2 x 24 = 2096 px, ~18 MB of float32 per call; exportImage caps at 15000.
 DEFAULT_UNIT_TILES = 4
-# Every level the store can hold, deepest first; one acquisition builds
-# `levels_for` its own DTM, not all of these.
 DEFAULT_LEVELS = (16, 15, 14, 13, 12, 11, 10, 9, 8, 7)
 COARSEST_LEVEL = 7
 WEBP_QUALITY = 90
 
-# Below this level a tile's alpha is the footprint, not the DEM's no-data:
-# ImageServer answers coarse requests out of per-mosaic-item overviews that fill
-# the item's whole rectangle, so a coarse window returns ground never flown.
 MASK_ALPHA_BELOW_Z = 12
 
 
@@ -89,8 +79,6 @@ class Coverage:
         self.mask = data["mask"]
         self.x0, self.x1, self.y0, self.y1 = (float(v) for v in data["bounds"])
         self.cell = float(data["cell"])
-        # Which acquisition the mask is of; None in files written before the
-        # stamp existed.
         self.project = str(data["project"]) if "project" in data.files else None
 
     def reaches(self, west, south, east, north):
@@ -158,8 +146,6 @@ def fetch_unit(z, ux, uy, unit_tiles, project, attempts=5, delay=2.0):
         except (urllib.error.URLError, RuntimeError, ValueError, TimeoutError):
             if attempt == attempts - 1:
                 raise
-            # The service answers a burst with a text body rather than a status,
-            # which arrives here as RuntimeError.
             time.sleep(delay * 2**attempt)
 
 
@@ -286,8 +272,6 @@ class Store:
         if span[0] is not None:
             rows["minzoom"], rows["maxzoom"] = str(span[0]), str(span[1])
         if recipe is not None:
-            # The digested body, so `digest` is sha256 of `recipe` and a reader
-            # can check one against the other.
             rows["recipe"] = json.dumps(
                 {k: v for k, v in recipe.items() if k != "levels"},
                 sort_keys=True)
@@ -378,8 +362,6 @@ def build_unit(args):
     z, ux, uy, unit_tiles, project, coverage_path = args
     res = resolution(z)
     dem = fetch_unit(z, ux, uy, unit_tiles, project)
-    # radius_in_metres=False: RVT's max_rad as written, so this level is RVT's
-    # combined VAT of its own grid.
     composite = cvat.cvat(dem, res, radius_in_metres=False)
     inner = composite[OVERLAP_PX:-OVERLAP_PX, OVERLAP_PX:-OVERLAP_PX]
     footprint = (
@@ -569,7 +551,6 @@ def readable_tile(blob):
             image.load()
             return image.size == (TILE_PX, TILE_PX)
     except Exception:
-        # Anything Pillow raises on is an image the app cannot draw.
         return False
 
 
@@ -587,8 +568,6 @@ def check_level(out, project, coverage, z, unit_tiles=DEFAULT_UNIT_TILES,
     store = read_store(out, project)
     try:
         marked = store.units(z) if store else set()
-        # Marked units the footprint does not reach: the mask was rebuilt, or
-        # --unit-tiles changed between runs.
         result.stray = sorted(marked - set(units))
 
         for seen, (ux, uy) in enumerate(units, 1):

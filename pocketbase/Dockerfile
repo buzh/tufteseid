@@ -1,6 +1,3 @@
-# PocketBase — auth + collections backend for lokaliteter.
-# Downloads a pinned release straight from the upstream GitHub. No official
-# image exists; building it in-repo keeps the supply chain visible.
 FROM alpine:3.20
 
 ARG PB_VERSION=0.40.2
@@ -14,13 +11,6 @@ RUN apk add --no-cache ca-certificates unzip wget \
 
 EXPOSE 8090
 
-# --dir keeps app data (SQLite + uploads) on the mounted volume.
-# --migrationsDir loads JS migrations from the repo-mounted directory,
-# so schema changes are versioned with the code.
-# --hooksDir likewise for the JS hooks. --hooksWatch=false because the watcher
-# answers a bind mount changing under it by re-execing the process: a git pull
-# would restart the backend at a moment nobody chose. Restarting the container
-# is the deliberate way, as it already is for a migration.
 CMD ["/pb/pocketbase", "serve", \
      "--http=0.0.0.0:8090", \
      "--dir=/pb_data", \

@@ -8,20 +8,14 @@ const STORE = process.env.CVAT_STORE || '/store';
 
 const MAX_AGE = 7 * 24 * 3600;
 
-// The slug alphabet from vat-cache/acquisitions.py, and the whole of the path
-// validation: nothing matching it can reach out of the store.
 const SLUG = /^[0-9a-zæøå-]+$/;
 
 const TILE = /^\/([^/]+)\/(\d{1,2})\/(\d{1,7})\/(\d{1,7})\.webp$/;
 
 const SUFFIX = '.mbtiles';
 
-// How long the synthesized manifest may stand before the store is surveyed
-// again, which also bounds how long a stale database handle can live.
 const SCAN_MS = 10_000;
 
-// Open databases by slug. A handle outlives the inode it was opened on, so the
-// survey below must drop one whose file has changed.
 const open = new Map();
 
 function acquire(slug) {
@@ -32,7 +26,6 @@ function acquire(slug) {
     db = new DatabaseSync(path.join(STORE, `${slug}${SUFFIX}`), {
       readOnly: true,
     });
-    // A batch run may hold the write lock while appending to this file.
     db.exec('PRAGMA busy_timeout = 5000');
   } catch {
     return null;
@@ -53,12 +46,9 @@ function release(slug, entry) {
   try {
     entry.db.close();
   } catch {
-    // Already closed.
   }
 }
 
-// MBTiles counts rows from the south, the app's grid from the north; the grid
-// is 2**(z-1) tiles a side at level z. Its own inverse.
 const tmsRow = (z, y) => 2 ** (z - 1) - 1 - y;
 
 function tile(res, slug, z, x, y) {
@@ -68,7 +58,6 @@ function tile(res, slug, z, x, y) {
   try {
     row = entry.select.get(z, x, tmsRow(z, y));
   } catch (err) {
-    // Replaced under the open handle, or corrupt: drop it and reopen next time.
     release(slug, entry);
     res.writeHead(503, { 'Content-Type': 'text/plain' });
     res.end(`cvat store error: ${err?.message ?? err}`);
@@ -83,8 +72,6 @@ function tile(res, slug, z, x, y) {
   res.end(row.tile_data);
 }
 
-// A miss must stay a miss: OpenLayers leaves the tile transparent, which is how
-// the acquisition's footprint is drawn. No Cache-Control — a hole may be filled.
 function miss(res) {
   res.writeHead(404, { 'Content-Type': 'text/plain' });
   res.end('no tile');
@@ -114,13 +101,10 @@ function inspect(slug) {
     try {
       db?.close();
     } catch {
-      // Never opened.
     }
   }
 }
 
-// `levels` is build_tiles.py's stamp; minzoom/maxzoom are the MBTiles spec's
-// own and cover a file written before it. The table scan is the last resort.
 function levelsOf(db, rows) {
   const stamped = rows.get('levels');
   if (stamped) {
@@ -128,7 +112,6 @@ function levelsOf(db, rows) {
       const zs = JSON.parse(stamped).filter(Number.isInteger);
       if (zs.length > 0) return zs;
     } catch {
-      // Not JSON; fall through.
     }
   }
   const lo = Number(rows.get('minzoom'));
@@ -142,12 +125,8 @@ function levelsOf(db, rows) {
     .map((r) => r.z);
 }
 
-// A tile is 2.7 km across at z12 and 86.7 km at z7, and an envelope is only as
-// tight as one tile, so nothing coarser than this is worth measuring at.
 const ENVELOPE_FLOOR_Z = 12;
 
-// Inclusive tile indices on the app's grid at one coarse level. Rows come back
-// flipped to north-origin y, which reverses the order — hence r1 giving y0.
 function boundsOf(db, levels) {
   const measurable = levels.filter((z) => z >= ENVELOPE_FLOOR_Z);
   const z =
@@ -160,7 +139,6 @@ function boundsOf(db, levels) {
         'FROM tiles WHERE zoom_level = ?',
     )
     .get(z);
-  // A level named in the stamp but holding no tiles has no envelope.
   if (at?.x0 == null) return null;
   return { z, x0: at.x0, y0: tmsRow(z, at.r1), x1: at.x1, y1: tmsRow(z, at.r0) };
 }
@@ -184,7 +162,6 @@ async function survey() {
       const { size, mtimeMs } = await fs.stat(path.join(STORE, file));
       found.push({ slug, mark: `${size}:${mtimeMs}` });
     } catch {
-      // Gone between the readdir and the stat.
     }
   }
   return found;
@@ -200,8 +177,6 @@ async function rebuild() {
   const marks = new Map(found.map((f) => [f.slug, f.mark]));
   let moved = body === null;
 
-  // A changed size or mtime means the file was appended to or replaced, so the
-  // handle cached for it may be of an inode that is no longer the file.
   for (const [slug, mark] of marks) {
     if (seen.get(slug) === mark) continue;
     moved = true;
@@ -268,7 +243,6 @@ const server = http.createServer(async (req, res) => {
   }
   const match = TILE.exec(url);
   if (!match) return miss(res);
-  // Slugs carry æøå, which a browser sends percent-encoded.
   let slug;
   try {
     slug = decodeURIComponent(match[1]);

@@ -1,5 +1,3 @@
-/* `ukjent` has no rule on purpose: `vernToneClass` returns undefined for it. */
-
 .fredede {
   background: var(--mantine-color-red-light);
   color: var(--mantine-color-red-light-color);

@@ -14,8 +14,6 @@ import uuid
 BASE = os.environ.get("POCKETBASE_URL", "http://pocketbase:8090").rstrip("/")
 
 READ_TIMEOUT_S = 30
-# The field's ceiling is 50 MB, and the link to pocketbase is a loopback bridge,
-# but the write lands behind an SQLite transaction.
 WRITE_TIMEOUT_S = 300
 
 
@@ -52,8 +50,6 @@ def _call(method, path, token, body=None, content_type=None, timeout=READ_TIMEOU
         raise PbError(e.code, _error_body(e)) from e
     except OSError as e:
         raise PbError(502, str(e)) from e
-    # A truncated or non-JSON body arrives as `http.client.IncompleteRead` or
-    # `json.JSONDecodeError`, neither of which is an `OSError`.
     except (http.client.HTTPException, ValueError) as e:
         raise PbError(502, f"{type(e).__name__}: {e}") from e
 

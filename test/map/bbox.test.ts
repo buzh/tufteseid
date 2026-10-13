@@ -8,9 +8,6 @@ import {
 } from '../../src/map/bbox';
 import { projInit } from '../../src/map/projections/proj/projInit';
 
-// Grid north leans further off true north the further a place lies from UTM
-// 33's central meridian, so these are only worth testing across the width of
-// the country. Kirkenes is 15° out — the worst Norway has.
 const PLACES: [name: string, lon: number, lat: number][] = [
   ['Oslo', 10.75, 59.91],
   ['Bergen', 5.32, 60.39],
@@ -32,9 +29,6 @@ describe('bboxFromMetric', () => {
     }
   });
 
-  // The bug this guards: a rectangle in hand is read, moved and written on
-  // every drag frame, and a bounding-box round trip grew it by an eighth a
-  // grab around Oslo and by nearly a third at Bergen.
   it.each(PLACES)('holds its size across drags at %s', (_name, lon, lat) => {
     let bbox = squareBboxAround([lon, lat], 200);
     for (let i = 0; i < 100; i += 1) {

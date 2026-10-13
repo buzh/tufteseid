@@ -15,14 +15,11 @@ from fetch_dem import QUERY
 HERE = Path(__file__).resolve().parent
 QUEUE_FILE = HERE / "acquisitions.json"
 
-# Reached directly: the app's /wms/geonorge proxy only exists in the compose stack.
 CAPS_URL = (
     "https://wms.geonorge.no/skwms1/wms.hoyde-dtm-prosjekt"
     "?SERVICE=WMS&REQUEST=GetCapabilities&VERSION=1.3.0"
 )
 
-# The catalogue answers at most 1000 distinct values per call, flagged with
-# exceededTransferLimit; there are ~1540 acquisitions.
 _PAGE = 1000
 
 
@@ -54,12 +51,9 @@ def native_cells(names, timeout=180):
             "outStatisticFieldName": "cell",
         }]),
     }
-    # POST: a long name list overruns the URL length the service accepts, and it
-    # answers 404 rather than 414.
     data = urllib.parse.urlencode(query).encode()
     with urllib.request.urlopen(QUERY, data=data, timeout=timeout) as response:
         body = json.load(response)
-    # The service may upper-case statistics field names whatever they were asked in.
     return {
         a["LAS_PROJECT_NAME"]: a.get("CELL", a.get("cell"))
         for a in (f["attributes"] for f in body.get("features", []))
@@ -67,7 +61,6 @@ def native_cells(names, timeout=180):
     }
 
 
-# Acquisitions per POST; the whole catalogue at once would be a 46 kB WHERE clause.
 _CELL_CHUNK = 150
 
 
@@ -102,7 +95,6 @@ def catalogue_names(timeout=180):
         features = body.get("features", [])
         for f in features:
             name = f["attributes"].get("LAS_PROJECT_NAME")
-            # The catalogue carries rows with no project name.
             if name:
                 names.add(name)
         if not features or not body.get("exceededTransferLimit"):

@@ -37,7 +37,6 @@ import { spotRecordsAtom } from './spotRecords';
 
 const CLUSTER_DISTANCE = 44;
 
-/** Room left around a gathering the view was zoomed into. */
 const FIT_PADDING_PX = 48;
 
 const draw = (source: VectorSource, view: string, records: SpotRecord[]) => {
@@ -92,11 +91,6 @@ export const useSpotLayer = () => {
       new ClusterSource({
         source,
         distance: CLUSTER_DISTANCE,
-        // Null drops the feature. The spot whose card or reader is open keeps
-        // no pin, so it must not swell the count of a gathering either. Nor
-        // does one whose drawing is on the shared layer: there the drawing is
-        // the pin, and the reader zoomed in to read the strokes, not a plate
-        // over them.
         geometryFunction: (feature) => {
           const record = feature.get(SPOT_RECORD_KEY) as SpotRecord;
           if (record.id === store.get(unpinnedSpotIdAtom)) return null;

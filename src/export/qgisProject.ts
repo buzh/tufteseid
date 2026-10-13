@@ -1,19 +1,9 @@
-// The bundle's QGIS project: every picture placed and stacked, the public
-// upstreams wired in, nothing for the reader to configure.
-//
-// Written against what QGIS 4.2 itself saves, element for element, rather
-// than from the format's documentation — `QGIS_VERSION` below is part of that
-// coupling and is not a minimum (`docs/architecture.md`).
-
 import type { Metric } from '../map/bbox';
 
 const QGIS_VERSION = '4.2.2-Belém do Pará';
 
-/** Rough mainland-plus-Svalbard bounds, so *Zoom to layer* on a service means
- *  something. Nothing renders off it. */
 const NORWAY_25833: Metric = [-200000, 6400000, 1400000, 9100000];
 
-/** How much ground the view opens with around the footprint. */
 const CANVAS_MARGIN = 0.15;
 
 const esc = (s: string): string =>
@@ -34,10 +24,6 @@ const SRS_25833 =
   '<geographicflag>false</geographicflag>' +
   '</spatialrefsys>';
 
-/**
- * QGIS writes a bare `styles` for one layer and an empty `styles=` per layer
- * beyond that; both forms are copied from its own output rather than derived.
- */
 const wmsSource = (url: string, layers: readonly string[]): string =>
   [
     'contextualWMSLegend=0',
@@ -51,23 +37,7 @@ const wmsSource = (url: string, layers: readonly string[]): string =>
     `url=${encodeURIComponent(url)}`,
   ].join('&');
 
-/**
- * The services a bundle wires up. These are the **public upstreams**, not this
- * installation's `/wms/…` paths: a bundle travels, and QGIS sits outside the
- * app's tile guard and circuit breaker. Change a host here and
- * `nginx/wms-cache.conf` holds the same one for the SPA's own path.
- *
- * `over` stands above the pictures — marks and names belong on top of the
- * ground; `under` is context around a footprint that is at most 500 m wide,
- * and within a stack the array order is the drawing order.
- *
- * Flyfoto is deliberately absent: it is reachable only through `nib-proxy`'s
- * injected token and is not open data (`docs/architecture.md`).
- */
 const SERVICES = [
-  // The app's own reference overlay: roads and names on transparency, for
-  // reading over a render. It draws no ground, so it is not a basemap and
-  // cannot be the thing that places a bundle — `topo` below is.
   {
     name: 'Topografisk referanse',
     url: 'https://wms.geonorge.no/skwms1/wms.topo',
@@ -88,7 +58,6 @@ const SERVICES = [
     stack: 'over',
     checked: false,
   },
-  // Relief rather than cartography, so it stands over the map below it.
   {
     name: 'Skyggerelieff (nasjonal)',
     url: 'https://wms.geonorge.no/skwms1/wms.hoyde-dtm-nhm-25833',
@@ -96,10 +65,6 @@ const SERVICES = [
     stack: 'under',
     checked: false,
   },
-  // The one service on by default, and the bottom of the stack. A footprint
-  // is at most 500 m across, so without ground under it a bundle opens as
-  // pictures floating on nothing — no coastline, no water, no telling where
-  // in the country you are.
   {
     name: 'Topografisk norgeskart',
     url: 'https://wms.geonorge.no/skwms1/wms.topo',
@@ -116,9 +81,6 @@ const MIN_MAX_ORIGIN =
   '<cumulativeCutUpper>0.98</cumulativeCutUpper>' +
   '<stdDevFactor>2</stdDevFactor></minMaxOrigin>';
 
-// 8-bit channels straight through: these are pictures, not measurements, so
-// nothing is stretched. PNG carries alpha and JPEG does not — true of the
-// sidecar's renders as much as the ones made in the tab.
 const bandEnhancement = (channel: string): string =>
   `<${channel}ContrastEnhancement><minValue>0</minValue>` +
   `<maxValue>255</maxValue><algorithm>NoEnhancement</algorithm>` +
@@ -159,7 +121,6 @@ const extentXml = ([minX, minY, maxX, maxY]: Metric): string =>
 type Layer = {
   id: string;
   name: string;
-  /** The `<datasource>` element and the tree's `source` attribute alike. */
   source: string;
   provider: 'gdal' | 'wms';
   extent: Metric;
@@ -167,9 +128,6 @@ type Layer = {
   renderer: string;
 };
 
-// QGIS's own shape: the name with everything but word characters replaced,
-// then a UUID with its dashes likewise. Regenerated per bundle, so two spots'
-// projects opened together cannot collide.
 const layerId = (name: string): string =>
   `${name.replace(/[^A-Za-z0-9_]/g, '_')}_${crypto
     .randomUUID()
@@ -190,8 +148,6 @@ const mapLayer = (layer: Layer): string =>
   pipe(layer.renderer) +
   '<blendMode>0</blendMode><legend/></maplayer>';
 
-// Collapsed: a spot can hold a dozen pictures, and each expanded node spends
-// a row on a colour swatch that says nothing about which reading it is.
 const treeEntry = (layer: Layer): string =>
   `<layer-tree-layer checked="Qt::${layer.checked ? 'Checked' : 'Unchecked'}" ` +
   `expanded="0" id="${esc(layer.id)}" legend_exp="" legend_split_behavior="0" ` +
@@ -199,8 +155,6 @@ const treeEntry = (layer: Layer): string =>
   `providerKey="${layer.provider}" source="${esc(layer.source)}">` +
   '<customproperties><Option/></customproperties></layer-tree-layer>';
 
-// The pre-tree mirror QGIS still writes. Cheap to emit and cheaper than
-// finding out which readers want it.
 const legendEntry = (layer: Layer): string =>
   `<legendlayer checked="Qt::${layer.checked ? 'Checked' : 'Unchecked'}" ` +
   `drawingOrder="-1" name="${esc(layer.name)}" open="true" ` +
@@ -214,14 +168,10 @@ const grown = ([minX, minY, maxX, maxY]: Metric): Metric => {
   return [minX - padX, minY - padY, maxX + padX, maxY + padY];
 };
 
-/** One picture as the project should carry it. */
 export type ProjectRaster = {
-  /** Layer name, and the file's own stem. */
   name: string;
-  /** Path relative to the project file, forward slashes. */
   path: string;
   bbox25833: Metric;
-  /** PNG carries an alpha band, JPEG does not. */
   alpha: boolean;
 };
 
@@ -236,12 +186,6 @@ const serviceLayers = (stack: 'over' | 'under'): Layer[] =>
     renderer: SERVICE_RENDERER,
   }));
 
-/**
- * `rasters` is the gallery's order, cover first, and that is the order they
- * stack in: the cover on top, each one unticked revealing the reading beneath
- * it. The whole point of the footprint is that they are all registered to one
- * another, so a stack is how they are meant to be read.
- */
 export const qgisProject = (
   title: string,
   rasters: readonly ProjectRaster[],

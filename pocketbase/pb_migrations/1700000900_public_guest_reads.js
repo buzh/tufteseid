@@ -1,14 +1,5 @@
 /// <reference path="../pb_data/types.d.ts" />
-//
-// `attachments.file` becomes unprotected: a protected file is only served
-// against a token from an authenticated endpoint, so a guest can hold none.
-// A file URL under a private lokalitet therefore works if it leaks.
-//
-// `fields.add()` with an existing id replaces the field; an omitted
-// property is a property removed.
 
-// `prefix` is '' on localities, where visibility is the record's own field,
-// and 'locality.' on the two that hang off it.
 const readRule = (prefix) =>
   prefix +
   'visibility = "public" || (@request.auth.id != "" && (owner = ' +

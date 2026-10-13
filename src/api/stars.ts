@@ -10,23 +10,16 @@ export type StarRecord = {
   created: string;
 };
 
-/** A row of the `starCounts` view. A spot nobody has starred has no row at all
- *  rather than a row of zeroes, and the owner's own star is not counted. */
 export type StarCount = {
-  /** The view's id *is* the spot id — it groups by `spot`. */
   id: string;
   spot: string;
   stars: number;
 };
 
-// PocketBase reports a unique-index violation as a 400 with a per-field entry.
-// Here it means this reader has already starred this spot.
 const isAlreadyStarred = (err: unknown): boolean =>
   (err as { response?: { data?: Record<string, { code?: string }> } })?.response
     ?.data?.owner?.code === 'validation_not_unique';
 
-/** The reader's own stars. Empty when signed out. Filtered here rather than
- *  left to the list rule, which also lets an admin list everybody's. */
 export const listMyStars = async (): Promise<StarRecord[]> => {
   const owner = pb.authStore.record?.id;
   return owner
@@ -37,11 +30,9 @@ export const listMyStars = async (): Promise<StarRecord[]> => {
     : [];
 };
 
-/** Every spot that has been starred, most first. Open to a guest. */
 export const listStarCounts = async (): Promise<StarCount[]> =>
   await pb.collection(COUNTS).getFullList<StarCount>({ sort: '-stars' });
 
-/** Null when nobody has starred the spot. */
 export const getStarCount = async (
   spotId: string,
 ): Promise<StarCount | null> => {
@@ -54,8 +45,6 @@ export const getStarCount = async (
   }
 };
 
-/** Idempotent: a second tab that has starred the same spot gets the row it
- *  already has rather than the unique-index 400. */
 export const addStar = async (
   spotId: string,
   ownerId: string,

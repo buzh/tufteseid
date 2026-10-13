@@ -14,7 +14,6 @@ const ANSWER_ICON: Record<Answer, MaterialSymbol> = {
   failed: 'link_off',
 };
 
-// Spelled out so the `t()` keys stay greppable.
 const ANSWER_TEXT: Record<Answer, string> = {
   copied: 'spots.copied',
   failed: 'spots.copyFailed',
@@ -23,8 +22,6 @@ const ANSWER_TEXT: Record<Answer, string> = {
 export const useShareCopy = (spot: SpotRecord | null) => {
   const { t } = useTranslation();
   const subject = spot?.id ?? null;
-  // Carries the subject it is about: the ribbon's button does not remount
-  // between spots, and "copied" against another spot's link would be a lie.
   const [last, setLast] = useState<{
     subject: string | null;
     answer: Answer;

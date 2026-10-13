@@ -71,12 +71,8 @@ from report import level_range, plural, size, spaced
 
 HERE = Path(__file__).resolve().parent
 
-# The numbered catalogue as this machine last saw it; a build artefact like the
-# masks, not a committed file.
 SNAPSHOT = HERE / "catalogue.json"
 
-# Where a tufteseid install keeps its store, for the copy line at the end. This
-# script never writes there.
 SERVED_STORE = "/site/tufteseid/data/cvat"
 
 
@@ -157,8 +153,6 @@ def resolve(snap, out, token):
             "hoydedata.no spells it."
         )
 
-    # One of them is already a file here, which is the one a re-fetch or an
-    # extension means; anything else has to be said exactly.
     built = [n for n in hits if n in held]
     if len(built) == 1:
         print(f"{token!r} fits {len(hits)} acquisitions; {built[0]!r} is the "
@@ -221,8 +215,6 @@ def guard(target, name, recipe, building, force, redo):
         print("  It carries no recipe, so there is no telling whether it was "
               "built like this one.")
     elif digest != want:
-        # --redo over every level the file holds leaves none of the old pixels
-        # behind, so the two recipes never meet in it.
         replacing = redo and not set(levels) - set(building)
         if not (force or replacing):
             sys.exit(
@@ -273,8 +265,6 @@ def do_list(snap, pattern, out, verbose):
         else:
             print("      grid    withdrawn from the catalogue — nothing left "
                   "to fetch")
-        # The app joins the manifest onto the per-project WMS's layer prefixes
-        # and drops an acquisition the WMS does not publish.
         known = "ok" if name in wms else "MISSING — the app would drop this"
         print(f"      wms     {known}")
         mask = coverage_mod.mask_file(name)
@@ -336,8 +326,6 @@ def wanted_levels(name, cell, asked):
 
 def do_get(args, snap, name):
     out = Path(args.out)
-    # Levels and the file first: both can refuse the run, and deriving a mask
-    # takes minutes.
     levels = wanted_levels(name, cell_of(snap, name), args.levels)
     target = build_tiles.store_path(out, name)
     recipe = build_tiles.settings(levels, args.unit_tiles)
@@ -360,8 +348,6 @@ def do_get(args, snap, name):
         build_tiles.run_levels(store, name, mask, levels, args.unit_tiles,
                                args.jobs, args.limit)
     finally:
-        # Again at the end, for the level span: the first stamp predates this
-        # run's tiles.
         store.stamp(name, recipe)
         store.close()
     delivered(target, name)
@@ -414,8 +400,6 @@ def do_check(args, name):
                  "-g builds it.")
     with build_tiles.Store(target) as store:
         held = store.levels()
-    # What the file holds, not every level the tool can build: a 0.5 m flight is
-    # not owed a z16.
     levels = args.levels or held
     if not levels:
         sys.exit(f"{target.name} holds no tiles at all.")
@@ -434,8 +418,6 @@ def do_check(args, name):
     if not args.fix:
         print(f"\n{plural(total, 'work unit')} to (re)build. Add -g to fix.")
         return
-    # A repair clears the unit before rebuilding it, so a dry run would destroy
-    # and not repair.
     if args.dry_run:
         print(f"\n{plural(total, 'work unit')} to (re)build. Drop --dry-run "
               "to fix.")
@@ -513,14 +495,12 @@ def main():
         do_list(snap, args.list, args.out, args.verbose)
         print()
     if args.get is None and args.check is None:
-        return  # -l or --refresh on its own
+        return
 
     if args.redo and args.check is not None:
         sys.exit("--redo rebuilds whatever is there, and -c reads it back to "
                  "find what needs\nrebuilding; ask for one or the other.")
 
-    # One acquisition between them: -c vestfold -g and -g 3 -c 3 are both a
-    # single request.
     asked = list(dict.fromkeys(t for t in (args.get, args.check) if t))
     named = {resolve(snap, args.out, token) for token in asked}
     if len(named) > 1:

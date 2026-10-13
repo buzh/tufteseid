@@ -1,6 +1,3 @@
-// The archive index is one ArcGIS query per moveend, so it is only asked while
-// Flyfoto is that half's ground.
-
 import { useAtom, useAtomValue } from 'jotai';
 import { transformExtent } from 'ol/proj';
 import { useEffect, useMemo, useState } from 'react';
@@ -14,12 +11,8 @@ import {
 } from '../map/layers/config/backgroundLayers/flyfotoProjects';
 import { countByEra, filterByEra, type FlyfotoEra } from './eras';
 
-// Furthest out the list is worth answering: a flight covers a town, so a
-// regional view already intersects several hundred of them.
 const MIN_FLYFOTO_ZOOM = 8;
 
-// Matches REFRESH_DEBOUNCE_MS in lidarFootprintsLayer.ts; the two viewport
-// passes answer the same shape of question and should cost the same.
 const REFRESH_DEBOUNCE_MS = 250;
 
 type FlyfotoViewportStatus =
@@ -48,12 +41,9 @@ export const useFlyfotoControls = (half: CompareHalf) => {
   const isProject = backgroundLayer === 'flyfotoProject';
   const isFlyfotoBackground = isMosaic || isProject;
 
-  // One query per moveend, answered out of wmscache for a view already seen.
   useEffect(() => {
     if (!isFlyfotoBackground) return;
     let cancelled = false;
-    // Panning refreshes faster than the service answers; only the newest
-    // writes.
     let latestRequest = 0;
     let inFlight: AbortController | null = null;
 
@@ -66,14 +56,10 @@ export const useFlyfotoControls = (half: CompareHalf) => {
         [number, number, number, number] | undefined;
       if (!extentLonLat) return;
 
-      // Claimed before the zoom check too, so a fetch started while zoomed in
-      // cannot land afterwards and overwrite the state.
       const request = ++latestRequest;
       inFlight?.abort();
       inFlight = null;
 
-      // getZoom() is a log2 of the resolution, so an integral zoom can come
-      // back a hair under itself; the epsilon keeps the threshold level usable.
       const zoom = map.getView().getZoom();
       if (zoom == null || zoom < MIN_FLYFOTO_ZOOM - 0.001) {
         setViewport({ status: 'zoomedOut', projects: [] });
@@ -82,7 +68,6 @@ export const useFlyfotoControls = (half: CompareHalf) => {
 
       const controller = new AbortController();
       inFlight = controller;
-      // Keep the rows while the next view loads, or the menu flickers.
       setViewport((prev) => ({ ...prev, status: 'loading' }));
 
       fetchFlyfotoProjectsForBbox(extentLonLat, controller.signal)
@@ -110,8 +95,6 @@ export const useFlyfotoControls = (half: CompareHalf) => {
       window.clearTimeout(debounce);
       inFlight?.abort();
       map.un('moveend', onMoveEnd);
-      // Emptied on the way out, not on the way in: the rows belong to the
-      // viewport they were read over.
       setViewport(EMPTY_VIEWPORT);
     };
   }, [map, isFlyfotoBackground]);
@@ -135,7 +118,6 @@ export const useFlyfotoControls = (half: CompareHalf) => {
     isMosaic,
     isProject,
     activeProject,
-    /** The raw query; `projects` is the same list after the period filter. */
     viewport,
     projects,
     era,
@@ -143,7 +125,6 @@ export const useFlyfotoControls = (half: CompareHalf) => {
     eraCounts,
     activateMosaic,
     activateProject,
-    // The mosaic always: it is the only member that renders everywhere.
     enterFlyfoto: () => {
       if (!isFlyfotoBackground) setBackgroundLayer('flyfoto');
     },

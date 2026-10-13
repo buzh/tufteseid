@@ -15,28 +15,20 @@ import {
 } from '../search/searchApi';
 import type { CadastralTeig, MunicipalityPoint } from '../types/searchTypes';
 
-/** Long enough to say what is around without becoming a list to read. */
 const MAX_PLACES = 8;
 
 export type PlaceReading = {
-  /** Where the box is anchored, in the view's projection. */
   coordinate: [number, number];
   lonLat: [number, number];
-  /** The box names one grid rather than the view's own, which the `projection`
-   *  URL parameter can change under it. */
   utm33: [number, number];
-  /** The lookups are still out. An empty field below means "nothing there"
-   *  only once this is false. */
   busy: boolean;
   metresAboveSea: number | null;
   municipality: MunicipalityPoint | null;
-  /** `kommunenummer-gnr/bnr`, the matrikkel's own notation. */
   cadastre: string | null;
   telling: NearbyPlace | null;
   places: NearbyPlace[];
 };
 
-/** What a click knows before anything is asked. */
 export const placeAt = (
   coordinate: [number, number],
   view: ProjectionIdentifier,
@@ -52,16 +44,12 @@ export const placeAt = (
   places: [],
 });
 
-/** The parcel the point is in, where a metre's radius caught a neighbour
- *  too. */
 const matrikkelOf = (teiger: CadastralTeig[]): string | null => {
   const teig = teiger.find((t) => t.hovedområde) ?? teiger[0];
   if (!teig) return null;
   return `${teig.kommunenummer}-${teig.matrikkelnummertekst}`;
 };
 
-/** Four independent lookups: one that fails leaves its own field empty rather
- *  than emptying the card. */
 export const readPlaceAt = async (
   base: PlaceReading,
   signal: AbortSignal,
@@ -82,7 +70,6 @@ export const readPlaceAt = async (
   ]);
 
   const points = names?.navn ?? [];
-  // The one heading the card is not also in the list under it.
   const telling = tellingPlace(points);
 
   return {
@@ -100,7 +87,6 @@ export const readPlaceAt = async (
   };
 };
 
-/** Nothing landed but the coordinates. */
 export const readingIsEmpty = (reading: PlaceReading): boolean =>
   reading.metresAboveSea === null &&
   reading.municipality === null &&

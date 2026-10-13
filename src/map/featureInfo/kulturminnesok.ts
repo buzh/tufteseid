@@ -1,15 +1,7 @@
 import { useEffect, useReducer } from 'react';
 
-// RA serves `linkkulturminnesok` on every record, but part of the register is
-// not in Kulturminnesøk's index and a miss comes back as HTTP 200 with an
-// all-null body, so a null `externalid` is the miss. Same-origin through
-// wmscache (`/kms/*`) because the API sends no CORS headers.
-
-/** `unknown` covers "not asked yet", "not a resolver URL" and "ask failed". */
 export type KulturminnesokStatus = 'unknown' | 'indexed' | 'missing';
 
-// Only the numeric lokalitet resolver is checkable: brukerminner link to their
-// own uuid and SEFRAK serves no link, so both fall through to `unknown`.
 const RESOLVER_LINK = /\/ra\/lokalitet\/(\d+)(?:[/?#]|$)/;
 
 const kulturminnesokId = (link: string): string =>
@@ -29,7 +21,6 @@ const probe = (id: string): Promise<KulturminnesokStatus> => {
       const body = (await res.json()) as { externalid?: string | null };
       return body?.externalid ? 'indexed' : 'missing';
     } catch {
-      // A dead probe must never be able to hide a link that works.
       return 'unknown';
     }
   })();
@@ -42,8 +33,6 @@ const probe = (id: string): Promise<KulturminnesokStatus> => {
   return request;
 };
 
-/** Status of one `linkkulturminnesok` URL. `unknown` until the probe answers,
- *  so a slow or broken one costs the mark and never the link. */
 export const useKulturminnesokStatus = (link: string): KulturminnesokStatus => {
   const id = kulturminnesokId(link);
   const [, rerender] = useReducer((n: number) => n + 1, 0);

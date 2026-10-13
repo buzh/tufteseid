@@ -29,11 +29,9 @@ const isInvalidAddressSearch = (query: string): boolean => {
   return directionWithNumber.test(q) || latLonLike.test(q);
 };
 
-// Both page sizes are the search box's list lengths: nothing pages.
 const ADDRESS_SEARCH_PAGE_SIZE = 8;
 const PLACE_SEARCH_PAGE_SIZE = 8;
 
-/** What the lookups behind one point are given, each on its own. */
 const POINT_DEADLINE_MS = 8000;
 
 const emptyAddressResult = (query: string): AddressApiResponse => ({
@@ -108,8 +106,6 @@ export const getPlaceNames = async (
   url.searchParams.append('treffPerSide', PLACE_SEARCH_PAGE_SIZE.toString());
   url.searchParams.append('side', page.toString());
   url.searchParams.append('fuzzy', 'true');
-  // The hits carry `nord`/`øst` with no datum on them, so the request names
-  // one: ETRS89 degrees, which are WGS84 at display precision.
   url.searchParams.append('utkoordsys', '4258');
 
   try {
@@ -171,7 +167,6 @@ export const getRoads = async (query: string): Promise<Road[]> => {
   }
 };
 
-// kommunenr/gnr/bnr(/festenr): 4 digits, then 1-5 each.
 const SLASH_ONLY_PATTERN = /^(\d{4})\/(\d{1,5})\/(\d{1,5})(\/\d{1,5})?$/;
 
 const normalizePropertyQuery = (query: string): string => {
@@ -207,10 +202,6 @@ export const getProperties = async (query: string): Promise<Property[]> => {
   }
 };
 
-/** Metres above the vertical datum at one point, or null where the national
- *  mosaic has no coverage — which arrives as the string `NoData` rather than
- *  as an error. Water inside coverage reads exactly 0
- *  (`docs/terrain-analysis.md`). */
 export const getElevation = async (
   x: number,
   y: number,
@@ -224,7 +215,6 @@ export const getElevation = async (
     f: 'json',
     geometry: `${east},${north}`,
     geometryType: 'esriGeometryPoint',
-    // Fixed, and matches the transform above: the ImageServer is 25833-only.
     sr: '25833',
     returnGeometry: 'false',
     returnCatalogItems: 'false',
@@ -240,9 +230,6 @@ export const getElevation = async (
   return isNumberOk(metres) ? metres : null;
 };
 
-/** Which kommune and fylke the point falls in. Off the mainland the service
- *  answers 404 rather than an empty body, so "nowhere" throws like a failure
- *  does. */
 export const getMunicipalityAtPoint = async (
   east: number,
   north: number,
@@ -261,8 +248,6 @@ export const getMunicipalityAtPoint = async (
   );
 };
 
-/** The matrikkel parcels within a metre of the point. Empty off registered
- *  land, which is a 200 with no features. */
 export const getCadastreAtPoint = async (
   east: number,
   north: number,

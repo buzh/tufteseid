@@ -26,16 +26,13 @@ const assignLatLon = (
   return { lon: applyDirection(val1, dir1), lat: applyDirection(val2, dir2) };
 };
 
-/** Norway UTM rough bounding box. */
 const isValidUTMRange = (east: number, north: number): boolean =>
   east >= -100000 && east <= 1200000 && north >= 5000000 && north <= 9000000;
 
-// EPSG:4258 (ETRS89) is absent on purpose: the parser normalises it to
-// EPSG:4326 first, the two being identical at display precision.
 const SUPPORTED_PROJECTIONS = new Set<ProjectionIdentifier>([
   'EPSG:4326',
   'EPSG:3857',
-  'EPSG:4230', // ED50 geographic — accepted as-is; no datum shift is applied
+  'EPSG:4230',
   'EPSG:25832',
   'EPSG:25833',
   'EPSG:25834',
@@ -121,9 +118,6 @@ const normalizeDirections = (input: string): string =>
     .replace(/Vest|VEST|West|WEST/g, 'W');
 
 const normalizeDecimalSeparators = (input: string): string => {
-  // A decimal comma becomes a dot, but a comma separating two coordinates
-  // ("500000,7000000") must survive. Two or more "digit,1-2-digits" at a
-  // separator boundary implies European decimal notation.
   const shortPatterns = input.match(/\d,\d{1,2}(?=,|;|\s|@|$)/g) ?? [];
   const hasMultipleShortPatterns = shortPatterns.length >= 2;
 
@@ -137,21 +131,16 @@ const normalizeDecimalSeparators = (input: string): string => {
     const textBefore = str.slice(0, offset + 1);
     const numberBeforeComma = textBefore.match(/[\d.]+$/);
 
-    // A dot already before the comma → the comma separates two coordinates.
     if (numberBeforeComma?.[0].includes('.')) return match;
 
-    // Large integers both sides → a UTM easting/northing pair.
     if (numberBeforeComma) {
       const fullBefore = parseInt(numberBeforeComma[0], 10);
       const fullAfter = parseInt(after, 10);
       if (fullBefore >= 1000 && fullAfter >= 1000) return match;
     }
 
-    // 3+ digits after the comma → unambiguously a decimal fraction.
     if (after.length >= 3) return `${before}.${after}`;
 
-    // 1–2 digits is ambiguous; convert only with corroborating context —
-    // another such pattern in the string, or a coordinate following.
     if (hasMultipleShortPatterns) return `${before}.${after}`;
 
     const rest = str.slice(offset + match.length);
@@ -163,16 +152,6 @@ const normalizeDecimalSeparators = (input: string): string => {
   return input.replace(/(\d),(\d+)/g, replaceComma);
 };
 
-/**
- * Accepted formats:
- * - Decimal degrees: "59.91273, 10.74609", "lat: 59.91273, lon: 10.74609"
- * - DMS / DM: "59°54'45.8\"N 10°44'45.9\"E", "60° 50.466' N, 04° 52.535' E"
- * - UTM: "598515, 6643994", "east: 598515, north: 6643994", "33W 598515 6643994"
- * - Explicit EPSG: "425917 7730314@25833", "59.91273, 10.74609@4326"
- * - Norwegian direction words: "60 Nord, 10 Øst"
- *
- * `fallbackProjection` is the tie-breaker for ambiguous projected pairs.
- */
 export const parseCoordinateInput = (
   input: string,
   fallbackProjection?: ProjectionIdentifier,
@@ -182,7 +161,6 @@ export const parseCoordinateInput = (
   const trimmedInput = input.trim();
 
   if (trimmedInput.includes('@')) {
-    // Explicit EPSG never falls through to the other parsers.
     return parseWithEPSG(
       normalizeDecimalSeparators(normalizeDirections(trimmedInput)),
     );
@@ -199,7 +177,6 @@ export const parseCoordinateInput = (
   );
 };
 
-// "425917 7730314@25834", "59.91273, 10.74609@4326", "163834.01,6663030.01@EPSG:25833"
 const parseWithEPSG = (input: string): ParsedCoordinate | null => {
   const atIndex = input.indexOf('@');
   if (atIndex === -1) return null;
@@ -211,7 +188,6 @@ const parseWithEPSG = (input: string): ParsedCoordinate | null => {
   if (!epsgMatch) return null;
 
   const rawCode = parseInt(epsgMatch[1], 10);
-  // ETRS89 equals WGS84 at display precision.
   const epsgCode = rawCode === 4258 ? 4326 : rawCode;
 
   const projection = toProjectionIdentifier(epsgCode);
@@ -235,7 +211,6 @@ const parseWithEPSG = (input: string): ParsedCoordinate | null => {
   if (isNaN(coord1) || isNaN(coord2)) return null;
 
   if (projection === 'EPSG:4326') {
-    // Geographic: lat, lon.
     if (coord1 < -90 || coord1 > 90 || coord2 < -180 || coord2 > 180)
       return null;
     return {
@@ -247,7 +222,6 @@ const parseWithEPSG = (input: string): ParsedCoordinate | null => {
     };
   }
 
-  // Projected: easting, northing.
   if (!isValidUTMRange(coord1, coord2)) return null;
   return {
     lat: coord2,
@@ -258,9 +232,7 @@ const parseWithEPSG = (input: string): ParsedCoordinate | null => {
   };
 };
 
-// "59.91273, 10.74609", "lat: 59.91273, lon: 10.74609", "59.9494° N, 10.7564° E"
 const parseDecimalDegrees = (input: string): ParsedCoordinate | null => {
-  // Minute markers mean DMS, not decimal degrees.
   if (!/['\u2032]/.test(input)) {
     const degreePattern =
       /([NSEW])?\s*(\d+(?:\.\d+)?)\s*°\s*([NSEW])?[\s,;]+([NSEW])?\s*(\d+(?:\.\d+)?)\s*°\s*([NSEW])?/i;
@@ -291,7 +263,6 @@ const parseDecimalDegrees = (input: string): ParsedCoordinate | null => {
     }
   }
 
-  // Both ° and minute/second markers, or "°digit" ("66°45.005 N"), is DM/DMS.
   if (/°/.test(input) && /['\u2032"\u2033]/.test(input)) return null;
   if (/°\d/.test(input)) return null;
 
@@ -319,10 +290,7 @@ const parseDecimalDegrees = (input: string): ParsedCoordinate | null => {
   };
 };
 
-// Degrees/minutes/seconds and degrees/decimal-minutes, with the direction
-// before, after or absent.
 const parseDMS = (input: string): ParsedCoordinate | null => {
-  // Pattern 1: Direction BEFORE, DMS — "N 60° 5' 38'', E 10° 50' 10''"
   const dirBeforeDMSPattern =
     /([NSEW])\s*(\d+)\s*°\s*(\d+)\s*['\u2032]\s*(\d+(?:\.\d+)?)\s*["\u2033']{0,2}\s*[,;\s]*([NSEW])\s*(\d+)\s*°\s*(\d+)\s*['\u2032]\s*(\d+(?:\.\d+)?)\s*["\u2033']{0,2}/i;
   const m1 = input.match(dirBeforeDMSPattern);
@@ -331,7 +299,6 @@ const parseDMS = (input: string): ParsedCoordinate | null => {
     return tryDMSWithDirections(d1, deg1, min1, d2, deg2, min2, sec1, sec2);
   }
 
-  // Pattern 2: Direction BEFORE, DM — "N 60° 44.077 E 011° 15.943"
   const dirBeforeDMPattern =
     /([NSEW])\s*(\d+)\s*°\s*(\d+(?:\.\d+)?)['\u2032]?[,;\s]+([NSEW])\s*(\d+)\s*°\s*(\d+(?:\.\d+)?)['\u2032]?/i;
   const m2 = input.match(dirBeforeDMPattern);
@@ -340,7 +307,6 @@ const parseDMS = (input: string): ParsedCoordinate | null => {
     return tryDMSWithDirections(d1, deg1, min1, d2, deg2, min2);
   }
 
-  // Pattern 3: DMS without direction — "60°10'10,10°10'10" or "60° 14' 18.306\", 9° 55' 45.113\""
   const dmsNoDirectionPattern =
     /(\d+)\s*°\s*(\d+)\s*['\u2032]\s*(\d+(?:\.\d+)?)\s*["\u2033]{0,2}\s*[,;\s]+(\d+)\s*°\s*(\d+)\s*['\u2032]\s*(\d+(?:\.\d+)?)/;
   const m3 = input.match(dmsNoDirectionPattern);
@@ -357,7 +323,6 @@ const parseDMS = (input: string): ParsedCoordinate | null => {
       );
   }
 
-  // Pattern 4: DM without direction — "60°10.5',10°10.5'"
   const dmNoDirectionPattern =
     /(\d+)\s*°\s*(\d+(?:\.\d+)?)\s*['\u2032]\s*[,;\s]+(\d+)\s*°\s*(\d+(?:\.\d+)?)\s*['\u2032]/;
   const m4 = input.match(dmNoDirectionPattern);
@@ -372,7 +337,6 @@ const parseDMS = (input: string): ParsedCoordinate | null => {
       );
   }
 
-  // Pattern 5: DM with only first direction — "58° 09.83' N, 06° 48.76'"
   const dmPartialDirectionPattern =
     /(\d+)\s*°\s*(\d+(?:\.\d+)?)\s*['\u2032]\s*([NSEW])\s*[,;\s]+(\d+)\s*°\s*(\d+(?:\.\d+)?)\s*['\u2032]?\s*$/i;
   const m5 = input.match(dmPartialDirectionPattern);
@@ -392,7 +356,6 @@ const parseDMS = (input: string): ParsedCoordinate | null => {
     }
   }
 
-  // Pattern 5b: DM without degree symbol, with direction AFTER — "67 24.5536 N 015 34.7826 E"
   const dmNoDegreeSymbolAfterPattern =
     /(\d{1,3})\s+(\d{1,2}(?:\.\d+)?)\s*([NSEW])\s*[,;\s]+(\d{1,3})\s+(\d{1,2}(?:\.\d+)?)\s*([NSEW])/i;
   const m5b = input.match(dmNoDegreeSymbolAfterPattern);
@@ -401,7 +364,6 @@ const parseDMS = (input: string): ParsedCoordinate | null => {
     return tryDMSWithDirections(d1, deg1, min1, d2, deg2, min2);
   }
 
-  // Pattern 5c: DM without degree symbol, with direction BEFORE — "N 67 24.5536 E 015 34.7826"
   const dmNoDegreeSymbolBeforePattern =
     /([NSEW])\s*(\d{1,3})\s+(\d{1,2}(?:\.\d+)?)\s*[,;\s]+([NSEW])\s*(\d{1,3})\s+(\d{1,2}(?:\.\d+)?)/i;
   const m5c = input.match(dmNoDegreeSymbolBeforePattern);
@@ -410,8 +372,6 @@ const parseDMS = (input: string): ParsedCoordinate | null => {
     return tryDMSWithDirections(d1, deg1, min1, d2, deg2, min2);
   }
 
-  // Pattern 5d: DM without degree symbol and without direction — "67 24.5536 015 34.7826".
-  // Requires 3+ decimals on the minutes so decimal degrees and UTM don't match.
   const dmNoDegreeSymbolNoDirectionPattern =
     /^(\d{1,3})\s+(\d{1,2}(?:\.\d{3,})?)[\s,;]+(\d{1,3})\s+(\d{1,2}(?:\.\d{3,})?)$/;
   const m5d = input.match(dmNoDegreeSymbolNoDirectionPattern);
@@ -429,16 +389,12 @@ const parseDMS = (input: string): ParsedCoordinate | null => {
       );
   }
 
-  // Pattern 6: DMS with direction AFTER — "59°54'45.8\"N 10°44'45.9\"E"
   const dmsAfterPattern =
     /(\d+)[°\s]+(\d+)['\u2032'\s]+(\d+(?:\.\d+)?)["\u2033"']{0,2}\s*([NSEW])/gi;
   let matches = Array.from(input.matchAll(dmsAfterPattern));
 
-  // Which of the two patterns below produced the matches, and therefore
-  // whether the capture groups hold seconds.
   const isDMS = matches.length === 2;
 
-  // Pattern 7: DM with direction AFTER — "60° 50.466' N, 04° 52.535' E"
   if (!isDMS) {
     const dmAfterPattern = /(\d+)[°\s]+(\d+(?:\.\d+)?)['\u2032\s]*([NSEW])/gi;
     matches = Array.from(input.matchAll(dmAfterPattern));
@@ -480,13 +436,10 @@ const parseDMS = (input: string): ParsedCoordinate | null => {
   return createDMSResult(lat, lon);
 };
 
-// Projected coordinates, UTM or Web Mercator. Defaults to UTM 33N
-// (EPSG:25833) unless a zone or a fallback projection says otherwise.
 const parseUTM = (
   input: string,
   fallbackProjection?: ProjectionIdentifier,
 ): ParsedCoordinate | null => {
-  // "Northing N, Easting E" order, when the direction letters say so.
   const directionPattern =
     /(\d+(?:\.\d+)?)\s*([NE])\s*[,;]\s*(\d+(?:\.\d+)?)\s*([NE])/i;
   const dirMatch = input.match(directionPattern);
@@ -503,16 +456,13 @@ const parseUTM = (
   const parts = cleaned.split(/[,;\s]+/).filter(Boolean);
   if (parts.length < 2) return null;
 
-  // An explicit zone may be the first or the last token.
   let zone: number | null = null;
   let numStartIdx = 0;
   let explicitZone = false;
 
   const tryExtractZone = (token: string): number | null => {
-    // "33", "33N", "33W", "W33".
     const zoneMatch = token.match(/^([A-Z]?)(\d{1,2})([A-Z]?)$/i);
     if (zoneMatch) return parseInt(zoneMatch[2], 10);
-    // Or a 5-digit EPSG code: 32633, 25833.
     const epsgMatch = token.match(/^(\d{5})$/);
     if (epsgMatch) {
       const code = parseInt(epsgMatch[1], 10);
@@ -546,7 +496,6 @@ const parseUTM = (
     north = coord1;
     east = coord2;
   } else if (coord1 > 1000000 && coord2 < 1000000) {
-    // Over a million can only be the northing.
     north = coord1;
     east = coord2;
   } else {
@@ -602,8 +551,6 @@ const parseUTM = (
   };
 };
 
-// Heuristic: a WGS84 pair landing in Central/South Asia (lat 0–45, lon 50–90)
-// is more likely a Norwegian coordinate entered lon/lat than a real one.
 export const isLikelyLonLatSwap = (parsed: ParsedCoordinate): boolean => {
   if (parsed.projection !== 'EPSG:4326') return false;
   const { lat, lon } = parsed;

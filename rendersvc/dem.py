@@ -19,35 +19,22 @@ import urllib.request
 
 from pyproj import Transformer
 
-# The float TIFF reader is shared with `vat-cache/`, copied into the image by
-# the Dockerfile. Its treatment of absent tiles is load-bearing here too.
 from fetch_dem import read_tiff_f32
 
 BASE = "https://hoydedata.no/arcgis/rest/services"
 
-# Per-acquisition mosaics, not the national NHM_* ones: where NHM never flew,
-# the national catalogue silently serves 10 m contour-derived rows upsampled.
 SERVICES = {"dtm": "Prosjekt_DTM", "dom": "Prosjekt_DOM"}
 
-# Finest acquisition wins where they overlap. Stated explicitly because
-# Prosjekt_DOM defaults to a Northwest mosaic method and Prosjekt_DTM does not.
 MOSAIC_RULE = {
     "mosaicMethod": "esriMosaicAttribute",
     "sortField": "lowps",
     "sortValue": 0,
 }
 
-# `meta.source` asking for the mosaic above rather than one acquisition.
-# Mirrors `AUTO_SOURCE` in `src/evidence/spec.ts`.
 AUTO_SOURCE = "auto"
 
-# The 10 m fallback rows have no OPPLOSNING, so excluding them makes a null
-# coverage answer mean "no laser data".
 LASER_ONLY = "OPPLOSNING IS NOT NULL"
 
-# An acquisition's name reaches the service inside a SQL `where`, so it is
-# checked rather than escaped: a LAS_PROJECT_NAME is a place, a density and a
-# year ("NDH Vestfold 5pkt 2016"), and nothing with a quote in it is one.
 _NAME = re.compile(r"^[\w .,()\-/]{1,200}$")
 
 
@@ -76,30 +63,12 @@ def _mosaic_rule(project):
         rule["where"] = _only(project)
     return json.dumps(rule)
 
-# Finest resolution the per-project services publish.
 FINEST_M_PER_PX = 0.25
 
-# No retry, and short: a probe that fails costs the render nothing but this,
-# because the fall-through assumes the finest resolution the services publish.
-# Erring that way asks for more pixels than the ground has, never fewer.
 PROBE_TIMEOUT_S = 20
 
-# One attempt. `urlopen`'s timeout is the socket's, so this bounds how long the
-# service may go silent rather than how long the transfer may take — which is
-# the right thing to be patient about: ArcGIS composes the whole mosaic before
-# it sends a byte, and a 2200 px F32 grid has been measured at 134 s of that on
-# a busy afternoon. Cutting a grid off for being slow buys nothing at all, since
-# the retry starts from the beginning against the same service.
 FETCH_TIMEOUT_S = 600
-# Every attempt at one grid, together. The picture is never made coarser to fit
-# a struggling upstream, so patience is the only thing left to spend — bounded
-# here, because the worker is serial and the queue behind it is real. A blend
-# fetches two grids and so may spend twice this.
 FETCH_BUDGET_S = 900
-# exportImage answers a burst with a text body under a 200 status, and that
-# recovers on its own in seconds. Real load does not, and hammering is how a
-# slow minute becomes a slow hour — so the wait grows, with jitter, and the
-# attempts are capped as well as the budget.
 MAX_ATTEMPTS = 6
 BACKOFF_CAP_S = 60
 
@@ -160,8 +129,6 @@ def probe_coverage(model, bbox25833, project=None):
     body = json.loads(_get(url, PROBE_TIMEOUT_S))
     if body.get("error"):
         raise RuntimeError(f"catalogue query rejected: {body['error']}")
-    # The service upper-cases outStatisticFieldName, and no coverage arrives as
-    # one feature with a null statistic, not as an empty features array.
     features = body.get("features") or [{}]
     attrs = features[0].get("attributes") or {}
     best = attrs.get("BEST", attrs.get("best"))
@@ -193,8 +160,6 @@ def fetch_grid(model, bbox25833, width, height, log=None, project=None):
         "format": "tiff",
         "pixelType": "F32",
         "interpolation": "RSP_BilinearInterpolation",
-        # rasterFunction 'None' returns values; the service's other function,
-        # `skyggerelieff`, returns a shaded image.
         "renderingRule": json.dumps({"rasterFunction": "None"}),
         "mosaicRule": _mosaic_rule(project),
     }
@@ -220,8 +185,6 @@ def fetch_grid(model, bbox25833, width, height, log=None, project=None):
             last = e
         if log:
             log(f"{width}x{height} attempt {attempt} failed: {last}")
-        # A timeout has already done the waiting, and waiting again only spends
-        # budget that would hold the next connection open instead.
         wait = (
             0
             if _slow(last)

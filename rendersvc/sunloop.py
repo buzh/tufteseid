@@ -27,12 +27,8 @@ from scipy.ndimage import binary_dilation
 import dem as dem_source
 import legend
 
-# A video budget, not a DEM limit: a 500 m footprint at 0.25 m would be 2000 px
-# a side and 72 frames of it is a lot of bytes for a loop.
 MAX_FRAME_PX = 1600
 
-# Ground fetched outside the rectangle and cropped off, so the gradient at the
-# edge is taken against real ground. A hillshade reaches one pixel.
 MARGIN_PX = 4
 
 FPS_DEFAULT = 24
@@ -40,26 +36,12 @@ STEP_DEG_DEFAULT = 5
 
 KIND = "sunloop"
 
-# The band is burnt into the frames: `createImageBitmap` throws on a WebM, so a
-# loop cannot be stamped client-side at download time the way a still is.
 WANTS_LEGEND = True
 
-# What a pixel with no laser data is painted. A WebM in yuv420p carries no alpha
-# channel, so the browser producers' "no-data is transparent" is not available
-# here and absence has to be a grey a reader cannot read as terrain. Not 0 and
-# not 255: hillshade saturates at both ends, so whole slopes come out black and
-# fully lit faces come out white in any honest frame. Mid grey appears only as a
-# gradient value, never as a flat field, and it stays put while the sun turns.
 NO_DATA_VALUE = 128
 
-# Of the rectangle, after the rim around each hole is written off. Below half the
-# square the loop is a picture of its own holes, and the reader is better served
-# by `empty` — which says the ground has too little laser data, and can be asked
-# again — than by a frame of mid grey with terrain in one corner.
 MIN_COVERAGE = 0.5
 
-# The evidence file field's ceiling. Over it PocketBase answers 400, and it
-# answers the same to every retry of the same bytes.
 MAX_FILE_BYTES = 50000000
 CRF_LADDER = (32, 40, 48)
 
@@ -90,8 +72,6 @@ def spec_of(meta):
         raise ValueError("model is neither dtm nor dom")
     if altitude is None or z_factor is None:
         raise ValueError("altitude or zFactor out of range")
-    # A step that does not divide the circle leaves a jump between the last
-    # frame and the first, which is the one thing a loop must not have.
     if not isinstance(step, int) or step < 1 or step > 45 or 360 % step:
         raise ValueError("stepDeg does not divide 360")
     if not isinstance(fps, int) or not 1 <= fps <= 60:
@@ -118,8 +98,6 @@ def render(spec, bbox25833, legend_content, log):
     try:
         native = dem_source.probe_coverage(model, bbox25833, project)
     except Exception as e:
-        # A probe that fails is not an absence; fall through at the finest the
-        # services publish and let the pixels answer.
         log(f"coverage probe failed, assuming {dem_source.FINEST_M_PER_PX} m: {e}")
         native = dem_source.FINEST_M_PER_PX
     if native is None:
@@ -129,17 +107,10 @@ def render(spec, bbox25833, legend_content, log):
     width = _even(round(width_m / metres_per_px))
     if width < 2:
         return None
-    # What the pixels actually are, after the rounding to an even count. The
-    # height follows from that one figure rather than from its own rounding,
-    # because `slope_aspect` is told resolution_x == resolution_y and the scale
-    # bar is drawn from it: square pixels have to be a fact, not an assumption.
     metres_per_px = width_m / width
     height = _even(round(height_m / metres_per_px))
     if height < 2:
         return None
-    # So the rectangle is trimmed to the pixel grid about its centre, sub-pixel
-    # and well inside the slack MAX_SIDE_M already allows, and what is fetched is
-    # what `meta` reports.
     centre_y = (bbox25833[1] + bbox25833[3]) / 2
     half_m = height * metres_per_px / 2
     bbox25833 = [
@@ -164,11 +135,6 @@ def render(spec, bbox25833, legend_content, log):
         project,
     )
     crop = slice(MARGIN_PX, -MARGIN_PX) if MARGIN_PX else slice(None)
-    # rvt 2.2.3 restores the input's NaN mask onto its output, so a hole is never
-    # drawn larger than it is — but its derivative substitutes a pixel's own value
-    # for a NaN neighbour (`roll_fill_nans`), which halves the gradient all round
-    # the rim. Dilating by that four-neighbour stencil writes the invented ring
-    # off with the hole. The mask is the ground's, so it serves every azimuth.
     absent = binary_dilation(~np.isfinite(grid))[crop, crop]
     coverage = 1 - float(absent.mean())
     if coverage < MIN_COVERAGE:
@@ -226,10 +192,6 @@ def render(spec, bbox25833, legend_content, log):
     meta = {
         "metresPerPx": round(metres_per_px, 4),
         "bbox25833": bbox25833,
-        # Where the ground stops, as a fraction of the frame's height: the band
-        # is burnt in under it, so the overlay has to know how much of the
-        # picture is registered to the bbox. A fraction rather than the row,
-        # because what the client measures is the decoded frame, not this array.
         "bandTop": round(height / frame_h, 5),
         "coverage": round(coverage, 3),
         "frames": len(frames),
@@ -252,16 +214,10 @@ def _encode(frames, fps, crf):
             "-c:v", "libvpx-vp9", "-pix_fmt", "yuv420p",
             "-crf", str(crf), "-b:v", "0",
             "-row-mt", "1", "-deadline", "good", "-cpu-used", "2",
-            # One GOP: the loop is played whole and never seeked into.
             "-g", str(len(frames)),
             "-an", "-f", "webm", out.name,
         ]
-        # stderr to a file, never a pipe: ~180 MB of raw frames takes minutes to
-        # feed and nothing here can drain a pipe meanwhile, so an ffmpeg blocked
-        # on a full stderr would stop reading stdin and wedge both ends.
         process = subprocess.Popen(command, stdin=subprocess.PIPE, stderr=err)
-        # The deadline covers the feed as well as the wait, so it is a timer that
-        # kills the child rather than a timeout on the wait at the end.
         expired = threading.Event()
 
         def give_up():
@@ -275,7 +231,6 @@ def _encode(frames, fps, crf):
                 for frame in frames:
                     process.stdin.write(frame.tobytes())
             except BrokenPipeError:
-                # ffmpeg leaving early is not itself the error; the code is.
                 pass
             finally:
                 try:
@@ -288,13 +243,9 @@ def _encode(frames, fps, crf):
             process.kill()
             process.wait()
 
-        # The return code as well as the flag: a timer that fires between a
-        # finished wait and the cancel below has killed nothing.
         if expired.is_set() and process.returncode != 0:
             raise RuntimeError(f"ffmpeg killed after {ENCODE_TIMEOUT_S} s")
         if process.returncode != 0:
-            # The child wrote through its own dup of this descriptor, so the
-            # offset shared with it is at the end of what it logged.
             err.seek(0)
             raise RuntimeError(f"ffmpeg: {err.read().decode('utf-8', 'replace')[:500]}")
         out.seek(0)

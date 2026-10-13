@@ -12,8 +12,6 @@ import {
 import { ORIGIN_IDS, type OriginId } from '../upstream/origins';
 import styles from './Ribbon.module.css';
 
-// Inside the dropdown, which Mantine mounts on open and unmounts on close, so
-// the one-second tick does not run behind a closed popover.
 const RetryCountdown = ({ at }: { at: number }) => {
   const { t } = useTranslation();
   const [now, setNow] = useState(() => Date.now());
@@ -30,8 +28,6 @@ const RetryCountdown = ({ at }: { at: number }) => {
   );
 };
 
-// Mounted only while something is down, so `opened` cannot survive one outage
-// and spring the popover open at the next.
 const OutagePopover = ({
   down,
   health,

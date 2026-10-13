@@ -12,7 +12,7 @@ import numpy as np
 from acquisitions import slug
 from fetch_dem import catalogue
 
-CELL = 25.0  # rasterisation cell, metres
+CELL = 25.0
 
 HERE = Path(__file__).resolve().parent
 
@@ -94,8 +94,6 @@ def sample_sites(mask, bounds, cell, count=6, side_m=1024.0, seed=7):
         if len(candidates) > 4000:
             break
     if not candidates:
-        # No square of this size fits inside the footprint; ordinary for small
-        # supplementary acquisitions, and the build needs no sites.
         return np.empty((0, 2))
     candidates = np.array(candidates)
 
@@ -174,8 +172,6 @@ def build_mask(project, out):
         bounds=np.array(bounds),
         cell=cell,
         sites=sample_sites(mask, bounds, cell),
-        # build_tiles.py checks this stamp: a mask paired with another
-        # acquisition's DEM fails silently, writing no tiles but marking done.
         project=project,
     )
     print(f"\n  wrote {Path(out).name} (mask, bounds, cell, sites, project)")

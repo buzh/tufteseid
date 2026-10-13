@@ -5,8 +5,6 @@ import {
   parseCoordinateInput,
 } from '../../../src/shared/utils/coordinateParser';
 
-// The parser crashes if `t()` returns undefined; uninitialized i18next returns
-// the key.
 vi.mock('i18next', () => ({
   default: { t: (key: string) => key },
 }));
@@ -374,7 +372,6 @@ describe('parseCoordinateInput', () => {
 
   describe('arctic and high-latitude coordinates', () => {
     it('parses decimal degrees where both lat and lon are >= 80', () => {
-      // "80, 80" is a valid coordinate, near Svalbard.
       const result = parseCoordinateInput('80, 80');
       expect(result).not.toBeNull();
       expect(result?.lat).toBeCloseTo(80, 1);
@@ -454,7 +451,6 @@ describe('parseCoordinateInput', () => {
 
   describe('normalizeDecimalSeparators – comma disambiguation', () => {
     it('does NOT convert commas between two large numbers (UTM pair)', () => {
-      // Both sides >= 1000 → treated as coordinate separator, not decimal
       const result = parseCoordinateInput('500000,6000000');
       expect(result).not.toBeNull();
       expect(result?.inputFormat).toBe('utm');
@@ -463,8 +459,6 @@ describe('parseCoordinateInput', () => {
     });
 
     it('does NOT convert comma in an ambiguous two-integer pair (60,10)', () => {
-      // One short pattern with no separator following → not converted, so this
-      // parses as two coordinates.
       const result = parseCoordinateInput('60,10');
       expect(result).not.toBeNull();
       expect(result?.lat).toBeCloseTo(60, 1);
@@ -472,7 +466,6 @@ describe('parseCoordinateInput', () => {
     });
 
     it('converts commas when both sides have 1–2 digits and a separator follows', () => {
-      // Two short patterns → both commas are decimal.
       const result = parseCoordinateInput('1,5 10,5');
       expect(result).not.toBeNull();
       expect(result?.lat).toBeCloseTo(1.5, 2);
@@ -480,7 +473,6 @@ describe('parseCoordinateInput', () => {
     });
 
     it('converts European decimal commas with trailing zeros (242366,00 6736146,01)', () => {
-      // Two short patterns → both commas are decimal.
       const result = parseCoordinateInput('242366,00 6736146,01@EPSG:25833');
       expect(result).not.toBeNull();
       expect(result?.lon).toBeCloseTo(242366, 0);
@@ -488,7 +480,6 @@ describe('parseCoordinateInput', () => {
     });
 
     it('does not convert if number before comma already has a dot', () => {
-      // "60.5,10" → dot present → comma is a separator
       const result = parseCoordinateInput('60.5,10.5');
       expect(result).not.toBeNull();
       expect(result?.lat).toBeCloseTo(60.5, 2);

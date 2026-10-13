@@ -1,8 +1,3 @@
-// Freeze first, then frame: `freezeMap` also cancels an easing view animation,
-// so the extent read afterwards is one the map will still show. A draft with
-// strokes keeps their frame and is flown back to it first; `bindFrameToMap`
-// absorbs what `constrainResolution` then rounds off.
-
 import { useAtomValue, useStore } from 'jotai';
 import { transformExtent } from 'ol/proj';
 import { useEffect } from 'react';
@@ -29,18 +24,13 @@ export const useSketchSession = (wanted: boolean) => {
     const view = map.getView();
     const projection = view.getProjection().getCode();
 
-    // Read through the store, not subscribed: the canvas writes this atom on
-    // every settle, and a dependency would rebuild the session mid-stroke.
     const resume = sketchOf(store.get(spotSketchAtom));
     const ground = store.get(draftGroundAtom);
     const size = map.getSize();
-    // No duration: the freeze below cancels animations.
     const groundExtent = ground ? draftGroundExtent(ground) : null;
     if (resume && size) {
       view.fit(frameExtentIn(resume.frame, projection), { size });
     } else if (groundExtent && size) {
-      // Only where there are no strokes yet: an existing frame is the one thing
-      // that must not move. The bounds span a mosaic's tiles; EPSG:25833.
       view.fit(transformExtent(groundExtent, 'EPSG:25833', projection), {
         size,
       });
@@ -49,7 +39,6 @@ export const useSketchSession = (wanted: boolean) => {
     freezeMap(map);
     const frame = resume?.frame ?? captureFrame(map);
     if (!frame) {
-      // No size, so no scene↔ground mapping; stay out of the draw stage.
       thawMap(map);
       store.set(setSpotStageAtom, 'idle');
       return;

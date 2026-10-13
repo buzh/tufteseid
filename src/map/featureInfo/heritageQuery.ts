@@ -1,7 +1,3 @@
-// One GetFeatureInfo per ticked RA service. Hover and click put the same
-// snapped question, so they share one memo in `featureInfoService.ts`. When to
-// ask is `src/heritageInfo/`.
-
 import type Map from 'ol/Map';
 import { CULTURAL_HERITAGE_LAYER_IDS } from '../layers/config/themeLayers/culturalHeritage';
 import {
@@ -10,17 +6,11 @@ import {
 } from './featureInfoService';
 import type { FeatureInfoReading } from './types';
 
-/** Snap grid in screen pixels. Under the WMS's own pick tolerance, so snapping
- *  never moves the answer. */
 const SNAP_PX = 6;
 
-/** Is any queryable register drawing. */
 export const heritageIsQueryable = (map: Map): boolean =>
   getQueryableWMSLayers(map, CULTURAL_HERITAGE_LAYER_IDS).length > 0;
 
-/** What the Kulturminner layers say about this pixel; null where they say
- *  nothing, or where none of them is drawing. Rejects if `signal` aborts, so a
- *  caller can tell its own cancellation from an empty map. */
 export const queryHeritageAt = async (
   map: Map,
   pixel: [number, number],

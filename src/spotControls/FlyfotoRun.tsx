@@ -1,7 +1,3 @@
-// The acquisition box while a run has the map. The proposal itself is on the
-// ground, in the footprint and under the spot's drawing, so this is a bar
-// along the bottom: nothing here covers what is being judged.
-
 import { Button, Loader } from '@mantine/core';
 import { useAtomValue } from 'jotai';
 import { useEffect } from 'react';
@@ -17,19 +13,14 @@ import type { FlyfotoRun as Run } from './useFlyfotoRun';
 
 export const FlyfotoRun = ({ run, failed }: { run: Run; failed: boolean }) => {
   const { t } = useTranslation();
-  // Excalidraw binds its own single-letter shortcuts while the canvas is up.
   const penHasTheMap = useAtomValue(sketchSessionAtom) !== null;
 
   const settled = run.tally.kept + run.tally.discarded;
   const card = run.cards[0];
-  // Nothing proposed and nothing passed over: never flown here, which is a
-  // different answer from having reached the end of the walk.
   const barren = settled === 0 && run.tally.skipped === 0;
   const stuck = card?.state === 'empty' || card?.state === 'failed';
   const pending = card != null && card.state !== 'ready' && !stuck;
 
-  // Ask again when there are no pixels to keep, keep them when there are. Null
-  // where the button is disabled, so the key can do no more than the hand.
   const yes = !card
     ? null
     : stuck
@@ -39,8 +30,6 @@ export const FlyfotoRun = ({ run, failed }: { run: Run; failed: boolean }) => {
         : null;
   const no = !card || run.keeping ? null : run.discard;
 
-  // A keystroke as well as a button: the reader is out on the ground over the
-  // proposal, and coming back to the bar each time is the walk's whole cost.
   useEffect(() => {
     if (penHasTheMap) return;
     const onKey = (event: KeyboardEvent) => {
@@ -58,7 +47,6 @@ export const FlyfotoRun = ({ run, failed }: { run: Run; failed: boolean }) => {
 
   if (run.phase === 'off') return null;
 
-  // What the picture is, once there is one; until then, why there is not.
   const note = !card
     ? ''
     : card.state === 'ready'
@@ -119,9 +107,6 @@ export const FlyfotoRun = ({ run, failed }: { run: Run; failed: boolean }) => {
           </>
         )}
 
-        {/* Held against the right edge of a bar of fixed width, and always two
-            buttons — a proposal with no pixels puts the ask again where the
-            yes was — so an answer never moves out from under the hand. */}
         <div className={styles.actions}>
           {card &&
             (stuck ? (

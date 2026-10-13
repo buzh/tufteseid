@@ -6,37 +6,24 @@ import { isUpstreamDown } from '../upstream/health';
 
 const IMAGE_SERVER_BASE = '/arcgis/hoydedata';
 
-// dtm = bare earth, dom = first return (canopy and buildings).
 export type DemModel = 'dtm' | 'dom';
 
-// Per-acquisition mosaics, not the national NHM_* ones: where NHM never flew
-// the national catalogue silently serves 10 m contour-derived rows upsampled,
-// while the per-project ones report no coverage.
 const SERVICE: Record<DemModel, string> = {
   dtm: 'Prosjekt_DTM',
   dom: 'Prosjekt_DOM',
 };
 
-// Finest acquisition wins where they overlap. Stated explicitly because
-// Prosjekt_DOM defaults to a Northwest mosaic method and Prosjekt_DTM does not.
 const MOSAIC_RULE = JSON.stringify({
   mosaicMethod: 'esriMosaicAttribute',
   sortField: 'lowps',
   sortValue: 0,
 });
 
-// Finest resolution the per-project services publish; acquisitions are 0.25,
-// 0.5 or 1 m.
 const FINEST_M_PER_PX = 0.25;
 
-/** A catalogue query against the same service the pixels come from
- *  (`demProjects.ts` asks which acquisitions are in it). */
 export const demQueryUrl = (model: DemModel, params: URLSearchParams): string =>
   `${IMAGE_SERVER_BASE}/${SERVICE[model]}/ImageServer/query?${params.toString()}`;
 
-// Ground fetched outside the rectangle on every side and cropped off before
-// painting, so horizon rays near the edge do not walk off the grid. 24 m is the
-// longest reach any view can ask for (`horizonMaxRadiusMetres`).
 export const DEM_MARGIN_M = 24;
 
 const MAX_DEM_PX_PER_SIDE = (MAX_SIDE_M + 2 * DEM_MARGIN_M) / FINEST_M_PER_PX;
@@ -47,21 +34,13 @@ const CATALOGUE_TIMEOUT_MS = 20_000;
 const TILE_TIMEOUT_MS = 60_000;
 
 export type Dem = {
-  // The assembled grid, margin included.
   width: number;
   height: number;
-  // Row-major, north-up (row 0 is the northern edge), metres above the vertical
-  // datum; NaN marks no coverage.
   data: Float32Array;
-  // The rectangle that was asked for.
   bbox25833: [number, number, number, number];
-  // `bbox25833` grown by DEM_MARGIN_M — what `width × height` spans.
   grid25833: [number, number, number, number];
-  // Where `bbox25833` sits inside the grid, in pixels.
   window: { x: number; y: number; width: number; height: number };
   metresPerPx: number;
-  // What the finest covering acquisition publishes: equal to metresPerPx unless
-  // the grid exceeded MAX_DEM_PX_PER_SIDE and was sampled down.
   nativeMetresPerPx: number;
   model: DemModel;
 };
@@ -81,24 +60,16 @@ function buildUrl(
     format: 'tiff',
     pixelType: 'F32',
     interpolation: 'RSP_BilinearInterpolation',
-    // rasterFunction 'None' returns values; the service's other function,
-    // `skyggerelieff`, returns a shaded image.
     renderingRule: JSON.stringify({ rasterFunction: 'None' }),
     mosaicRule: MOSAIC_RULE,
   });
   return `${IMAGE_SERVER_BASE}/${SERVICE[model]}/ImageServer/exportImage?${params.toString()}`;
 }
 
-// 'none' is the catalogue answering that nothing covers this; 'unknown' is the
-// probe itself failing, which must not be reported as an absence.
 type Coverage = { metresPerPx: number } | 'none' | 'unknown';
 
-// wmscache declines to store responses under 1000 bytes and this one is far
-// under, so memoise in-tab.
 const coverageCache = new Map<string, Promise<Coverage>>();
 
-// Finest OPPLOSNING among the acquisitions intersecting the rectangle, read off
-// the envelope: one clipping a corner sets the target for the whole grid.
 function probeCoverage(
   model: DemModel,
   bbox25833: [number, number, number, number],
@@ -120,8 +91,6 @@ function probeCoverage(
     geometryType: 'esriGeometryEnvelope',
     inSR: '25833',
     spatialRel: 'esriSpatialRelIntersects',
-    // The 10 m fallback rows have no OPPLOSNING, so excluding them makes a null
-    // answer mean "no laser data".
     where: 'OPPLOSNING IS NOT NULL',
     outStatistics: JSON.stringify([
       {
@@ -141,8 +110,6 @@ function probeCoverage(
       (res) => res.json(),
     );
     if (body?.error) throw new Error('catalogue query rejected');
-    // The service upper-cases outStatisticFieldName, and no coverage arrives as
-    // one feature with a null statistic, not an empty features array.
     const attrs = body?.features?.[0]?.attributes;
     const best = attrs ? (attrs.BEST ?? attrs.best) : null;
     if (typeof best !== 'number' || !(best > 0)) return 'none';
@@ -160,16 +127,9 @@ function probeCoverage(
 export type FetchDemOptions = {
   model?: DemModel;
   signal?: AbortSignal;
-  /** Refuse a grid any tile of which errored, rather than returning it with a
-   *  hole. For pixels that are kept: a tile the service shed reads exactly like
-   *  ground no laser ever covered, and a picture nothing re-renders would carry
-   *  that lie for good. The reading view takes the partial grid instead, where
-   *  the next pan fetches it again. */
   whole?: boolean;
 };
 
-// Null when the bbox is entirely outside LiDAR coverage; throws when every tile
-// request failed, or when any did and `whole` was asked for.
 export async function fetchDem(
   bbox4326: Bbox,
   { model = 'dtm', signal, whole = false }: FetchDemOptions = {},
@@ -181,8 +141,6 @@ export async function fetchDem(
     number,
   ];
 
-  // Probed on the rectangle, not on the margin: the margin must not pull a
-  // finer neighbouring acquisition in and resample the whole grid.
   const coverage = await probeCoverage(model, bbox25833, signal);
   if (coverage === 'none') return null;
   const nativeMetresPerPx =
@@ -196,7 +154,6 @@ export async function fetchDem(
   ];
   const plan = planTiles(grid25833, nativeMetresPerPx, MAX_DEM_PX_PER_SIDE);
   const data = new Float32Array(plan.widthPx * plan.heightPx);
-  // Absent tiles must read as no-data, not sea level.
   data.fill(NaN);
 
   let covered = 0;
@@ -216,7 +173,6 @@ export async function fetchDem(
         return;
       } catch (err) {
         if (signal?.aborted) return;
-        // The breaker is already waiting; a local backoff would only add to it.
         if (isUpstreamDown(err)) {
           failed++;
           return;
@@ -230,8 +186,6 @@ export async function fetchDem(
     }
   });
 
-  // An all-errored fetch must not reach the reader as an absence of LiDAR;
-  // real absence arrives as valid but entirely sparse TIFFs.
   if (covered === 0 && failed > 0) {
     throw new Error('every DEM tile request failed');
   }
@@ -241,8 +195,6 @@ export async function fetchDem(
   if (covered === 0) return null;
 
   const metresPerPx = (grid25833[2] - grid25833[0]) / plan.widthPx;
-  // Clamped so the window can never name a pixel the grid does not have:
-  // planTiles is free to have scaled the whole thing down.
   const inset = Math.min(
     Math.round(DEM_MARGIN_M / metresPerPx),
     Math.floor((plan.widthPx - 1) / 2),
@@ -266,8 +218,6 @@ export async function fetchDem(
   };
 }
 
-// Returns whether the tile carried any real values: a tile outside coverage
-// decodes fine but is all NaN.
 function blitTile(
   raster: FloatRaster,
   dest: Float32Array,
@@ -304,9 +254,6 @@ const TAG = {
   sampleFormat: 339,
 } as const;
 
-// The endpoint emits one shape only: uncompressed, single-band, 32-bit IEEE
-// float, tiled, planar config 1. Georeferencing is ignored — ModelTiepoint is
-// always the requested bbox's north-west corner at the requested pixel size.
 function readFloatTiff(buffer: ArrayBuffer): FloatRaster {
   const dv = new DataView(buffer);
   const byteOrder = dv.getUint16(0, false);
@@ -355,15 +302,12 @@ function readFloatTiff(buffer: ArrayBuffer): FloatRaster {
 
   const tilesAcross = Math.ceil(width / tileW);
   for (let i = 0; i < offsets.length; i++) {
-    // A sparse tile — offset 0, byte count 0 — is how the service says "no
-    // LiDAR here", not an error; those pixels stay NaN.
     if (offsets[i] === 0 || byteCounts[i] === 0) continue;
 
     const originX = (i % tilesAcross) * tileW;
     const originY = Math.floor(i / tilesAcross) * tileH;
     for (let ty = 0; ty < tileH; ty++) {
       const y = originY + ty;
-      // Tiles are padded out to full size at the right and bottom edges.
       if (y >= height) break;
       let src = offsets[i] + ty * tileW * 4;
       let dst = y * width + originX;
@@ -404,8 +348,6 @@ function requireEntry(entries: Map<number, IfdEntry>, tag: number): IfdEntry {
   return e;
 }
 
-// SHORT (3) and LONG (4) only. Values totalling four bytes or fewer are stored
-// inline in the entry; anything larger stores a file offset.
 function readValues(dv: DataView, le: boolean, e: IfdEntry): number[] {
   const size = e.type === 3 ? 2 : 4;
   if (e.type !== 3 && e.type !== 4) {

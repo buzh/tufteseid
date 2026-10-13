@@ -1,7 +1,4 @@
 /// <reference path="../pb_data/types.d.ts" />
-//
-// `fields.add()` with an existing id replaces the field; an omitted
-// property is a property removed.
 
 migrate(
   (app) => {

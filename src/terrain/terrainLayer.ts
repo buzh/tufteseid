@@ -7,21 +7,16 @@ import { mapAtom } from '../map/atoms';
 
 const LAYER_ID = 'terrain.render';
 
-// Over the backgrounds (0) and under the B half of a split (1.5), the LiDAR
-// footprints (3) and this rectangle's frame (4). Register: docs/map-layers.md.
 const Z_INDEX = 1;
 
 export type TerrainPlacement = {
   canvas: HTMLCanvasElement;
-  /** EPSG:25833, the ground `canvas` covers edge to edge (`demImageExtent`). */
   extent25833: [number, number, number, number];
 };
 
 let placed: TerrainPlacement | null = null;
 let layer: ImageLayer<ImageCanvasSource> | null = null;
-// Held outside the layer: the transparency slider moves while nothing is up.
 let opacity = 1;
-// One viewport-sized output canvas — some 30 MB — reused across frames.
 let out: HTMLCanvasElement | null = null;
 
 const drawFrame = (
@@ -46,8 +41,6 @@ const drawFrame = (
   const [minX, minY, maxX, maxY] = placed.extent25833;
   const w = (maxX - minX) * scale;
   const h = (maxY - minY) * scale;
-  // Nearest-neighbour on the way up: smoothing blurs away the single-pixel step
-  // the picture exists to show.
   ctx.imageSmoothingEnabled = w < placed.canvas.width;
   ctx.drawImage(
     placed.canvas,
@@ -59,8 +52,6 @@ const drawFrame = (
   return out;
 };
 
-// `null` takes the render down. ImageCanvasSource caches one image, so
-// `changed()` is the only way to repaint the same canvas.
 export const setTerrainRender = (next: TerrainPlacement | null) => {
   placed = next;
   const map = getDefaultStore().get(mapAtom);
@@ -72,7 +63,6 @@ export const setTerrainRender = (next: TerrainPlacement | null) => {
   }
   if (!layer) {
     layer = new ImageLayer({
-      // Fixed projection, so a view in another one reprojects.
       source: new ImageCanvasSource({
         projection: 'EPSG:25833',
         canvasFunction: drawFrame,

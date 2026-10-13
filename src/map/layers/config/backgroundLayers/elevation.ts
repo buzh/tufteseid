@@ -15,16 +15,11 @@ const NATIONAL_CACHE_URL: Record<LidarModel, string> = {
   dom: '/cache/lidar-dom/{z}/{x}/{y}.png',
 };
 
-// The same MBTiles published with no source behind them, so a miss is
-// transparent rather than an upstream render. `tileGuard.ts` swaps to these
-// while the `hoyde` breaker is open.
 const NATIONAL_HELD_URL: Record<LidarModel, string> = {
   dtm: '/cache/lidar-dtm-held/{z}/{x}/{y}.png',
   dom: '/cache/lidar-dom-held/{z}/{x}/{y}.png',
 };
 
-// A 1 m product; z16 is 0.33 m/px, past which the service upsamples its own
-// grid.
 export const NATIONAL_CACHE_MAX_ZOOM = 16;
 
 export const buildNationalLidarConfig = (
@@ -55,7 +50,6 @@ export const buildNationalLidarConfig = (
   return {
     type: 'WMS',
     layerName: 'lidarHillshade',
-    // Same-origin via /wms/geonorge/*: wms.geonorge.no direct fails CORS.
     url: NATIONAL_WMS[model].url,
     props: {
       LAYERS: `${NATIONAL_WMS[model].prefix}:${style}`,

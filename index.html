@@ -1,6 +1,4 @@
 <!doctype html>
-<!-- Set statically rather than by Mantine's ColorSchemeScript, which the CSP
-     has no nonce for. Keep in step with `defaultColorScheme` in src/mainApp.tsx. -->
 <html lang="nb" data-mantine-color-scheme="dark">
   <head>
     <meta charset="UTF-8" />
@@ -8,8 +6,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Tufteseid</title>
     <script src="/config.js"></script>
-    <!-- Written at container start from `.env`; absent on a dev server, where
-         src/services.ts then falls back to the whole stack. -->
     <script src="/services.js"></script>
   </head>
   <body>

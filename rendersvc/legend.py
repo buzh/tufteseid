@@ -32,29 +32,15 @@ from PIL import Image, ImageDraw, ImageFont
 REGULAR = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 
-# legend.ts's band with nothing to show through it: near-black, white ink.
 BAND_VALUE = 10
 INK = 255
 
 SEP = " · "
 
-# Where the resolution lands in the line the client sent: the one fact it cannot
-# know before the render, so it travels as a hole. The decimal separator travels
-# with it, because the rest of the band is already in the reader's language and
-# `0.50` next to `z 1,5` reads as a typo.
 RESOLUTION_TOKEN = "{res}"
 
-# Where the spot's author goes in the rights line the client worded. Filled from
-# the record in `server.py`, never from the request: the band cannot be edited
-# once it is in the pixels, so the name in it may not be the caller's to choose.
-# Braced like the other hole for the same reason — nothing the app translates
-# carries a literal brace, i18next's own placeholders are interpolated away
-# before a line is sent, and substitution is one pass over the text.
 CREDIT_TOKEN = "{credit}"
 
-# Of the ground the band is added to. Past it the link, then the scale bar, are
-# dropped. The rights lines never are — they are the only part a licence
-# actually requires.
 MAX_BAND_FRACTION = 0.4
 
 BAR_TARGET_FRACTION = 0.18
@@ -138,8 +124,6 @@ def compose(width, height, content, metres_per_px):
     semibold = ImageFont.truetype(BOLD, size)
     small = ImageFont.truetype(REGULAR, max(8, int(round(size * 0.9))))
 
-    # A coverage mask, not a picture: the strip is mixed from it below. Every
-    # draw names INK, because PIL's default ink on an L image is 1, not white.
     mask = Image.new("L", (width, height), 0)
     draw = ImageDraw.Draw(mask)
 
@@ -156,7 +140,6 @@ def compose(width, height, content, metres_per_px):
     link = content.get("link") or ""
     bar = _plan_bar(metres_per_px, width * BAR_TARGET_FRACTION)
 
-    # Rights first: they set the floor the two optional rows are dropped against.
     body = []
     for line in rights:
         body.extend(_wrap(draw, line, regular, content_w))
@@ -173,14 +156,10 @@ def compose(width, height, content, metres_per_px):
         tail = False
 
     total = band_height(len(body), tail)
-    # The frame is the ground plus this, and yuv420p wants an even height, so
-    # the band is what keeps it even now that it is no longer part of the ground.
     total += total % 2
     if total >= height:
         return None
 
-    # Typeset against the bottom of a ground-sized canvas and sliced off it, so
-    # the layout above is the one `legend.ts` writes for a frame of this size.
     top = height - total
     y = top + pad
     draw.text(
@@ -206,7 +185,5 @@ def compose(width, height, content, metres_per_px):
                 fill=INK,
             )
 
-    # The mask carries the glyphs' antialiasing, so mixing the two values by it
-    # is what keeps the type from coming out jagged against the dark ground.
     strip = np.asarray(mask, dtype=np.uint16)[top:]
     return ((BAND_VALUE * (255 - strip) + INK * strip) // 255).astype(np.uint8)

@@ -1,9 +1,3 @@
-// Past a ground's deepest level OpenLayers stretches the last tiles it holds,
-// and `interpolate: false` draws that as square blocks — which reads as terrain
-// unless something says otherwise. The chip is absent at 1:1, so its appearing
-// is the signal; the cached ground brings it on a zoom step earlier than the
-// mosaic wherever an acquisition only reaches z15.
-
 import { Tooltip } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 import { ControlChip } from '../ui/ControlChip';

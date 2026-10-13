@@ -16,8 +16,6 @@ import { Icon, type MaterialSymbol } from '../ui/Icon';
 import styles from './controls.module.css';
 import type { LidarControls } from './useLidarControls';
 
-// Open-ended: GetCapabilities may advertise a style not listed here, which
-// falls back to `texture`.
 const STYLE_ICONS: Record<string, MaterialSymbol> = {
   [CVAT_STYLE]: 'database',
   skyggerelieff: 'contrast',
@@ -60,7 +58,6 @@ export const RenderMenu = ({ lidar }: { lidar: LidarControls }) => {
     .filter(Boolean)
     .join(' — ');
 
-  // DOM publishes one style, and the cache is terrain-only, so nothing to pick.
   if (lidarModel === 'dom') {
     return (
       <Tooltip label={t('lidarControls.render.domLocked')}>
@@ -92,9 +89,6 @@ export const RenderMenu = ({ lidar }: { lidar: LidarControls }) => {
     </Menu.Item>
   );
 
-  // The national mosaic is never in the cVAT store. Nothing is, on an
-  // installation with no `cvat-tiles`, so the row would stand under every
-  // flight saying so.
   const cacheMissing =
     serviceOn('cvat') && isLidarFlight && activeLidarProject && !activeCvat;
 
@@ -110,8 +104,6 @@ export const RenderMenu = ({ lidar }: { lidar: LidarControls }) => {
         />
       </Menu.Target>
       <Menu.Dropdown>
-        {/* Not a Tooltip on the chip: `Menu.Target` and `Tooltip` both clone
-            their single child. */}
         {isLidarCvat && activeCvat && (
           <Menu.Label className={styles.provenance}>
             {t('lidarControls.render.cvatProvenance', {

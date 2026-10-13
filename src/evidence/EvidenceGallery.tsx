@@ -1,6 +1,3 @@
-// The spot's kept pictures in the card: the one place their order is set and
-// the one place a picture is laid back on the map to trace over.
-
 import { Alert, Tooltip } from '@mantine/core';
 import { useAtom } from 'jotai';
 import {
@@ -40,13 +37,9 @@ import {
 import type { SpotEvidence } from './useSpotEvidence';
 
 type Drag = {
-  /** The group key being dragged. */
   key: string;
   from: number;
-  /** The slot the group is being shown in, which is also where it would land. */
   to: number;
-  /** Where the middle of every slot is, measured at the press. The rows are
-   *  one height, so previewing a move does not move the slots. */
   slots: number[];
 };
 
@@ -89,10 +82,6 @@ const EvidenceItem = ({
   const title = evidenceLabel(record);
   const file = evidenceFileUrl(record);
   const note = renderNote(record, state);
-  // A row kept before the gate, or rendered onto this spot by an admin, can
-  // outlive the feature that ordered it — and the sidecar would only answer
-  // 403 (`src/auth/features.ts`). A row whose service this installation no
-  // longer runs is the same story with a 502.
   const mayRender = useHasFeature('render');
   const mayRedo =
     evidenceRenderable(record) && (mayRender || !rendersOnServer(record.kind));
@@ -206,25 +195,16 @@ export const EvidenceGallery = ({
   const listRef = useRef<HTMLUListElement>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
 
-  // One entry per picture, its tiles gathered — the author manages a mosaic as
-  // one thing, the way the reader reads it.
   const groups = useMemo(() => groupEvidence(items ?? []), [items]);
 
-  // A picture whose tiles are all gone — deleted, or whose renders the queue is
-  // redoing — must not leave its ground on the map.
   useEffect(() => {
     if (!ground || items === null) return;
     const group = groups.find((g) => g.key === ground.id);
     if (!group || !group.rows.some((rec) => rec.file)) setGround(null);
   }, [ground, groups, items, setGround]);
 
-  // The list goes when the spot is closed or the reading opens, and the picture
-  // is the list's: nothing else is left to take it off the map.
   useEffect(() => () => setGround(null), [setGround]);
 
-  // A group's state for the one slot that shows it: a retryable tile so the
-  // group offers a redo, else working, else nothing (every tile has pixels).
-  // A fault outranks an empty tile, which is a note of its own.
   const groupStateOf = (group: EvidenceGroup): RenderState | undefined => {
     const states = group.rows.map((rec) => evidence.stateOf(rec));
     if (states.some((s) => s === 'failed')) return 'failed';
@@ -250,8 +230,6 @@ export const EvidenceGallery = ({
       });
     };
 
-  // The slot whose middle is nearest, so the row changes places once the
-  // pointer is past halfway and the rule is the same going up as going down.
   const onDragMove = (event: ReactPointerEvent<HTMLElement>) => {
     if (!drag) return;
     let to = drag.to;
@@ -274,9 +252,6 @@ export const EvidenceGallery = ({
     setDrag(null);
   };
 
-  // The handle answers arrows too, for a reader with no pointer. Stopped before
-  // the bounds check, or OL's keyboard pan answers a press that runs off the
-  // end.
   const nudge =
     (key: string, index: number, total: number) =>
     (event: ReactKeyboardEvent<HTMLElement>) => {
@@ -290,8 +265,6 @@ export const EvidenceGallery = ({
       evidence.reorderGroup(key, to);
     };
 
-  // Lays the whole picture: a mosaic's tiles, or the one box — a loop to its
-  // own overlay, stills to the other.
   const pick = (group: EvidenceGroup) => {
     if (ground?.id === group.key) {
       setGround(null);
@@ -327,9 +300,6 @@ export const EvidenceGallery = ({
         <Icon icon="photo_library" size={14} />
         <span>{t('evidence.label')}</span>
       </div>
-      {/* Heading stands in all three states so the card does not jump as the
-          list lands. A list that never landed is neither loading nor empty —
-          the alert below is the whole of what can be said. */}
       {items === null ? (
         !evidence.failed && (
           <p className={styles.hint}>{t('evidence.loading')}</p>

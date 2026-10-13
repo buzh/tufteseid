@@ -12,23 +12,13 @@ import type { DemModel } from '../terrain/dem';
 import { DEFAULT_ALTITUDE, DEFAULT_Z_FACTOR } from '../terrain/render';
 import { VISUALIZATIONS, type Visualization } from '../terrain/shade';
 
-/** The seamless best-available mosaic, as against one acquisition. */
 export const NIB_MOSAIC = 'mosaic';
 
-/** `meta.source` on a server-rendered row: the finest acquisition covering each
- *  pixel, which is what the catalogue mosaics by itself. Anything else is one
- *  acquisition, spelled as hoydedata's `LAS_PROJECT_NAME`
- *  (`src/terrain/demProjects.ts`, `docs/render-sidecar.md`). */
 export const AUTO_SOURCE = 'auto';
 
-/** Degrees between frames. Must divide 360, or the loop jumps where it closes;
- *  the sidecar refuses one that does not. */
 const SUNLOOP_STEP_DEG = 5;
 const SUNLOOP_FPS = 24;
 
-/** The RVT blends the sidecar can make. Mirrors the `PRODUCERS` table in
- *  `rendersvc/blends.py`, and each name is a key under `evidence.rvt` in the
- *  locale files. */
 export const RVT_BLENDS = ['e4mstp'] as const;
 
 export type RvtBlend = (typeof RVT_BLENDS)[number];
@@ -36,10 +26,8 @@ export type RvtBlend = (typeof RVT_BLENDS)[number];
 export type EvidenceSpec =
   | {
       kind: 'lidar';
-      /** `national`, or `project:<prosjektnavn>`: the catalogue's own key. */
       sourceKey: string;
       sourceLabel: string;
-      /** WMS layer suffix, e.g. `skyggerelieff`. */
       style: string;
       model: LidarModel;
       year: number | null;
@@ -49,27 +37,21 @@ export type EvidenceSpec =
       kind: 'terrain';
       vis: Visualization;
       model: DemModel;
-      /** Degrees, degrees, dimensionless. */
       azimuth: number;
       altitude: number;
       zFactor: number;
-      /** Metres; ignored by views with no radius. */
       radius: number;
     }
   | {
       kind: 'flyfoto';
-      /** `NIB_MOSAIC`, or one acquisition's prosjektnavn. */
       projectId: string;
       projectName: string | null;
       year: number | null;
       photoDate: string | null;
     }
   | {
-      /** Shaded relief with the sun walked all the way round, as a WebM loop.
-       *  Sidecar only. No azimuth: the loop is every azimuth. */
       kind: 'sunloop';
       model: DemModel;
-      /** `AUTO_SOURCE`, or one acquisition's `LAS_PROJECT_NAME`. */
       source: string;
       altitude: number;
       zFactor: number;
@@ -77,18 +59,12 @@ export type EvidenceSpec =
       fps: number;
     }
   | {
-      /** One of RVT's blended visualizations, sidecar only. One kind for all of
-       *  them; which blend is `vis`. */
       kind: 'rvt';
       vis: RvtBlend;
       model: DemModel;
-      /** `AUTO_SOURCE`, or one acquisition's `LAS_PROJECT_NAME`. */
       source: string;
     };
 
-/** What the sun loop is lit by where the reader asks nothing: the analysis
- *  panel's own height and exaggeration, so a loop and a still of the same
- *  ground are lit alike. */
 export const SUN_LOOP_DEFAULTS = {
   altitude: DEFAULT_ALTITUDE,
   zFactor: DEFAULT_Z_FACTOR,
@@ -97,9 +73,6 @@ export const SUN_LOOP_DEFAULTS = {
 
 export type SunLoopSettings = typeof SUN_LOOP_DEFAULTS;
 
-// DTM, because a canopy walked round is a picture of the canopy. The frame rate
-// is not the reader's: it is how fast the finished loop plays, and the frames
-// are the step's.
 export const sunLoopSpec = (
   source: string,
   settings: SunLoopSettings,
@@ -111,8 +84,6 @@ export const sunLoopSpec = (
   ...settings,
 });
 
-// Nothing to ask about: a blend is RVT's whole recipe. DTM, because a blend of
-// the canopy is a picture of the canopy.
 export const rvtSpec = (
   vis: RvtBlend,
   source: string,
@@ -123,8 +94,6 @@ export const rvtSpec = (
   source,
 });
 
-/** Rendered by the sidecar rather than in the tab that asked. The same split
- *  `BrowserSpec` (`render.ts`) states as a type, off a stored row's kind. */
 export const rendersOnServer = (kind: EvidenceKind): boolean =>
   kind === 'sunloop' || kind === 'rvt';
 
@@ -147,8 +116,6 @@ const asBlend = (v: unknown): RvtBlend | null =>
     ? (v as RvtBlend)
     : null;
 
-// The spec flattened for the column. The render merges what it achieved over
-// this, so nothing here is a figure the pixels must live up to.
 export const metaOf = (spec: EvidenceSpec): EvidenceMeta => {
   switch (spec.kind) {
     case 'lidar':
@@ -190,8 +157,6 @@ export const metaOf = (spec: EvidenceSpec): EvidenceMeta => {
   }
 };
 
-// A stored row read back as parameters; null when the column no longer
-// describes a render — nothing to retry, not a failure.
 export const specOf = (rec: EvidenceRecord): EvidenceSpec | null => {
   const meta = rec.meta;
   if (!meta) return null;
@@ -242,8 +207,6 @@ export const specOf = (rec: EvidenceRecord): EvidenceSpec | null => {
       return {
         kind: 'sunloop',
         model,
-        // Rows made before the acquisition could be named were rendered off
-        // the mosaic, which is what `AUTO_SOURCE` asks for again.
         source: str(meta.source) ?? AUTO_SOURCE,
         altitude: num(meta.altitude) ?? 0,
         zFactor: num(meta.zFactor) ?? 1,
@@ -254,7 +217,6 @@ export const specOf = (rec: EvidenceRecord): EvidenceSpec | null => {
     case 'rvt': {
       const vis = asBlend(meta.vis);
       const model = asModel(meta.model);
-      // A blend this build no longer knows how to name or ask for again.
       if (!vis || !model) return null;
       return {
         kind: 'rvt',
@@ -266,10 +228,6 @@ export const specOf = (rec: EvidenceRecord): EvidenceSpec | null => {
   }
 };
 
-/** Whether this installation can still make this picture again. A row it
- *  cannot reads as it always did — a service gates the making, never the
- *  reading (`src/services.ts`). Off the spec rather than the kind: one lidar
- *  style is served by `cvat-tiles` and the rest by a WMS. */
 export const evidenceRenderable = (rec: EvidenceRecord): boolean => {
   const spec = specOf(rec);
   if (!spec) return false;
@@ -279,14 +237,10 @@ export const evidenceRenderable = (rec: EvidenceRecord): boolean => {
   return true;
 };
 
-// EPSG:25833, as the render wrote it — not the spot's footprint, which may have
-// moved. Null for a row with no rectangle, which cannot be laid back on the
-// map.
 export const evidenceBbox = (
   rec: EvidenceRecord,
 ): [number, number, number, number] | null => bboxOfMeta(rec.meta);
 
-// The same rectangle off a `meta` with no row behind it yet.
 export const bboxOfMeta = (
   meta: EvidenceMeta | null,
 ): [number, number, number, number] | null => {
@@ -298,9 +252,6 @@ export const bboxOfMeta = (
     : null;
 };
 
-// Where the burnt-in band starts, as a fraction of height; 1 for anything
-// without one (everything but a sun loop). Only the part above it is registered
-// to `bbox25833`.
 export const evidenceBandTop = (rec: EvidenceRecord): number => {
   const value = num(rec.meta?.bandTop);
   return value != null && value > 0 && value <= 1 ? value : 1;
@@ -309,11 +260,9 @@ export const evidenceBandTop = (rec: EvidenceRecord): number => {
 export const evidenceResolution = (rec: EvidenceRecord): number | null =>
   num(rec.meta?.metresPerPx);
 
-// Needs both pixels and a ground to lay them over.
 export const isReadable = (rec: EvidenceRecord): boolean =>
   rec.file !== '' && evidenceBbox(rec) !== null;
 
-// Off the kind, not the filename: the kind is known before the file lands.
 export const isVideoEvidence = (rec: EvidenceRecord): boolean =>
   rec.kind === 'sunloop';
 
@@ -321,18 +270,11 @@ export const coverOf = (
   rows: readonly EvidenceRecord[],
 ): EvidenceRecord | null => rows.find(isReadable) ?? null;
 
-// Azimuth degrees per frame. The row's own figure where it kept one: an older
-// loop may have been walked in coarser steps.
 export const loopStepDeg = (rec: EvidenceRecord): number => {
   const spec = specOf(rec);
   return spec?.kind === 'sunloop' ? spec.stepDeg : SUNLOOP_STEP_DEG;
 };
 
-// A picture's identity independent of the ground it covers — the fields
-// `evidenceMatches` compares minus the bbox, so tiles of one mosaic (same spec,
-// different tile) share a key. Terrain's floats are stringified raw rather than
-// to a tolerance: every tile of one keep is made from the same spec, so they
-// are bit-identical, and two keeps a hair apart are deliberately two pictures.
 export const specKey = (spec: EvidenceSpec): string => {
   switch (spec.kind) {
     case 'lidar':
@@ -348,10 +290,6 @@ export const specKey = (spec: EvidenceSpec): string => {
   }
 };
 
-/** Stamped on every row one press of keep creates, so a mosaic's tiles find
- *  each other without comparing ground. Survives the render: both the browser
- *  queue and the sidecar write the row's own meta back under what they
- *  achieved. */
 export const newKeepId = (): string => Math.random().toString(36).slice(2, 10);
 
 export const keepIdOf = (rec: EvidenceRecord): string | null => {
@@ -359,12 +297,6 @@ export const keepIdOf = (rec: EvidenceRecord): string | null => {
   return typeof id === 'string' && id !== '' ? id : null;
 };
 
-/** The group a row belongs to — its spec and the keep it came from, or the
- *  row's own id when the meta no longer parses, so an orphan stands alone
- *  rather than merging. A row kept before the stamp has no keep to belong to,
- *  and stands on the ground it covers instead: whole metres, since a pre-stamp
- *  row is a picture on its own and two of them a metre apart are two
- *  pictures. */
 export const evidenceGroupKey = (rec: EvidenceRecord): string => {
   const spec = specOf(rec);
   if (!spec) return rec.id;
@@ -372,11 +304,8 @@ export const evidenceGroupKey = (rec: EvidenceRecord): string => {
   return `${specKey(spec)}@${keepIdOf(rec) ?? ground}`;
 };
 
-// Metres; absorbs a JSON round trip, and a sub-metre nudge is the same ground.
 const BBOX_TOLERANCE_M = 1;
 
-// Float drift only, not a "close enough" threshold: two hillshades one degree
-// apart are deliberately two pictures.
 const PARAM_TOLERANCE = 1e-6;
 
 const sameBbox = (a: [number, number, number, number], b: unknown): boolean =>
@@ -389,10 +318,6 @@ const sameBbox = (a: [number, number, number, number], b: unknown): boolean =>
 
 const sameNumber = (a: number, b: number) => Math.abs(a - b) <= PARAM_TOLERANCE;
 
-// Whether this row is already the picture `spec` would produce over
-// `bbox25833`. Only identifying fields count (year and point density are
-// provenance, not identity); strict about the rectangle, so a row kept before
-// the footprint moved does not read as kept.
 export const evidenceMatches = (
   rec: EvidenceRecord,
   spec: EvidenceSpec,

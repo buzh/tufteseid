@@ -24,12 +24,9 @@ export type ThemeLayerName =
   | 'protectedBuildings'
   | 'userReportedHeritage';
 
-// LAYERS and STYLES are excluded: `updateParams` changes them on a live layer.
 export const themeLayerPoolKey = (layerId: string, projection: string) =>
   `theme|${layerId}|${projection}`;
 
-// `overrides` pins LAYERS/STYLES at construction; correcting them afterwards
-// costs a screenful of GetMap.
 export const createThemeLayerFromConfig = (
   config: ThemeLayerConfig,
   layerDef: ThemeLayerDefinition,
@@ -77,7 +74,6 @@ export const createThemeLayerFromConfig = (
   const minZoom =
     layerDef.minZoom ?? category?.minZoom ?? parentCategory?.minZoom;
 
-  // No SRS/CRS: OL writes it from the source projection on every request.
   const wmsParams = {
     LAYERS: layerDef.layers,
     TRANSPARENT: true,
@@ -99,7 +95,6 @@ export const createThemeLayerFromConfig = (
     source,
     properties: layerProperties,
     cacheSize: WMS_TILE_CACHE_SIZE,
-    // On-the-fly renders share one tile queue.
     preload: 0,
     ...(minZoom !== undefined ? { minZoom } : {}),
   });

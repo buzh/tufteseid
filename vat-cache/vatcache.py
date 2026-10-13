@@ -46,11 +46,8 @@ import coverage as coverage_mod
 import report
 from report import level_range, plural, spaced
 
-# Where the store is on the server that serves it; also named by README.md and
-# docker-compose.yml.
 DEFAULT_STORE = "/site/tufteseid/data/cvat"
 
-# -c's sentinel for "given without an index"; argparse spends None on "not given".
 BARE = -1
 
 
@@ -123,8 +120,6 @@ def do_list(out, rows, verbose, pattern):
             continue
 
         print(f" {row['index']:2}  {name}")
-        # The committed cell ordered the queue; the catalogue's is what a build
-        # asks the ladder for. Drift between them is worth seeing.
         cell = cells.get(name)
         listed_cell = row.get("cell_m")
         drift = "" if cell is None or listed_cell in (None, cell) else \
@@ -141,8 +136,6 @@ def do_list(out, rows, verbose, pattern):
         if not row.get("listed"):
             print("     where    not in acquisitions.json; found in the store")
         print(f"     store    {level_range(levels)}")
-        # Off the units table, so there is no total to divide by: getting one
-        # would mean deriving a mask per acquisition.
         counts = {
             z: len(build_tiles.marked_units(out, name, z))
             for z in build_tiles.DEFAULT_LEVELS
@@ -152,9 +145,6 @@ def do_list(out, rows, verbose, pattern):
         mask = coverage_mod.mask_file(name)
         print(f"     mask     "
               f"{mask.name if mask.exists() else '— (derived on a build)'}")
-        # Both name sets must carry the acquisition verbatim: missing from
-        # hoydedata is nothing to render, missing from the WMS is tiles the app
-        # never asks for.
         print(f"     names    hoydedata {'ok' if name in names_cat else 'MISSING'}"
               f"  ·  wms {'ok' if name in names_wms else 'MISSING'}")
         if row.get("note"):
@@ -189,8 +179,6 @@ def do_check(out, row, args):
 
     faults = {}
     for project in projects:
-        # What the database says it holds, not every level the tool can build: a
-        # 0.5 m flight is not owed a z16.
         levels = args.levels or built.get(project) or list(build_tiles.DEFAULT_LEVELS)
         reports = report.check(out, project, levels, args.unit_tiles,
                                args.verbose)
@@ -205,8 +193,6 @@ def do_check(out, row, args):
     total = sum(len(u) for levels in hurt.values() for u in levels.values())
     print(f"{plural(total, 'work unit')} to (re)build. makevat.py repairs "
           "in place:\n")
-    # Named, not numbered: makevat.py numbers the whole catalogue and this list
-    # is the queue, so an index from one means something else in the other.
     for project in hurt:
         print(f"    makevat.py -o {out} -c {project!r} -g")
 

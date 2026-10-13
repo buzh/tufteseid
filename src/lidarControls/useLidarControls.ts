@@ -43,13 +43,6 @@ import {
 } from '../map/layers/config/backgroundLayers/lidarRelevance';
 import { lidarNativeResolution } from '../map/layers/config/backgroundLayers/stack';
 
-// Spent on the first dataset Automatisk settles on, which is the only one the
-// link can have meant, and not before the list the clamp consults is in — an
-// empty one resolves to the default and the render the link carried is gone,
-// with the parameter already rewritten and nothing left to restore it from.
-// Module scope and not a ref, because each ground section runs this hook: B's
-// copy would otherwise sit unspent until the reader turned Automatisk on
-// there, and then impose the link's render over what they had just picked.
 let linkRender: string | null = linkedLidarRender;
 
 export const useLidarControls = (half: CompareHalf) => {
@@ -73,16 +66,11 @@ export const useLidarControls = (half: CompareHalf) => {
     hybridContoursHalves[half],
   );
 
-  // `lidarFootprintsLayer` paints footprints only while this is open.
   const [pickerOpen, setPickerOpen] = useAtom(lidarPickerOpenHalves[half]);
   const setHoveredProjectId = useSetAtom(hoveredLidarProjectIdAtom);
 
-  // Filled by `lidarFootprintsLayer`: one WFS pass over the viewport, shared.
   const viewport = useAtomValue(lidarViewportAtom);
 
-  // Fetched at runtime, never rejects. Null until the manifest lands, empty on
-  // an install without a store: the difference is what the link's render is
-  // held against below, `cvat` being the one style no catalogue row carries.
   const [cvatAcquisitions, setCvatAcquisitions] = useState<
     CvatAcquisition[] | null
   >(null);
@@ -96,7 +84,6 @@ export const useLidarControls = (half: CompareHalf) => {
     };
   }, []);
 
-  // The mosaic's styles; a flight's are already in its catalogue row.
   const [nationalStyles, setNationalStyles] = useState<string[]>([]);
   useEffect(() => {
     let cancelled = false;
@@ -113,13 +100,10 @@ export const useLidarControls = (half: CompareHalf) => {
   }, []);
 
   const isNationalMosaic = backgroundLayer === 'lidarHillshade';
-  // `lidarProject` and `lidarCvat` are the same dataset under two names: the
-  // flight rendered by Kartverket's WMS, or by us onto our own disk.
   const isLidarCvat = backgroundLayer === 'lidarCvat';
   const isLidarFlight = backgroundLayer === 'lidarProject' || isLidarCvat;
   const isLidarBackground = isLidarFlight || isNationalMosaic;
 
-  // Metres per pixel; the view is EPSG:25833.
   const [resolution, setResolution] = useState<number | null>(null);
   useEffect(() => {
     const read = () => setResolution(map.getView().getResolution() ?? null);
@@ -130,8 +114,6 @@ export const useLidarControls = (half: CompareHalf) => {
     };
   }, [map]);
 
-  // Both clamp the render to what the target offers: the mosaic serves only
-  // `skyggerelieff`, and `cvat` draws only where the store holds that flight.
   const selectNational = useCallback(
     (wanted?: string) => {
       setActiveLidarStyle(
@@ -213,8 +195,6 @@ export const useLidarControls = (half: CompareHalf) => {
     else if (choice.kind === 'project') selectProject(choice.project);
   };
 
-  // With auto on the dataset is chosen up front rather than left to the
-  // resolver: landing on the mosaic first costs two screenfuls of WMS requests.
   const enterLidar = () => {
     const choice = autoDataset
       ? chooseAutoDataset({ resolution, viewport, current: null })
@@ -223,32 +203,22 @@ export const useLidarControls = (half: CompareHalf) => {
     else selectNational();
   };
 
-  // Every branch compares against what is drawing before writing, or the pass
-  // its own write triggers would loop. Both spend `linkRender` only once the
-  // list that branch clamps against has arrived; until then the pass runs
-  // without it and the one that lands the list applies it.
   useEffect(() => {
     if (!isLidarBackground || !autoDataset) return;
     const choice = chooseAutoDataset({
       resolution,
       viewport,
-      // The mosaic leaves `activeLidarProject` holding the last flight.
       current: isLidarFlight ? activeLidarProject : null,
     });
     if (choice.kind === 'hold') return;
     if (choice.kind === 'national') {
       const settled = nationalStyles.length > 0;
       const wanted = (settled && linkRender) || undefined;
-      // `wanted` forces the call even on the mosaic already drawing: the seed
-      // is whatever the link said, and the mosaic puts its style straight into
-      // a GetMap, so something has to clamp it to the one style it publishes.
       if (!isNationalMosaic || wanted) selectNational(wanted);
       if (settled) linkRender = null;
     } else if (choice.kind === 'project') {
       const settled = cvatAcquisitions != null;
       const wanted = (settled && linkRender) || undefined;
-      // Forced for the same reason: the flight may already be the one drawing
-      // by the time the manifest says whether it has a cached render.
       if (
         wanted ||
         !isLidarFlight ||
@@ -272,9 +242,6 @@ export const useLidarControls = (half: CompareHalf) => {
     selectProject,
   ]);
 
-  // A pin lapses back to Automatisk once the reader pans clear of the flight.
-  // Moves only, never on mount: a flight picked off the far end of the pulldown
-  // can already be off-screen when it is picked.
   useEffect(() => {
     if (autoDataset || !isLidarFlight || !activeLidarProject) return;
     const check = () => {
@@ -301,10 +268,6 @@ export const useLidarControls = (half: CompareHalf) => {
     (cvatAcquisitions ?? []).map((a) => a.project.id),
   );
 
-  // How far past the deepest level held the view has been pushed: 1 while the
-  // pixels are the source's own, 2, 4, 8 … once the last tiles are only being
-  // stretched. The view snaps to the ladder (`constrainResolution`), so the
-  // ratio is a whole power of two.
   const nativeResolution = lidarNativeResolution(backgroundLayer, activeCvat);
   const magnification =
     resolution != null && nativeResolution != null

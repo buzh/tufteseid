@@ -10,8 +10,6 @@ import { mosaicTiles } from '../map/grid';
 import { standingSpotFootprintAtom } from './atoms';
 import { PIN_Z_INDEX } from './pinStyle';
 
-// Solid on purpose, against the terrain window's dashed frame: the two say
-// different things and must not be unified.
 const CASING = 'rgba(255, 255, 255, 0.4)';
 const FRAME = 'rgba(255, 106, 0, 0.7)';
 
@@ -20,8 +18,6 @@ const frameStyle = [
   new Style({ stroke: new Stroke({ color: FRAME, width: 1 }) }),
 ];
 
-// Thinner, so the render tiles read as a grid inside the boundary rather than
-// competing with it.
 const cellStyle = [
   new Style({ stroke: new Stroke({ color: FRAME, width: 0.5 }) }),
 ];
@@ -52,7 +48,6 @@ export const spotFootprintLayerEffect = atomEffect((get) => {
     wrapX: false,
     features: [...cells, frame],
   });
-  // Just under the pin, so the pin it belongs to stays legible over it.
   const layer = new VectorLayer({
     zIndex: PIN_Z_INDEX - 1,
     source,

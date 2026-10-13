@@ -1,6 +1,3 @@
-// The tools apply whichever ground is up. `UpstreamStatus` stays last: it comes
-// and goes on its own, and nothing left of it should move when it does.
-
 import { Group } from '@mantine/core';
 import { AuthButton } from '../auth';
 import { PlaceInfoToggle } from '../placeInfo';

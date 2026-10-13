@@ -1,6 +1,3 @@
-// Callers put the long form in `title`/`aria-label`, not a Mantine `Tooltip`:
-// `Menu.Target` and `Tooltip` both clone their single child and do not nest.
-
 import { UnstyledButton } from '@mantine/core';
 import type { ComponentPropsWithoutRef, ReactNode, Ref } from 'react';
 import styles from './ControlChip.module.css';
@@ -50,7 +47,6 @@ export const ControlChip = ({
       {label && <span className={styles.chipLabel}>{label}</span>}
       {hint && <span className={styles.chipHint}>{hint}</span>}
       {withChevron && (
-        // `Icon` writes its size inline, so a stylesheet rule would lose to it.
         <Icon
           icon="keyboard_arrow_down"
           size={bare ? 12 : 16}

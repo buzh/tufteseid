@@ -1,11 +1,9 @@
-/* Holds the width of a row's check, so rows without one line up under it. */
 .gutter {
   display: block;
   width: calc(18px * var(--ui-scale));
   height: calc(18px * var(--ui-scale));
 }
 
-/* A Menu.Item is one line; the empty state is a sentence. */
 .empty {
   white-space: normal;
   line-height: 1.4;

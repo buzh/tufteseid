@@ -111,8 +111,6 @@ def check(out, project, levels, unit_tiles, verbose, mask=None):
         if result.stray:
             print(f"        {plural(len(result.stray), 'finished unit')} outside "
                   "the footprint (mask or --unit-tiles changed since)")
-        # Every unit empty means the fetch was pinned to ground the acquisition
-        # never flew; a few are the footprint clipping a corner.
         if result.empty and result.empty == result.done:
             print("        every finished unit is empty — the mask and the DEM "
                   "are of different ground")

@@ -1,7 +1,5 @@
 export type WMSLayerName = 'lidarHillshade' | 'lidarProject';
 
-// NiB publishes no per-project WMS (/wms/ortofoto_prosjekter 403s), so an
-// ortofoto acquisition comes off an ArcGIS ImageServer.
 export type ArcGISImageLayerName = 'flyfotoProject';
 
 export type XYZLayerName =
@@ -9,7 +7,6 @@ export type XYZLayerName =
 
 export type EmptyLayerName = 'empty';
 
-// Each name is the WMTS identifier Kartverket's cache is asked for.
 export type WMTSLayerName =
   'topo' | 'topograatone' | 'toporaster' | 'sjokartraster';
 
