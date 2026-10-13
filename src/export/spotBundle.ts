@@ -24,11 +24,15 @@ import { renderScene } from '../sketch/render';
 import { sketchOf } from '../sketch/scene';
 import { shareUrlOf } from '../spots/shareLink';
 import { CRS_WKT, EXPORT_CRS, worldExtension, worldFile } from './georef';
+import { qgisProject, type ProjectRaster } from './qgisProject';
 import { zip, type ZipEntry } from './zip';
 
 const PICTURES_DIR = 'bilder';
 const SKETCH_NAME = 'tegning';
 const README_NAME = 'LESMEG.txt';
+
+/** The drawing's layer name in the project; the file keeps its own stem. */
+const SKETCH_LAYER = 'Tegning';
 
 /** The drawing at the resolution it was drawn; the overlay's own scaling is a
  *  function of the view, which an export has not got. */
@@ -135,6 +139,9 @@ type Picture = {
   entries: ZipEntry[];
   /** The provenance block this picture contributes to the readme. */
   credit: string[];
+  /** Null for anything the project cannot place — a loop, or a raster whose
+   *  frame is not all ground. */
+  layer: ProjectRaster | null;
 };
 
 const pictureOf = async (
@@ -182,25 +189,48 @@ const pictureOf = async (
     credit.push(`  ${t('export.readme.video')}`);
   }
 
-  return { entries, credit };
+  const layer = ground
+    ? {
+        name: stem,
+        path: `${PICTURES_DIR}/${stem}.${extension}`,
+        bbox25833: ground,
+        // Every PNG the app stores carries alpha and every JPEG does not,
+        // the sidecar's renders included — checked against what QGIS itself
+        // wrote for each kind.
+        alpha: extension === 'png',
+      }
+    : null;
+
+  return { entries, credit, layer };
 };
+
+type Drawing = { entries: ZipEntry[]; layer: ProjectRaster | null };
 
 const sketchEntries = async (
   spot: SpotRecord,
   folder: string,
-): Promise<ZipEntry[]> => {
+): Promise<Drawing> => {
+  const none = { entries: [], layer: null };
   const sketch = sketchOf(spot.sketch);
-  if (!sketch) return [];
+  if (!sketch) return none;
   const render = await renderScene(sketch.frame, sketch.elements, SKETCH_SCALE);
-  if (!render) return [];
+  if (!render) return none;
   const blob = await canvasBlob(render.canvas, 'image/png');
-  if (!blob) return [];
-  return georeferenced(
-    `${folder}/${SKETCH_NAME}`,
-    'png',
-    blob,
-    render.extent25833,
-  );
+  if (!blob) return none;
+  return {
+    entries: await georeferenced(
+      `${folder}/${SKETCH_NAME}`,
+      'png',
+      blob,
+      render.extent25833,
+    ),
+    layer: {
+      name: SKETCH_LAYER,
+      path: `${SKETCH_NAME}.png`,
+      bbox25833: render.extent25833,
+      alpha: true,
+    },
+  };
 };
 
 /** Only what the bundle really holds: a spot written before the footprint rule
@@ -218,6 +248,8 @@ const readme = (
       name: spot.name,
       app: t('evidence.figure.app'),
     }),
+    '',
+    t('export.readme.project', { file: `${slug}.qgs` }),
     '',
     t('export.readme.raster'),
     t('export.readme.vector', { file: `${slug}_punkt.geojson` }),
@@ -255,6 +287,7 @@ export const buildSpotBundle = async (
   const slug = sanitizeFilename(spot.name);
   const entries: ZipEntry[] = [];
   const credits: string[][] = [];
+  const pictures: ProjectRaster[] = [];
 
   let index = 0;
   for (const rec of rows) {
@@ -264,10 +297,24 @@ export const buildSpotBundle = async (
     if (!picture) continue;
     entries.push(...picture.entries);
     credits.push(picture.credit);
+    if (picture.layer) pictures.push(picture.layer);
   }
 
   const sketch = await sketchEntries(spot, slug);
-  entries.push(...sketch);
+  entries.push(...sketch.entries);
+
+  // Above the pictures, as it is on the map: the drawing is traced over them.
+  const layers = sketch.layer ? [sketch.layer, ...pictures] : pictures;
+  entries.push({
+    path: `${slug}/${slug}.qgs`,
+    body: text(
+      qgisProject(
+        spot.name,
+        layers,
+        spot.footprint ? bboxToMetric(spot.footprint) : null,
+      ),
+    ),
+  });
 
   entries.push({
     path: `${slug}/${slug}_punkt.geojson`,
@@ -284,7 +331,7 @@ export const buildSpotBundle = async (
     body: text(
       readme(spot, slug, credits, {
         footprint: spot.footprint != null,
-        sketch: sketch.length > 0,
+        sketch: sketch.layer != null,
       }),
     ),
   });

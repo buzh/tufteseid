@@ -16,7 +16,7 @@ One row per directory under `src/`.
 | `api/` | PocketBase singleton (`pocketbase.ts`), the `spots`, `evidence`, `votes`, `stars` and `invites` collection clients, and the one call into the render sidecar (`render.ts`). |
 | `auth/` | The sign-in dialog — password, registration and reset on one form — the three calls behind it (`session.ts`), the account menu (with the admin-only links to `/stats/` and PocketBase's dashboard), and `currentUserAtom` mirrored off the SDK's `authStore`. |
 | `evidence/` | Keeping a reading of a spot's ground: the offer the map is making, the spec that survives it, the producers, the serial render queue and the handover to the render sidecar, the gallery that lists and orders what was kept, the reader that lays them back on the map, and the provenance legend stamped onto a download. |
-| `export/` | A spot as files a GIS can open: the store-only zip writer, the world file and `.prj` that place a raster, and the bundle that assembles them. |
+| `export/` | A spot as files a GIS can open: the store-only zip writer, the world file and `.prj` that place a raster, the QGIS project that wires them up, and the bundle that assembles them. |
 | `flyfotoControls/` | The Flyfoto arm: which Norge i bilder acquisition, and its era grouping. |
 | `grounds/` | The ground switch. Which ground is up is derived from the half's background layer, never stored. |
 | `heritageControls/` | The Kulturminner control: which theme layers are ticked and how they are drawn. |
@@ -773,12 +773,16 @@ of that.
 ## The export bundle
 
 The second door out, and the one the legend cannot ride through. `src/export/`
-packs a spot into a zip a GIS opens: every kept raster with a world file and a
-`.prj` beside it, the pin and the rectangle as GeoJSON, the drawing as a
-georeferenced transparent PNG, and a `LESMEG.txt`. One press on the card's
-tools row and one in the reader's title row, so a visitor reading somebody
-else's public spot has it too — the same reasoning that gave the reader a
-download.
+packs a spot into a zip a GIS opens: a QGIS project, every kept raster with a
+world file and a `.prj` beside it, the pin and the rectangle as GeoJSON, the
+drawing as a georeferenced transparent PNG, and a `LESMEG.txt`. One press on
+the card's tools row and one in the reader's title row, so a visitor reading
+somebody else's public spot has it too — the same reasoning that gave the
+reader a download.
+
+The rasters and the GeoJSON are the durable half: a world file and a `.prj` are
+read by anything with GDAL under it, including no QGIS at all. The project file
+is the convenience half, and the one with a version attached.
 
 - **The bundle carries the stored bytes, never the stamped ones.** A stamped
   download is deliberately not registered to its rectangle (*The provenance
@@ -810,6 +814,40 @@ download.
 - Attribute names in the GeoJSON mirror the collection's own columns rather
   than the reader's language: a schema that changed with the locale could not
   be joined to another export.
+
+### The project file
+
+`qgisProject.ts` writes a `.qgs` at the bundle root. Opening it is the whole
+import: the pictures stacked in the gallery's order with the cover on top, the
+drawing above them, a basemap under them, and the services wired in. Nothing is
+configured by hand — a QGIS *connection* lives in the reader's own profile and
+does not travel, but a *layer* in a project carries its datasource inline and
+does.
+
+- **Written against what QGIS 4.2 saves, element for element**, not from the
+  format's documentation. `QGIS_VERSION` is that coupling stated, and it is
+  not a minimum — a bundle targets a recent QGIS on purpose, and the rasters
+  are the version-proof half. The blocks QGIS writes and we leave out
+  (`resourceMetadata`, `flags`, `temporal`, `elevation`) are defaults it fills
+  in; the ones kept are the ones a layer cannot be read without.
+- **Layer ids are regenerated per bundle** and must agree across four places —
+  `layer-tree-group`, `projectlayers`, `layerorder` and `legend`.
+- **The services are the public upstreams, not this installation's `/wms/…`
+  paths.** A bundle travels, and QGIS sits outside the tile guard and the
+  circuit breaker, so pointing a desktop GIS at our own cache would put
+  unbounded traffic through `wmscache` and `mapproxy`. The cost is that the
+  same hosts are now named in `src/export/qgisProject.ts`,
+  `nginx/wms-cache.conf` and `mapproxy/mapproxy.yaml` — change one, check
+  three (`docs/wms-proxy-and-tiles.md`).
+- **Flyfoto is not among them.** It resolves only through `nib-proxy`'s
+  injected token and is not open data. Its *rasters* travel like any other;
+  only the live layer is absent.
+- **One service is on by default and it is a basemap, not an overlay.**
+  `topo` — Kartverket's full cartography — sits at the bottom of the stack. A
+  footprint is at most 500 m across, so a bundle with no ground under it opens
+  as pictures floating on nothing. The app's own transparent reference overlay
+  is in the project too but off: it draws roads and names and no landmass, so
+  it can read over a render but cannot place one.
 
 ## Opt-in services
 

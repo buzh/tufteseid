@@ -20,6 +20,14 @@ container, `:3000`; host `127.0.0.1:3030`):
 - `Browser → Caddy → rendersvc → hoydedata.no` — the one path that leaves the
   stack *without* wmscache in front of it, on purpose (below).
 
+Nothing the SPA draws reaches an upstream directly. The one place that names
+an upstream host outside this stack is the exported QGIS project
+(`src/export/qgisProject.ts`), which points at `wms.geonorge.no` and
+`kart.ra.no` rather than at our own paths: a bundle travels, and a desktop GIS
+answers to neither the tile guard nor the circuit breaker. Change a host in
+`nginx/wms-cache.conf` or `mapproxy/mapproxy.yaml` and that module holds the
+same one (`docs/architecture.md`, *The export bundle*).
+
 ## Routes
 
 Caddy strips the same-origin prefix and rewrites into an internal namespace;
