@@ -24,6 +24,13 @@ Read-only: nothing here is written or persisted. Internal name `terreng`.
 Precomputed VAT served as tiles (`/cvat/*`) is a separate path: `vat-cache/`
 and `vat-cache/README.md`, registered in `docs/map-layers.md`.
 
+The window is a single ≤`MAX_SIDE_M` box, never the whole spot. Reading terrain
+on a spot whose footprint is a larger boundary seeds the window with
+`squareBboxWithin` (`readTerrainWindowAtom`) — a cap-sized square centred in the
+boundary that the reader drags to the part of the site they want — so the
+elevation endpoint is never asked for more than a capped rectangle at once
+(`docs/architecture.md`, the boundary-and-tiles note).
+
 Two other readers of the same endpoint carry their own copies of the quirks
 below, because neither runs in the browser: `vat-cache/fetch_dem.py` and
 `rendersvc/dem.py` (`docs/render-sidecar.md`). A fact learned here is learned in

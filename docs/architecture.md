@@ -371,8 +371,15 @@ megabytes on every press.
 - **A rectangle being *changed* starts from what is there.** `seedFootprint`
   (`src/spots/atoms.ts`) only runs for a draft with no footprint in hand, and
   `bringBboxIntoView` then pans or zooms *out* until the square is on screen,
-  never in, so a reader who can already see it keeps the view they chose;
-  `MAX_SIDE_M` bounds how far out that ever goes.
+  never in, so a reader who can already see it keeps the view they chose.
+- **Past the cap the rectangle is a boundary, tiled into render boxes.** A
+  spot-footprint drag may grow to `maxBoundaryMetres()` (`src/map/grid.ts`), and
+  on release anything over `MAX_SIDE_M` snaps to whole z15 tiles on the app's own
+  grid (`wmsTileGrid`). `mosaicTiles(footprint)` then derives the render boxes:
+  one free box within the cap — today's behaviour unchanged — or the covering
+  tiles past it, each ≤ cap. The boundary frame is solid, the tile cells drawn
+  thin inside it (`spots/footprintLayer.ts`). The terrain window stays a single
+  ≤cap box centred in the boundary (`readTerrainWindowAtom`).
 - **The card can take the map without becoming the properties box.**
   `adjustSpotDraftAtom` opens a draft on the open record straight into its
   `footprint` or `sketch` stage with `box: 'card'`, and `SpotSurface` keeps
@@ -441,7 +448,11 @@ size and changes none of them.
   one stray click away. The press is dead while any sidecar render of the
   spot's is outstanding, since the sidecar takes one job per caller, and while
   one already covers the footprint with those parameters; a settled row is
-  retried in the gallery, where every other kind's is. The box is wider for as
+  retried in the gallery, where every other kind's is. The lines are blocked
+  outright on a boundary larger than one tile: the sidecar renders the single box
+  it reads off the spot row and refuses anything over the cap, so sun loops and
+  RVT blends wait on the sidecar learning to fan out (`docs/render-sidecar.md`).
+  The box is wider for as
   long as the list stands, and the list stands down when a draft takes the map.
 - **Which acquisition a render reads is the reader's.** `meta.source` on a
   `sunloop` or `rvt` row is `auto` — the finest laser data covering each pixel,
@@ -456,14 +467,16 @@ size and changes none of them.
   tools row proposes every Norge i bilder acquisition over the footprint, one
   at a time, and the reader keeps or discards each (`useFlyfotoRun.ts`,
   `FlyfotoRun.tsx`).
-  A proposal is rendered before it is offered, at the acquisition's own
-  resolution, so keeping writes the very
-  bytes on screen: `keepProduced` (`useSpotEvidence.ts`) creates the row and
-  PATCHes the file in one go, and deletes the row again if the file will not
-  land, because a row with no pixels and no queue state is nothing the gallery
-  could retry. A discard was never a record — the pixels only ever existed in
+  A proposal is rendered over the first render tile before it is offered, at the
+  acquisition's own resolution — the preview is for judging the acquisition, not
+  the bytes kept. On a single-tile spot keeping writes the very bytes on screen:
+  `keepProduced` (`useSpotEvidence.ts`) creates the row and PATCHes the file in
+  one go, and deletes the row again if the file will not land, because a row with
+  no pixels and no queue state is nothing the gallery could retry. On a boundary,
+  keeping instead fans out: `keep` re-renders the acquisition over every tile. A
+  discard was never a record — the pixels only ever existed in
   the tab — so running again asks about it a second time. What the run passes
-  over is only what `evidenceMatches` already finds against the footprint as it
+  over is only what `evidenceMatches` already finds against the first tile as it
   now stands, which is also how an acquisition the catalogue has added since
   comes up on its own, and how moving the footprint re-offers the lot. The
   seamless mosaic is not in the series: that one is a ground, and the card's
@@ -534,12 +547,17 @@ size and changes none of them.
 
 ## Reading a spot
 
-Every row of evidence covers the same rectangle — the spot's footprint, as
-`meta.bbox25833` records it — so a spot's kept renders are registered to one
-another. The reader (`src/evidence/EvidenceReader.tsx`) is what that buys: it
-stands in for the card, fits the map to the footprint, and lays one kept render
-at a time back on the ground it was made over (`evidenceOverlay.ts`). Flipping
-holds the ground still and changes only how it was seen.
+Every row of evidence covers one render box — a spot within the cap has one box,
+the whole footprint; a larger boundary has a tile, as `meta.bbox25833` records it
+— and the boxes of one picture tile seamlessly, so a spot's kept renders are
+registered to one another. The reader (`src/evidence/EvidenceReader.tsx`) is what
+that buys: it stands in for the card, fits the map to the footprint, and groups
+the rows by picture (`groups.ts`, `evidenceGroupKey`) so a mosaic is one thing to
+flip to. Flipping lays that picture's tiles — one for an ordinary spot, the whole
+grid for a boundary — back on the ground they were made over (`evidenceOverlay.ts`
+takes a set), holding the ground still and changing only how it was seen. (The
+author's gallery and traced ground still work a row at a time; grouping them is a
+later pass.)
 
 - The overlay is at z 1.25: over the terrain render, **under the B half**, so a
   curtain reads a kept render against a live ground. The transparency slider
@@ -713,7 +731,7 @@ of main-thread work.
 unchanged at the top, the band appended underneath, every dimension derived from
 the one font size, which is `clamp(11, captureWidth / 70, 26)`. Off the capture
 and not the finished canvas, because the band can widen the canvas and a font
-size that grew with it would want a wider band again. A footprint is 50–500 m
+size that grew with it would want a wider band again. A render box is 50–500 m
 and the producers publish between 1 and 0.08 m/px, so a capture is anywhere from
 50 to 6300 px across and the legend has to hold its proportions over the whole
 of that.
@@ -844,7 +862,8 @@ does.
   only the live layer is absent.
 - **One service is on by default and it is a basemap, not an overlay.**
   `topo` — Kartverket's full cartography — sits at the bottom of the stack. A
-  footprint is at most 500 m across, so a bundle with no ground under it opens
+  footprint is small — a single box at most 500 m, a boundary a few tiles — so a
+  bundle with no ground under it opens
   as pictures floating on nothing. The app's own transparent reference overlay
   is in the project too but off: it draws roads and names and no landmass, so
   it can read over a render but cannot place one.

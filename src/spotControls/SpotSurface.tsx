@@ -123,7 +123,10 @@ export const SpotSurface = () => {
   // A loop goes to `DraftGroundLoop` instead: an `ImageStatic` cannot carry a
   // WebM, and the two overlays are never up at once.
   const still = ground?.loop ? null : ground;
-  useEvidenceOverlay(still?.url ?? '', still?.extent ?? null, 1);
+  useEvidenceOverlay(
+    still ? [{ url: still.url, extent: still.extent }] : [],
+    1,
+  );
 
   return (
     <>

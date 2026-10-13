@@ -23,9 +23,14 @@ import { Panel } from '../ui/Panel';
 import { useFloatingPanel, type PanelLayout } from '../ui/useFloatingPanel';
 import { useEvidenceDownload } from './download';
 import styles from './EvidenceReader.module.css';
-import { useEvidenceLoopOverlay, useEvidenceOverlay } from './evidenceOverlay';
+import {
+  useEvidenceLoopOverlay,
+  useEvidenceOverlay,
+  type OverlayTile,
+} from './evidenceOverlay';
 import { EvidenceThumb } from './EvidenceThumb';
 import { EvidenceTransport } from './EvidenceTransport';
+import { groupEvidence } from './groups';
 import {
   downloadLabel,
   evidenceFacts,
@@ -34,7 +39,6 @@ import {
   KIND_ICON,
 } from './labels';
 import {
-  coverOf,
   evidenceBandTop,
   evidenceBbox,
   isReadable,
@@ -69,29 +73,39 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
 
   const readable = useMemo(() => (items ?? []).filter(isReadable), [items]);
 
-  // Held by id, not by index: a render landing or a row being deleted
+  // One entry per picture, its tiles gathered: a mosaic reads as one thing to
+  // flip to and lays all its tiles at once.
+  const groups = useMemo(() => groupEvidence(readable), [readable]);
+
+  // Held by key, not by index: a render landing or a row being deleted
   // reshuffles the list under the reader.
-  const [shownId, setShownId] = useState<string | null>(null);
-  // Nothing flipped to yet, or the row that was is gone: fall back to the
-  // cover.
-  const shown = shownId ?? coverOf(readable)?.id;
+  const [shownKey, setShownKey] = useState<string | null>(null);
+  // Nothing flipped to yet, or the group that was is gone: fall back to the
+  // first, which holds the cover.
+  const shown = shownKey ?? groups[0]?.key;
   const index = Math.max(
     0,
-    readable.findIndex((rec) => rec.id === shown),
+    groups.findIndex((group) => group.key === shown),
   );
-  const current = readable[index] ?? null;
+  const group = groups[index] ?? null;
+  const current = group?.cover ?? null;
 
   const [transparency, setTransparency] = useState(0);
 
-  // Two overlays, one at a time: an `ImageStatic` cannot carry a WebM.
-  const still = current && !isVideoEvidence(current) ? current : null;
+  // Two overlays, one at a time: an `ImageStatic` cannot carry a WebM, and a
+  // loop is always a single tile (the sidecar does not fan out yet).
   const loop = current && isVideoEvidence(current) ? current : null;
+  const stillTiles = useMemo<OverlayTile[]>(() => {
+    if (!group || isVideoEvidence(group.cover)) return [];
+    const out: OverlayTile[] = [];
+    for (const rec of group.rows) {
+      const extent = evidenceBbox(rec);
+      if (extent) out.push({ url: evidenceFileUrl(rec), extent });
+    }
+    return out;
+  }, [group]);
 
-  useEvidenceOverlay(
-    still ? evidenceFileUrl(still) : '',
-    still ? evidenceBbox(still) : null,
-    1 - transparency / 100,
-  );
+  useEvidenceOverlay(stillTiles, 1 - transparency / 100);
   const transport = useEvidenceLoopOverlay(
     loop ? evidenceFileUrl(loop) : '',
     loop ? evidenceBbox(loop) : null,
@@ -101,11 +115,11 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
 
   const step = useCallback(
     (delta: number) => {
-      if (readable.length === 0) return;
-      const next = (index + delta + readable.length) % readable.length;
-      setShownId(readable[next].id);
+      if (groups.length === 0) return;
+      const next = (index + delta + groups.length) % groups.length;
+      setShownKey(groups[next].key);
     },
-    [index, readable],
+    [index, groups],
   );
 
   // Arrow keys flip, not pan: OL's `keyboardEventTarget` is the document, so
@@ -273,7 +287,7 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
                   <span className={styles.count}>
                     {t('evidence.position', {
                       index: index + 1,
-                      total: readable.length,
+                      total: groups.length,
                     })}
                   </span>
                   <Tooltip label={t('evidence.next')}>
@@ -338,32 +352,36 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
         ) : (
           <Hint
             id="pictureKeys"
-            tips={readable.length > 1 ? [t('hints.pictures')] : []}
+            tips={groups.length > 1 ? [t('hints.pictures')] : []}
             keys={['ArrowLeft', 'ArrowRight']}
             position={box.layout === 'wide' ? 'top-start' : 'left-start'}
           >
             <div className={styles.strip}>
-              {readable.map((rec) => {
-                const label = evidenceLabel(rec);
+              {groups.map((g) => {
+                const base = evidenceLabel(g.cover);
+                const label =
+                  g.rows.length > 1
+                    ? `${base} · ${t('evidence.tileCount', { count: g.rows.length })}`
+                    : base;
                 return (
-                  <Tooltip key={rec.id} label={label}>
+                  <Tooltip key={g.key} label={label}>
                     <button
                       type="button"
                       className={cx(
                         styles.frame,
-                        rec.id === current?.id && styles.frameOn,
+                        g.key === shown && styles.frameOn,
                       )}
                       aria-label={label}
-                      aria-pressed={rec.id === current?.id}
-                      onClick={() => setShownId(rec.id)}
+                      aria-pressed={g.key === shown}
+                      onClick={() => setShownKey(g.key)}
                     >
                       <EvidenceThumb
-                        record={rec}
+                        record={g.cover}
                         className={styles.thumb}
                         alt={label}
                       />
                       <Icon
-                        icon={KIND_ICON[rec.kind]}
+                        icon={KIND_ICON[g.cover.kind]}
                         size={12}
                         className={styles.frameKind}
                       />

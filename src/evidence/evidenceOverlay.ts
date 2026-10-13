@@ -16,18 +16,24 @@ const Z_INDEX = 1.25;
 const LAYER_ID = 'spotEvidenceOverlay';
 const LOOP_LAYER_ID = 'spotEvidenceLoop';
 
-// Extent is EPSG:25833 whatever the view is in; `ImageStatic` reprojects.
-export const useEvidenceOverlay = (
-  url: string,
-  extent: [number, number, number, number] | null,
-  opacity: number,
-) => {
-  const map = useAtomValue(mapAtom);
-  const [minX, minY, maxX, maxY] = extent ?? [NaN, NaN, NaN, NaN];
+/** A still laid over the ground it was rendered on. Extent is EPSG:25833
+ *  whatever the view is in; `ImageStatic` reprojects. */
+export type OverlayTile = {
+  url: string;
+  extent: [number, number, number, number];
+};
 
-  // Outlive their effect on purpose: the outgoing picture comes off only once
-  // the incoming one has pixels, so flipping between two renders never blinks.
+// A set, so a mosaic lays all its tiles under one overlay. One tile is the
+// ordinary case.
+export const useEvidenceOverlay = (tiles: OverlayTile[], opacity: number) => {
+  const map = useAtomValue(mapAtom);
+
+  // Outlive their effect on purpose: the outgoing set comes off only once every
+  // incoming tile has pixels, so flipping between two renders never blinks.
   const shown = useRef<ImageLayer<Static>[]>([]);
+
+  // Rebuild only when the set changes, not on every render that re-derives it.
+  const key = tiles.map((t) => `${t.url}@${t.extent.join(',')}`).join(';');
 
   useEffect(() => {
     const retireAll = () => {
@@ -35,43 +41,51 @@ export const useEvidenceOverlay = (
       shown.current = [];
     };
 
-    if (!url || !Number.isFinite(minX)) {
+    if (tiles.length === 0) {
       retireAll();
       return;
     }
 
-    const source = new Static({
-      url,
-      projection: 'EPSG:25833',
-      imageExtent: [minX, minY, maxX, maxY],
-    });
-    const layer = new ImageLayer({
-      source,
-      opacity,
-      zIndex: Z_INDEX,
-      properties: { id: LAYER_ID },
-    });
-    map.addLayer(layer);
-
     const outgoing = shown.current;
-    shown.current = [...outgoing, layer];
-
+    const incoming: ImageLayer<Static>[] = [];
+    // Dropped in one go once the last incoming tile lands, so a mosaic flips
+    // whole rather than tile by tile.
+    let pending = tiles.length;
     const retireOutgoing = () => {
+      pending -= 1;
+      if (pending > 0) return;
       for (const old of outgoing) map.removeLayer(old);
       shown.current = shown.current.filter((l) => !outgoing.includes(l));
     };
-    source.once('imageloadend', retireOutgoing);
-    // Or an image that never arrives leaves the previous one up for ever.
-    source.once('imageloaderror', retireOutgoing);
 
-    // No cleanup: the next layer retires this one, and the unmount effect
-    // sweeps whatever is left.
+    for (const tile of tiles) {
+      const source = new Static({
+        url: tile.url,
+        projection: 'EPSG:25833',
+        imageExtent: tile.extent,
+      });
+      const layer = new ImageLayer({
+        source,
+        opacity,
+        zIndex: Z_INDEX,
+        properties: { id: LAYER_ID },
+      });
+      map.addLayer(layer);
+      incoming.push(layer);
+      source.once('imageloadend', retireOutgoing);
+      // Or an image that never arrives leaves the previous set up for ever.
+      source.once('imageloaderror', retireOutgoing);
+    }
+    shown.current = [...outgoing, ...incoming];
+
+    // No cleanup: the next set retires this one, and the unmount effect sweeps
+    // whatever is left.
 
     // `opacity` seeded here, kept in step by the effect below: naming it would
-    // rebuild the layer on every slider drag and bring back the flash this
+    // rebuild the layers on every slider drag and bring back the flash this
     // avoids.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [map, url, minX, minY, maxX, maxY]);
+  }, [map, key]);
 
   useEffect(() => {
     for (const layer of shown.current) layer.setOpacity(opacity);

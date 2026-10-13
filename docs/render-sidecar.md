@@ -78,6 +78,12 @@ the parameters come out of `meta` and the ground out of the expanded spot's
 posted, and there is no rectangle, resolution or frame count a request can ask
 for.
 
+Because the box is the whole `footprint`, a boundary larger than the cap is
+refused by `bbox_of` (below). Until the sidecar reads a per-tile box from the
+request and fans one job out per tile, the client gates sun loops and RVT blends
+to single-tile spots (`SpotRenders`, `docs/architecture.md`) — the one piece of
+the mosaic that is not yet server-side.
+
 ### The token trade
 
 `rendersvc` holds no credentials. Every PocketBase call carries the reader's own

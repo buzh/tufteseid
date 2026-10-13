@@ -85,6 +85,7 @@
     "open": "Åpne bildet i full oppløsning",
     "failed": "Fikk ikke hentet eller lagret bildene.",
     "position": "{{index}} av {{total}}",
+    "tileCount": "{{count}} ruter",
     "previous": "Forrige bilde (←)",
     "next": "Neste bilde (→)",
     "play": "Spill av",
