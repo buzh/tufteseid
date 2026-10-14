@@ -92,7 +92,7 @@ A `Halves` suffix means a pair (see below). Each pair's `live*` sibling is
 | `favouriteSpotsAtom` | same | Derived: what the reader has starred, resolved against the records, most recently starred first. A spot since made private is in no readable record list and drops out. |
 | `terrainOfferAtom` | `evidence/offer.ts` | What the terrain analysis would keep, published by `useTerrainControls` because its settings are component state. |
 | `keepOfferAtom` | same | Derived: the terrain's offer when an analysis is running, otherwise the ground's (off the A half). Null where the view cannot be re-rendered. |
-| `draftGroundAtom` | `evidence/draftGround.ts` | A picture laid on the map at the extent it was rendered over: a kept picture to trace a drawing onto, published by `EvidenceGallery`, or a flyfoto proposal under review, published by `useFlyfotoRun`. Never both — the card and the acquisition box do not stand at once. `tiles` is the whole picture — a mosaic's grid, or the one box — and `id` the group it came off, so the list drops the ground when the last of its tiles goes. `loop` says the file is a WebM instead, always a single tile, and so which overlay draws it. `draftGroundExtent` is the bounds over whatever is laid, which is what the sketch frame fits to. |
+| `draftGroundAtom` | `evidence/draftGround.ts` | A picture laid on the map at the extent it was rendered over: a kept picture to trace a drawing onto, published by `EvidenceGallery`, or a flyfoto proposal under review, published by `useFlyfotoRun`. Never both — the card and the acquisition box do not stand at once. `tiles` is the whole picture — a mosaic's grid, or the one box — and `id` the group it came off, so the list drops the ground when the last of its tiles goes. `loop` says the file is a WebM instead, always a single tile, and so which overlay draws it. `draftGroundExtent` is the bounds over whatever is laid, which is what the pen brings into view when the picture to trace is off screen. |
 | the floating panel's layout and placement | `ui/useFloatingPanel.ts` | Which way round the box is laid out, where it was dragged to, how big it may get and which wall it is docked against. Module-private, reached through `useFloatingPanel`: held outside the component, which remounts per spot — and so only one floating panel at a time. `EvidenceReader` is the one caller. |
 | `sketchSessionAtom` | `sketch/session.ts` | Non-null exactly while the map is frozen and Excalidraw has it. |
 | `uiContextAtom` | `shared/uiContext.ts` | Derived: `map` or `draw`, off the session above. Which surface is in front (*The context in front*). |
@@ -295,6 +295,41 @@ megabytes on every press.
   down and answers with an empty scene, which went over `spotSketchAtom` as a
   drawing with no strokes. So `commit` writes that atom as well as the record,
   and the pen's Avbryt puts it back to what is stored.
+- **The frame is the footprint at one fixed resolution**, `FRAME_ZOOM` — zoom
+  16 on the app's own grid, which is 0.33 m to the scene pixel wherever the spot
+  is (`footprintFrame`, `src/sketch/frame.ts`; the ground metre is read off
+  `getPointResolution`, so a projection in degrees frames the same ground as one
+  in metres). Scene coordinates therefore mean the same thing on every spot and
+  in every session, and the scene covers the whole rectangle rather than
+  whatever happened to be on screen. A spot with no rectangle yet — a new one,
+  drawn before `derivedFootprint` has run — still frames the viewport
+  (`captureFrame`), and the session after the rectangle exists reframes it.
+- **A stored drawing is reframed on the way in**, never read as it was written:
+  `reframeScene` (`scene.ts`) carries every element from the frame it was drawn
+  under into the session's, which is what lets a spot's rectangle grow under a
+  drawing that is already there. The frames are two axis-aligned extents, so the
+  carry is one offset and one scale — positions exactly per axis, everything
+  with a size (the extent, the points of a line, the font, the stroke) by the
+  geometric mean of the two, so a drawing keeps its shape and its weight on the
+  ground. Identical frames are left alone rather than multiplied by one, and
+  what is carried is trimmed to a hundredth of a scene pixel — three
+  millimetres — because a multiply turns a column of short decimals into long
+  ones and the drawing has a 5 MB cap to stay under.
+- **Nothing moves the view to open the pen.** The scene absorbs the difference
+  instead: it opens at `res(FRAME_ZOOM) / res(view)`, so a reader who framed
+  their rectangle at zoom 14 and one who framed it at 18 both get the map they
+  were looking at, untouched. Two cases fit the view anyway, because the pen
+  could not otherwise be used: the target is off screen entirely, or the ratio
+  falls outside the zoom range Excalidraw will hold (0.1…30, which is the view
+  more than three levels out from the frame).
+- **A line's weight is ground, not screen.** The three widths the strip offers
+  are scene pixels, so they are 0.33, 0.66 and 1.3 m whoever drew them and
+  wherever they were drawn — which is what makes the shared drawing layer
+  legible, every spot's strokes weighing the same against the country. The
+  price is at the ends of the range: open the pen four levels in from the
+  frame and the thinnest line is already four screen pixels, four levels out
+  and it is a hair. Zooming the scene in is the answer to the second, and the
+  stretched map it brings carries no less than the view did.
 - **The scene opens on the view the map is showing and is held over it.** The
   map is frozen for the session and follows the scene by a CSS transform
   (`slaveMapToScene`), so the canvas opens at the zoom that makes that transform
@@ -576,13 +611,13 @@ size and changes none of them.
   loop, in a leaf component of its own because that hook's transport changes
   with every frame and the surface renders the whole card. The card drives no
   transport; play, pause and seek belong to the reading.
-- Entering the draw stage with a picture chosen fits the view to that picture's
-  own rectangle before `captureFrame` — `draftGroundExtent`, which spans a
-  mosaic's tiles — so the frame holds the ground the picture does and the
-  strokes register to every other picture of the spot as well. Strokes already
-  made keep their own frame — nothing may move it. Switching pictures inside a
-  session swaps the overlay and leaves the frame alone, which is the whole
-  point: every row covers the same rectangle.
+- The frame spans the footprint, so a drawing registers to every picture of the
+  spot without the pen having to know which one is being traced. Switching
+  pictures inside a session swaps the overlay and leaves the frame alone, which
+  is the whole point: every row covers the same rectangle, and so does the
+  scene. A picture off screen when the pen opens is the one thing that moves the
+  view — `draftGroundExtent`, which spans a mosaic's tiles, is what the fit then
+  lands on.
 
 ## Reading a spot
 
@@ -1236,6 +1271,12 @@ that is a last resort rather than the design.
 - **A render is not a cache.** Upstreams re-fly and reprocess, so the same spec
   re-rendered later may not be the picture its author read. `meta.renderedAt`
   says when the file was made; nothing re-renders on its own.
+- **The frame reaches further than the pen does.** The scene spans the whole
+  footprint, but the map under it is one frozen viewport and zooming out is
+  floored at the opening zoom, so the part of a rectangle that was off screen
+  when the pen opened has no ground to trace. Strokes made there would be
+  registered correctly — there is just nothing to see. A reader who wants the
+  whole of a large footprint zooms out to it before reaching for the pen.
 - **Evidence never meets the sketch.** Excalidraw's image tool stays off
   (`sketch/SketchCanvas.tsx`): a PNG dropped into the scene would be stored
   inside the drawing, against the 5 MB `sketch` cap, where nothing can see it.

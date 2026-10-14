@@ -5,7 +5,7 @@ import {
   type SpotRecord,
   type SpotSketch,
 } from '../api/spots';
-import type { SketchFrame } from './frame';
+import { frameExtentIn, type SketchFrame } from './frame';
 
 export type SceneElement = NonNullable<
   ExcalidrawInitialDataState['elements']
@@ -28,6 +28,87 @@ export const storableScene = (
       for (const key of VOLATILE) delete copy[key];
       return copy as unknown as SceneElement;
     });
+
+type Reframing = {
+  ax: number;
+  ay: number;
+  bx: number;
+  by: number;
+  scale: number;
+};
+
+const SETTLED_PX = 0.001;
+
+const SETTLED_SCALE = 0.00001;
+
+const reframing = (from: SketchFrame, to: SketchFrame): Reframing | null => {
+  const source = frameExtentIn(from, to.projection);
+  const spanX = to.extent[2] - to.extent[0];
+  const spanY = to.extent[3] - to.extent[1];
+  if (!(spanX > 0) || !(spanY > 0)) return null;
+  const ax = ((source[2] - source[0]) / from.widthPx) * (to.widthPx / spanX);
+  const ay = ((source[3] - source[1]) / from.heightPx) * (to.heightPx / spanY);
+  if (!(ax > 0) || !(ay > 0)) return null;
+  const bx = ((source[0] - to.extent[0]) / spanX) * to.widthPx;
+  const by = ((to.extent[3] - source[3]) / spanY) * to.heightPx;
+  if (
+    Math.abs(ax - 1) < SETTLED_SCALE &&
+    Math.abs(ay - 1) < SETTLED_SCALE &&
+    Math.abs(bx) < SETTLED_PX &&
+    Math.abs(by) < SETTLED_PX
+  ) {
+    return null;
+  }
+  return { ax, ay, bx, by, scale: Math.sqrt(ax * ay) };
+};
+
+const SCALED = ['fontSize', 'strokeWidth'] as const;
+
+const SCENE_PX_PRECISION = 100;
+
+const trimmed = (value: number): number =>
+  Math.round(value * SCENE_PX_PRECISION) / SCENE_PX_PRECISION;
+
+const scaledNumber = (value: unknown, by: number): unknown =>
+  typeof value === 'number' && Number.isFinite(value)
+    ? trimmed(value * by)
+    : value;
+
+const reframeElement = (el: SceneElement, at: Reframing): SceneElement => {
+  const copy = { ...el } as Record<string, unknown>;
+  copy.x = trimmed(at.ax * el.x + at.bx);
+  copy.y = trimmed(at.ay * el.y + at.by);
+  copy.width = trimmed(el.width * at.scale);
+  copy.height = trimmed(el.height * at.scale);
+  if (Array.isArray(copy.points)) {
+    copy.points = (copy.points as unknown[]).map((point) =>
+      Array.isArray(point)
+        ? point.map((value) => scaledNumber(value, at.scale))
+        : point,
+    );
+  }
+  const roundness = copy.roundness as { value?: unknown } | null | undefined;
+  if (roundness && typeof roundness.value === 'number') {
+    copy.roundness = {
+      ...roundness,
+      value: trimmed(roundness.value * at.scale),
+    };
+  }
+  for (const key of SCALED) {
+    if (key in copy) copy[key] = scaledNumber(copy[key], at.scale);
+  }
+  return copy as unknown as SceneElement;
+};
+
+export const reframeScene = (
+  sketch: Sketch,
+  frame: SketchFrame,
+): readonly SceneElement[] => {
+  const at = reframing(sketch.frame, frame);
+  return at
+    ? sketch.elements.map((el) => reframeElement(el, at))
+    : sketch.elements;
+};
 
 export const SKETCH_BUDGET_BYTES = 4000000;
 

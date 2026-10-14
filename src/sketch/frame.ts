@@ -2,8 +2,39 @@ import type Map from 'ol/Map';
 import { getPointResolution, transformExtent } from 'ol/proj';
 
 import type { SpotSketch } from '../api/spots';
+import type { Bbox } from '../map/bbox';
+import { getWMSTileGrid } from '../map/layers/wmsTileGrid';
 
 export type SketchFrame = SpotSketch['frame'];
+
+export const FRAME_ZOOM = 16;
+
+const frameMetresPerPx = (): number | null =>
+  getWMSTileGrid('EPSG:25833')?.getResolution(FRAME_ZOOM) ?? null;
+
+export const footprintFrame = (map: Map, bbox: Bbox): SketchFrame | null => {
+  const metres = frameMetresPerPx();
+  if (metres == null) return null;
+  const projection = map.getView().getProjection();
+  const extent = transformExtent(bbox, 'EPSG:4326', projection);
+  const unitsPerPx =
+    metres /
+    getPointResolution(
+      projection,
+      1,
+      [(extent[0] + extent[2]) / 2, (extent[1] + extent[3]) / 2],
+      'm',
+    );
+  const widthPx = Math.round((extent[2] - extent[0]) / unitsPerPx);
+  const heightPx = Math.round((extent[3] - extent[1]) / unitsPerPx);
+  if (!(widthPx >= 1) || !(heightPx >= 1)) return null;
+  return {
+    projection: projection.getCode(),
+    extent: [extent[0], extent[1], extent[2], extent[3]],
+    widthPx,
+    heightPx,
+  };
+};
 
 export const captureFrame = (map: Map): SketchFrame | null => {
   const size = map.getSize();
@@ -47,9 +78,11 @@ export const metresPerScenePx = (frame: SketchFrame): number => {
   const [minX, minY, maxX, maxY] = frame.extent;
   const unitsPerPx = (maxX - minX) / frame.widthPx;
   return (
-    getPointResolution(frame.projection, unitsPerPx, [
-      (minX + maxX) / 2,
-      (minY + maxY) / 2,
-    ]) || unitsPerPx
+    getPointResolution(
+      frame.projection,
+      unitsPerPx,
+      [(minX + maxX) / 2, (minY + maxY) / 2],
+      'm',
+    ) || unitsPerPx
   );
 };
