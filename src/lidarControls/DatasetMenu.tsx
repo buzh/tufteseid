@@ -1,4 +1,5 @@
 import { Badge, Group, Menu, ScrollArea, Text } from '@mantine/core';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { LidarProject } from '../map/layers/config/backgroundLayers/lidarProjects';
 import type { LidarViewportEntry } from '../map/layers/config/backgroundLayers/lidarRelevance';
@@ -9,6 +10,26 @@ import type { LidarControls } from './useLidarControls';
 
 const flightFacts = (p: LidarProject): string =>
   [p.year, p.pointDensity].filter(Boolean).join(' · ');
+
+const FLASH_MS = 700;
+
+const useAutoFlash = (datasetKey: string, autoDataset: boolean): boolean => {
+  const [flashing, setFlashing] = useState(false);
+  const [previous, setPrevious] = useState(datasetKey);
+
+  if (previous !== datasetKey) {
+    setPrevious(datasetKey);
+    if (autoDataset && !flashing) setFlashing(true);
+  }
+
+  useEffect(() => {
+    if (!flashing) return;
+    const timer = window.setTimeout(() => setFlashing(false), FLASH_MS);
+    return () => window.clearTimeout(timer);
+  }, [flashing]);
+
+  return flashing;
+};
 
 export const DatasetMenu = ({ lidar }: { lidar: LidarControls }) => {
   const { t } = useTranslation();
@@ -35,6 +56,7 @@ export const DatasetMenu = ({ lidar }: { lidar: LidarControls }) => {
     : `${t('lidarControls.dataset.national')} · ${t('lidarControls.dataset.nationalHint')}`;
 
   const held = viewport.status === 'held';
+  const flashing = useAutoFlash(flight ? flight.id : 'national', autoDataset);
 
   const row = (entry: LidarViewportEntry) => {
     const { project, areaRatio } = entry;
@@ -130,6 +152,7 @@ export const DatasetMenu = ({ lidar }: { lidar: LidarControls }) => {
           title={title}
           aria-label={title}
           dimmed={autoDataset}
+          className={flashing ? styles.flash : undefined}
         />
       </Menu.Target>
       <Menu.Dropdown>

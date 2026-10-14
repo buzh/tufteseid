@@ -8,3 +8,21 @@
   white-space: normal;
   line-height: 1.4;
 }
+
+@keyframes datasetFlash {
+  from {
+    border-color: var(--mantine-primary-color-filled);
+    background: var(--mantine-primary-color-light);
+    opacity: 1;
+  }
+}
+
+.flash {
+  animation: datasetFlash 700ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flash {
+    animation: none;
+  }
+}

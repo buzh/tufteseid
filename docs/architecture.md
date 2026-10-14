@@ -1183,6 +1183,12 @@ that is a last resort rather than the design.
 - `ControlChip` is the labelled box that opens something — icon, label, hint,
   chevron. `ControlButton` is the square icon toggle, optionally split into two
   lit halves.
+- The dataset chip sits at half light while Automatisk is on, and **flashes its
+  background for 700 ms whenever Automatisk hands the reader a different
+  dataset** (`useAutoFlash`, `DatasetMenu.tsx`, the keyframes in
+  `lidarControls/controls.module.css`). That flash is the only notice that the
+  ground changed by itself; a pick the reader made turns Automatisk off and so
+  never flashes. `prefers-reduced-motion` takes the animation away.
 - Shared metrics: `--control-height` and `--control-icon-width` in
   `src/index.css`.
 - **The whole interface draws at one of two sizes**, `small` — what it has
