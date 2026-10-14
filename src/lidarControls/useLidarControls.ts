@@ -296,6 +296,7 @@ export const useLidarControls = (half: CompareHalf) => {
 
     tierAStyles,
     tierBStyles,
+    activeLidarStyle,
     shownStyle,
     selectStyle,
     lidarModel,

@@ -14,6 +14,7 @@ import { serviceOn } from '../services';
 import { ControlChip } from '../ui/ControlChip';
 import { Icon, type MaterialSymbol } from '../ui/Icon';
 import styles from './controls.module.css';
+import { useAutoFlash } from './useAutoFlash';
 import type { LidarControls } from './useLidarControls';
 
 const STYLE_ICONS: Record<string, MaterialSymbol> = {
@@ -32,6 +33,7 @@ export const RenderMenu = ({ lidar }: { lidar: LidarControls }) => {
   const {
     tierAStyles,
     tierBStyles,
+    activeLidarStyle,
     shownStyle,
     selectStyle,
     isLidarCvat,
@@ -42,6 +44,11 @@ export const RenderMenu = ({ lidar }: { lidar: LidarControls }) => {
     autoDataset,
     nativeResolution,
   } = lidar;
+
+  const flashing = useAutoFlash(
+    activeLidarStyle,
+    autoDataset && lidarModel === 'dtm' && activeLidarStyle !== CVAT_STYLE,
+  );
 
   const label = lidarStyleLabel(shownStyle);
 
@@ -101,6 +108,7 @@ export const RenderMenu = ({ lidar }: { lidar: LidarControls }) => {
           aria-label={chipTitle}
           dimmed={autoDataset}
           on={isLidarCvat}
+          className={flashing ? styles.flash : undefined}
         />
       </Menu.Target>
       <Menu.Dropdown>

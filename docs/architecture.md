@@ -1183,12 +1183,23 @@ that is a last resort rather than the design.
 - `ControlChip` is the labelled box that opens something — icon, label, hint,
   chevron. `ControlButton` is the square icon toggle, optionally split into two
   lit halves.
-- The dataset chip sits at half light while Automatisk is on, and **flashes its
-  background for 700 ms whenever Automatisk hands the reader a different
-  dataset** (`useAutoFlash`, `DatasetMenu.tsx`, the keyframes in
-  `lidarControls/controls.module.css`). That flash is the only notice that the
-  ground changed by itself; a pick the reader made turns Automatisk off and so
-  never flashes. `prefers-reduced-motion` takes the animation away.
+- **A chip flashes its background for 700 ms when something it reports changed
+  without the reader asking** — `useAutoFlash(key, armed)`, a previous-value
+  compare in render, with the keyframes in
+  `lidarControls/controls.module.css`. Both chips of the LiDAR arm sit at half
+  light while Automatisk is on, and both arm the flash on `autoDataset`, since
+  every pick the reader makes in either menu turns Automatisk off. That is the
+  whole notice that the ground moved by itself. `prefers-reduced-motion` takes
+  the animation away.
+  - The **dataset chip** flashes whenever Automatisk hands the reader a
+    different dataset.
+  - The **render chip** watches `activeLidarStyle` rather than the effective
+    one and flashes only on a change that lands somewhere other than cVAT: what
+    it marks is Automatisk panning out of a cached acquisition and dropping the
+    ground back to WMS. DTM/DOM is not the reader turning Automatisk off, so it
+    is excluded twice over — the model leaves `activeLidarStyle` alone, and the
+    arming reads `lidarModel === 'dtm'`, which is also when the chip is a menu
+    rather than the locked readout.
 - Shared metrics: `--control-height` and `--control-icon-width` in
   `src/index.css`.
 - **The whole interface draws at one of two sizes**, `small` — what it has
