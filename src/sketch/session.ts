@@ -3,6 +3,7 @@ import type Map from 'ol/Map';
 import type Interaction from 'ol/interaction/Interaction';
 
 import type { SpotSketch } from '../api/spots';
+import { PEN_HOLDS_MAP, rememberMapView } from '../map/atoms';
 import type { SketchFrame } from './frame';
 import { storableScene, type SceneElement } from './scene';
 
@@ -45,71 +46,47 @@ export type SceneView = {
   offsetTop: number;
 };
 
-let worn: { x: number; y: number; scale: number } | null = null;
+let bound: { minX: number; maxY: number; unitsPerPx: number } | null = null;
 
-const sceneTranslation = (view: SceneView, scale: number) => ({
-  x:
-    view.scrollX * view.zoom +
-    view.offsetLeft -
-    mapOrigin.x -
-    sceneToMap.origin.x * scale,
-  y:
-    view.scrollY * view.zoom +
-    view.offsetTop -
-    mapOrigin.y -
-    sceneToMap.origin.y * scale,
-});
-
-export const slaveMapToScene = (map: Map, view: SceneView | null) => {
-  const target = map.getTargetElement();
-  if (!target) return;
-  if (!view) {
-    worn = null;
-    target.style.transform = '';
-    target.style.transformOrigin = '';
-    return;
-  }
-  if (!frozen) return;
-  const scale = view.zoom / sceneToMap.unit;
-  const { x, y } = sceneTranslation(view, scale);
-  worn = { x, y, scale };
-  target.style.transformOrigin = '0 0';
-  target.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
-};
-
-const HOLD_SLACK = 0.01;
-
-const inRoom = (t: number, room: number) => Math.max(-room, Math.min(0, t));
-
-export const holdSceneOnMap = (
-  map: Map,
-  view: SceneView,
-  floorZoom: number,
-): SceneView | null => {
+export const moveMapToScene = (map: Map, view: SceneView) => {
   const size = map.getSize();
-  if (!frozen || !size) return null;
-  const zoom = Math.max(view.zoom, floorZoom);
-  const scale = zoom / sceneToMap.unit;
-  const held = { ...view, zoom };
-  const t = sceneTranslation(held, scale);
-  held.scrollX += (inRoom(t.x, size[0] * (scale - 1)) - t.x) / zoom;
-  held.scrollY += (inRoom(t.y, size[1] * (scale - 1)) - t.y) / zoom;
-  return zoom !== view.zoom ||
-    Math.abs(held.scrollX - view.scrollX) > HOLD_SLACK ||
-    Math.abs(held.scrollY - view.scrollY) > HOLD_SLACK
-    ? held
-    : null;
+  if (!frozen || !bound || !size) return;
+  const resolution = bound.unitsPerPx / view.zoom;
+  if (!(resolution > 0)) return;
+  const mapView = map.getView();
+  mapView.setResolution(resolution);
+  mapView.setCenter([
+    bound.minX -
+      view.scrollX * bound.unitsPerPx -
+      (view.offsetLeft - mapOrigin.x - size[0] / 2) * resolution,
+    bound.maxY +
+      view.scrollY * bound.unitsPerPx +
+      (view.offsetTop - mapOrigin.y - size[1] / 2) * resolution,
+  ]);
+  map.renderSync();
 };
+
+const SESSION_MAX_ZOOM = 26;
+
+let released: { maxZoom: number; constrained: boolean } | null = null;
 
 export const freezeMap = (map: Map) => {
   if (frozen) return;
-  map.getView().cancelAnimations();
+  const view = map.getView();
+  view.cancelAnimations();
   const target = map.getTargetElement();
   if (target) {
     const rect = target.getBoundingClientRect();
     mapOrigin = { x: rect.left, y: rect.top };
   }
   sceneToMap = { unit: 1, origin: { x: 0, y: 0 } };
+  released = {
+    maxZoom: view.getMaxZoom(),
+    constrained: view.getConstrainResolution(),
+  };
+  map.set(PEN_HOLDS_MAP, true);
+  view.setMaxZoom(SESSION_MAX_ZOOM);
+  view.setConstrainResolution(false);
   frozen = map
     .getInteractions()
     .getArray()
@@ -127,8 +104,10 @@ export const bindFrameToMap = (
   const size = map.getSize();
   if (!resolution || !size) return;
   const mapExtent = view.calculateExtent(size);
+  const unitsPerPx = (extentInMap[2] - extentInMap[0]) / frame.widthPx;
+  bound = { minX: extentInMap[0], maxY: extentInMap[3], unitsPerPx };
   sceneToMap = {
-    unit: (extentInMap[2] - extentInMap[0]) / frame.widthPx / resolution,
+    unit: unitsPerPx / resolution,
     origin: {
       x: (extentInMap[0] - mapExtent[0]) / resolution,
       y: (mapExtent[3] - extentInMap[3]) / resolution,
@@ -142,27 +121,19 @@ export const initialSceneView = (rect: { left: number; top: number }) => ({
   scrollY: (mapOrigin.y + sceneToMap.origin.y - rect.top) / sceneToMap.unit,
 });
 
-const followTransform = (map: Map) => {
-  const size = map.getSize();
-  const view = map.getView();
-  const resolution = view.getResolution();
-  if (!worn || !size || !resolution) return;
-  const centre = map.getCoordinateFromPixel([
-    (size[0] / 2 - worn.x) / worn.scale,
-    (size[1] / 2 - worn.y) / worn.scale,
-  ]);
-  if (!centre) return;
-  view.setResolution(resolution / worn.scale);
-  view.setCenter(centre);
-  map.renderSync();
-};
-
 export const thawMap = (map: Map) => {
   if (!frozen) return;
   const was = frozen;
   frozen = null;
-  followTransform(map);
-  slaveMapToScene(map, null);
+  bound = null;
+  const view = map.getView();
+  if (released) {
+    view.setMaxZoom(released.maxZoom);
+    view.setConstrainResolution(released.constrained);
+    released = null;
+  }
+  map.set(PEN_HOLDS_MAP, false);
+  rememberMapView(map);
   sceneToMap = { unit: 1, origin: { x: 0, y: 0 } };
   const stillThere = map.getInteractions().getArray();
   was.forEach((interaction) => {

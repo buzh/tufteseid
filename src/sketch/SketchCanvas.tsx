@@ -1,5 +1,5 @@
 import './excalidrawAssets';
-import { CaptureUpdateAction, Excalidraw } from '@excalidraw/excalidraw';
+import { Excalidraw } from '@excalidraw/excalidraw';
 import '@excalidraw/excalidraw/index.css';
 import type {
   ExcalidrawImperativeAPI,
@@ -22,11 +22,9 @@ import { rememberedPen, rememberStroke, rememberTool, type Pen } from './pen';
 import styles from './SketchCanvas.module.css';
 import { storableScene, type SceneElement } from './scene';
 import {
-  holdSceneOnMap,
   initialSceneView,
+  moveMapToScene,
   setLiveScene,
-  slaveMapToScene,
-  type SceneView,
   type SketchSession,
 } from './session';
 import { SketchTools } from './SketchTools';
@@ -77,16 +75,6 @@ type Offset = { x: number; y: number; zoom: number };
 
 const OPENING_TOOL: BoxTool = 'hand';
 
-const holdView = (api: ExcalidrawImperativeAPI | null, view: SceneView) =>
-  api?.updateScene({
-    appState: {
-      scrollX: view.scrollX,
-      scrollY: view.scrollY,
-      zoom: { value: view.zoom as NormalizedZoomValue },
-    },
-    captureUpdate: CaptureUpdateAction.NEVER,
-  });
-
 type Store = ReturnType<typeof useStore>;
 
 const keepScene = (
@@ -125,7 +113,6 @@ export const SketchCanvas = ({ session }: { session: SketchSession }) => {
   const apiRef = useRef<ExcalidrawImperativeAPI | null>(null);
   const hostRef = useRef<HTMLDivElement>(null);
   const [offset, setOffset] = useState<Offset | null>(null);
-  const floorZoom = useRef<number | null>(null);
   const lastView = useRef('');
   const settle = useRef<number | null>(null);
 
@@ -201,14 +188,10 @@ export const SketchCanvas = ({ session }: { session: SketchSession }) => {
               offsetLeft: appState.offsetLeft,
               offsetTop: appState.offsetTop,
             };
-            const floor = floorZoom.current ?? view.zoom;
-            floorZoom.current = floor;
             const key = Object.values(view).join();
             if (key !== lastView.current) {
               lastView.current = key;
-              const held = holdSceneOnMap(map, view, floor);
-              if (held) holdView(apiRef.current, held);
-              else slaveMapToScene(map, view);
+              moveMapToScene(map, view);
             }
             rememberTool(appState.activeTool.type, appState.activeTool.locked);
             rememberStroke(

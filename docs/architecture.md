@@ -31,7 +31,7 @@ One row per directory under `src/`.
 | `search/` | The band's search field: Geonorge place and address lookup, a typed coordinate, and the fly to whichever was picked. Beside them the point lookups — place names, kommune, matrikkel and elevation — and the ranking of a stedsnavn answer that names a spot and heads a place card alike. The road and property calls by *name* have no caller. |
 | `shared/` | The context in front (`uiContext.ts`), the error boundary, URL parameter access, coordinate parsing, enum and number helpers, and the request deadline that reports to the breaker. |
 | `showControls/` | The band's what-is-drawn-over-the-ground group: the Kulturminner control, the open drawing's toggle and the shared drawing layer's. |
-| `sketch/` | Excalidraw over a frozen map: the georeferencing frame, the scene, the toolbox that stands in for Excalidraw's own, the remembered pen, the render onto the ground, and the layer that puts every spot's drawing on it at once. |
+| `sketch/` | Excalidraw over a map it drives: the georeferencing frame, the scene, the toolbox that stands in for Excalidraw's own, the remembered pen, the render onto the ground, and the layer that puts every spot's drawing on it at once. |
 | `spotControls/` | The reader's records as surfaces: the `+`, the properties box, the read card, the box that orders a render from elsewhere, the index menu. |
 | `spots/` | Spot state and geometry: the pin layer, its clustering and its style, the footprint frame, hit test, place and adjust, share link, and the up/down tally each spot is ranked by. |
 | `terrain/` | Client-side terrain analysis: DEM fetch, shading, the analysis window and its layers. |
@@ -94,7 +94,7 @@ A `Halves` suffix means a pair (see below). Each pair's `live*` sibling is
 | `keepOfferAtom` | same | Derived: the terrain's offer when an analysis is running, otherwise the ground's (off the A half). Null where the view cannot be re-rendered. |
 | `draftGroundAtom` | `evidence/draftGround.ts` | A picture laid on the map at the extent it was rendered over: a kept picture to trace a drawing onto, published by `EvidenceGallery`, or a flyfoto proposal under review, published by `useFlyfotoRun`. Never both — the card and the acquisition box do not stand at once. `tiles` is the whole picture — a mosaic's grid, or the one box — and `id` the group it came off, so the list drops the ground when the last of its tiles goes. `loop` says the file is a WebM instead, always a single tile, and so which overlay draws it. `draftGroundExtent` is the bounds over whatever is laid, which is what the pen brings into view when the picture to trace is off screen. |
 | the floating panel's layout and placement | `ui/useFloatingPanel.ts` | Which way round the box is laid out, where it was dragged to, how big it may get and which wall it is docked against. Module-private, reached through `useFloatingPanel`: held outside the component, which remounts per spot — and so only one floating panel at a time. `EvidenceReader` is the one caller. |
-| `sketchSessionAtom` | `sketch/session.ts` | Non-null exactly while the map is frozen and Excalidraw has it. |
+| `sketchSessionAtom` | `sketch/session.ts` | Non-null exactly while Excalidraw has the map and drives its view. |
 | `uiContextAtom` | `shared/uiContext.ts` | Derived: `map` or `draw`, off the session above. Which surface is in front (*The context in front*). |
 | `drawHoldAtom` | same | What the draw context puts in the band: whose drawing it is and the two ways out. Published by whichever `useSpotDraft` has the pen, because its box is away and the writes are still the controller's. |
 | `sketchShownAtom`, `sketchFadeAtom` | `sketch/overlay.ts` | Whether the open spot's drawing is on the ground, and how far it is faded towards it. A reading setting, not the record's: they outlive the spot the box was opened on. Putting the pen down with strokes kept turns the first back on, so a drawing is never written out of sight. |
@@ -124,8 +124,8 @@ What that costs each surface is different, and the difference is the rule:
   lose and fetch again. Both bands wear `.ribbon`, whose `height` is stated
   rather than left to the contents: the scene↔ground mapping is bound to the
   map rectangle as it was at the freeze that opened the session and is never
-  rebound, so a band that grew or shrank afterwards would slide the map element
-  out from under strokes already registered to it. For the same reason no
+  rebound, so a band that grew or shrank afterwards would slide the ground out
+  from under strokes already registered to it. For the same reason no
   scrollport in the band may show a scrollbar — a classic one takes its track
   out of the content box, and the band would grow by it on a platform that has
   them.
@@ -141,9 +141,9 @@ What that costs each surface is different, and the difference is the rule:
   the draw stage, because a rectangle under a canvas could not be put down
   again.
 - **The heritage tip and card and the place card close outright.** All three
-  ride OpenLayers overlays on the map element, which the session wears a CSS
-  transform on, so left up they would be dragged and scaled with the ground
-  rather than anchored to it. They belonged to the context that has gone, so
+  ride OpenLayers overlays on the map element, under a canvas that would take
+  every click meant for them and over ground the scene is free to move.
+  They belonged to the context that has gone, so
   `useHeritageInfo` and `usePlaceInfo` clear them rather than hiding them —
   and the latter disarms the button with them.
 
@@ -328,24 +328,33 @@ megabytes on every press.
   legible, every spot's strokes weighing the same against the country. The
   price is at the ends of the range: open the pen four levels in from the
   frame and the thinnest line is already four screen pixels, four levels out
-  and it is a hair. Zooming the scene in is the answer to the second, and the
-  stretched map it brings carries no less than the view did.
-- **The scene opens on the view the map is showing and is held over it.** The
-  map is frozen for the session and follows the scene by a CSS transform
-  (`slaveMapToScene`), so the canvas opens at the zoom that makes that transform
-  the identity (`initialSceneView`) — one map element laid out exactly under the
-  surface being drawn on. Zooming out from there brings no more ground in; it
-  scales the ground off the edges. So `holdSceneOnMap` puts the zoom floor at
-  the opening zoom and the scroll inside whatever room zooming *in* bought,
-  which at the floor is none at all, and `SketchCanvas` writes any frame outside
-  that back with `updateScene`. Excalidraw has a prop for neither. Zooming in is
-  not capped: stretched tiles still cover.
-- **Leaving hands the view what the scene was looking at.** `thawMap` inverts
-  the transform it is about to take off into a centre and a resolution, so the
-  pen is put down on the ground it was lifted from rather than on the extent the
-  session froze. The centre is exact; `constrainResolution` rounds the scale to
-  a whole zoom level, so a scene zoomed to something between two of them lands
-  on the nearer.
+  and it is a hair. Zooming the scene in is the answer to the second, and it
+  costs no detail: the ground re-renders at the zoom the scene reached.
+- **The scene drives the map, not a picture of it.** What the session freezes
+  is the map's *interactions*, not its rendering: on every scene view
+  `moveMapToScene` sets the resolution to `unitsPerScenePx / zoom` and the
+  centre to whatever puts scene (0,0) — the frame's north-west corner — back
+  under the pixel Excalidraw is drawing it at, then renders in the same frame.
+  So the ground is native at every zoom the pen reaches rather than a raster
+  stretched off the one the session opened on, panning brings more of the
+  country in rather than running out of picture, and there is no zoom floor to
+  enforce. The canvas opens at `initialSceneView`, which is the zoom and scroll
+  that leave the map exactly where it stood, so taking up the pen moves
+  nothing.
+- **What the session borrows from the view, it gives back.** `constrainResolution`
+  goes off for the duration — the scene's zoom is continuous and snapping the
+  ground to whole levels would slide it under the strokes — and `maxZoom` goes
+  up to `SESSION_MAX_ZOOM`, which is past anything Excalidraw's own 0.1…30 can
+  ask for, because a view that clamped would leave the map at one resolution
+  and the scene believing another. `thawMap` puts both back, and the snap to a
+  whole zoom level happens then: a scene left between two of them lands on the
+  nearer.
+- **The URL holds still while the pen draws.** Panning the scene is panning the
+  map, and the `moveend` that writes `lat`/`lon`/`zoom` would fire on every
+  frame of it — three `replaceState` calls a frame, where Safari throws past a
+  hundred in thirty seconds. `PEN_HOLDS_MAP` (`map/atoms.ts`) is the flag the handler
+  reads, and `thawMap` writes the view once itself on the way out
+  (`rememberMapView`).
 - **The toolbox is ours, not Excalidraw's.** Neither its toolbar nor its
   properties island has a prop behind it and neither leaves a slot to put a
   button in, so both are hidden in `SketchCanvas.module.css` and `SketchTools`
@@ -366,9 +375,9 @@ megabytes on every press.
   `OPENING_TOOL` is the hand and every canvas opens on it, so entering the draw
   stage behaves as the map did a press earlier — a drag moves the view, and
   nothing is drawn until the reader reaches for something that draws. Panning is
-  the map's own interaction everywhere else and that one is frozen for the
-  session, so the hand is also the only thing that moves the view once zooming
-  in has bought the room for it.
+  the map's own interaction everywhere else and that one is held off for the
+  session, so the hand is the only thing that moves the view — and moving the
+  view is what moves the map.
 - **What went with the island stays gone on purpose.** The laser and
   frame tools have no use over a map; the layer order, the alignment and the
   actions are on the canvas's own context menu; and the properties the strip
@@ -604,7 +613,7 @@ size and changes none of them.
 - **Clicking a picture lays it on the map**, opaque, through `draftGroundAtom`,
   driven from `SpotSurface` — the whole picture, so a mosaic's tiles go down as
   one grid. That is the ground the pen draws over, and it rides the map
-  element, so a sketch session's transform carries it along. A sun loop
+  element, so it is carried wherever a sketch session takes the view. A sun loop
   grounds like anything else and plays while it is there; which
   overlay carries it is the only difference, and `draftGround.loop` is what
   says so — `useEvidenceOverlay` for a still, `useEvidenceLoopOverlay` for a
@@ -1271,12 +1280,6 @@ that is a last resort rather than the design.
 - **A render is not a cache.** Upstreams re-fly and reprocess, so the same spec
   re-rendered later may not be the picture its author read. `meta.renderedAt`
   says when the file was made; nothing re-renders on its own.
-- **The frame reaches further than the pen does.** The scene spans the whole
-  footprint, but the map under it is one frozen viewport and zooming out is
-  floored at the opening zoom, so the part of a rectangle that was off screen
-  when the pen opened has no ground to trace. Strokes made there would be
-  registered correctly — there is just nothing to see. A reader who wants the
-  whole of a large footprint zooms out to it before reaching for the pen.
 - **Evidence never meets the sketch.** Excalidraw's image tool stays off
   (`sketch/SketchCanvas.tsx`): a PNG dropped into the scene would be stored
   inside the drawing, against the 5 MB `sketch` cap, where nothing can see it.

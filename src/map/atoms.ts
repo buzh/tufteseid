@@ -55,6 +55,21 @@ const getInitialMapView = () => {
   });
 };
 
+export const PEN_HOLDS_MAP = 'penHoldsMap';
+
+export const rememberMapView = (map: Map) => {
+  const view = map.getView();
+  const center = view.getCenter();
+  if (center) {
+    setUrlParameter('lon', center[0].toString());
+    setUrlParameter('lat', center[1].toString());
+  }
+  const zoom = view.getZoom();
+  if (zoom && !Number.isNaN(zoom)) {
+    setUrlParameter('zoom', zoom.toString());
+  }
+};
+
 export const mapAtom = atom<Map>(() => {
   const map = new Map({
     controls: defaultControls({ zoom: false, rotate: false }).extend([
@@ -70,16 +85,8 @@ export const mapAtom = atom<Map>(() => {
 
   map.setView(getInitialMapView());
   map.on('moveend', (e) => {
-    const view = e.map.getView();
-    const center = view.getCenter();
-    if (center) {
-      setUrlParameter('lon', center[0].toString());
-      setUrlParameter('lat', center[1].toString());
-    }
-    const zoom = view.getZoom();
-    if (zoom && !Number.isNaN(zoom)) {
-      setUrlParameter('zoom', zoom.toString());
-    }
+    if (e.map.get(PEN_HOLDS_MAP) === true) return;
+    rememberMapView(e.map);
   });
   const mapId = uuidv4();
   map.setProperties({ id: mapId });
