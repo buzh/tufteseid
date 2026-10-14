@@ -33,10 +33,15 @@ asked for more than a capped rectangle at once (`docs/architecture.md`, the
 boundary-and-tiles note).
 
 Two other readers of the same endpoint carry their own copies of the quirks
-below, because neither runs in the browser: `vat-cache/fetch_dem.py` and
-`rendersvc/dem.py` (`docs/render-sidecar.md`). A fact learned here is learned in
-three places; the probe's upper-cased `BEST`, the explicit `mosaicRule` and the
-absent-tile NaN are the three that have caught all of them.
+below, because neither runs in the browser: `vat-cache/fetch_dem.py` and the
+render sidecar's `dem.py`, which is in the **tufteseid-render** repo
+(`docs/render-sidecar.md`). A fact learned here is learned in three places; the
+probe's upper-cased `BEST`, the explicit `mosaicRule` and the absent-tile NaN
+are the three that have caught all of them.
+
+The absent-tile NaN is the one that is now duplicated rather than imported: the
+sidecar's `tiff.py` is a second copy of `read_tiff_f32`, where before the split
+its image copied `vat-cache/fetch_dem.py` outright.
 
 ## The endpoint
 

@@ -112,8 +112,8 @@ being that site's to give away (`src/grounds/norgeIBilder.ts`). A hand-written
 `?backgroundLayer=flyfoto` still seats the ground, and the archive walk over a
 spot's footprint is the *service's* to offer, not the feature's.
 
-**An administrator holds every feature.** `src/auth/features.ts` and
-`rendersvc/server.py` both say so, so that a `features` entry nobody
+**An administrator holds every feature.** `src/auth/features.ts` and the
+sidecar's `server.py` both say so, so that a `features` entry nobody
 remembered to grant cannot lock an installation out of its own renders.
 
 **Pictures already rendered stay readable to everybody who can see the spot**,

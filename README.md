@@ -200,16 +200,22 @@ half only asserts that the `spots` collection answers.
 
 ## Renders that cost you CPU
 
-Most of what a reader keeps is rendered in their own browser. One kind — a 360°
-sun rotation over a spot, stored as a WebM loop — is rendered on the server by
-the `rendersvc` container, which is a minute of two cores per job.
+Most of what a reader keeps is rendered in their own browser. Two kinds are
+rendered on the server instead — a 360° sun rotation over a spot, stored as a
+WebM loop, and an RVT blend of its terrain — because each is a minute or two of
+two cores.
+
+That work is done by the `rendersvc` container, which is **a separate project**:
+[tufteseid-render](https://github.com/buzh/tufteseid-render), pulled as a pinned
+image rather than built from this repo. `docker compose build` does not touch
+it.
 
 It is capped for you: signed-in readers only, one job at a time per reader, a
 queue of eight, `cpus: 2.0` and `mem_limit: 2g` in `docker-compose.yml`, and a
-frame count and rectangle taken from the stored record rather than from the
-request. The sidecar holds no credentials of its own — every call it makes to
-PocketBase carries the requesting reader's token, so it can touch exactly what
-that reader can.
+rectangle, resolution and frame count taken from the stored record rather than
+from the request. The sidecar holds no credentials of its own — every call it
+makes to PocketBase carries the requesting reader's token, so it can touch
+exactly what that reader can.
 
 Set `PUBLIC_ORIGIN` on that service to the address your own readers visit. A sun
 loop is cited in its own pixels, and the short link in that band is composed
@@ -217,11 +223,12 @@ from the stored record and this origin rather than taken from the request, so
 that nobody can forge one — which means it has to be your address and there is
 no sensible default. Left unset, a loop is rendered with no link in its band.
 
-To switch the feature off, remove the `rendersvc` service and its `/render/*`
-route from the `Caddyfile`. Nothing else breaks: the button is still offered and
-reports a failed render when pressed, and `live-check.sh` fails its two render
-assertions.
-[`docs/render-sidecar.md`](docs/render-sidecar.md) has the details.
+It is off unless you ask for it: `ENABLE_RENDER=true` in `.env` is what both
+starts the container and lets the app offer the two render lines, so an
+installation that leaves it alone pays none of this and shows no control that
+would meet a 502.
+[`docs/render-sidecar.md`](docs/render-sidecar.md) has this side of it, and that
+repo's own docs have the service.
 
 ## See who is using it
 

@@ -8,7 +8,6 @@ dist
 .DS_Store
 
 vat-cache
-!vat-cache/fetch_dem.py
 docs
 scripts
 nginx

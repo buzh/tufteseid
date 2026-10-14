@@ -346,7 +346,8 @@ stack: no wmscache entry, no CSP host.
 whole Caddy side of it: the sidecar answers 202 and works in the background, so
 there is no long timeout to set and no response to buffer. The result reaches the
 browser over PocketBase's realtime feed, not over this connection.
-`docs/render-sidecar.md` owns the rest.
+`docs/render-sidecar.md` owns the rest, and the service itself is the
+**tufteseid-render** repo.
 
 The part that belongs here is the upstream rule. **`rendersvc` fetches float DEM
 straight from hoydedata.no, never through wmscache** — the same exemption

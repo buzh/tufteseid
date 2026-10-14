@@ -31,7 +31,7 @@ Each owns its subject; this file keeps only what is true across all of them.
 | `docs/map-layers.md` | Background grounds, theme layers, and the recipes for adding another | `src/map/layers/`, any new map source |
 | `docs/wms-proxy-and-tiles.md` | Caddy → wmscache → upstream and Caddy → mapproxy → upstream, nib-proxy, cache rules, CSP hosts, tile-loading limits | `Caddyfile`, `nginx/`, `mapproxy/`, `nib-proxy/`, tile grids, anything that multiplies request counts |
 | `docs/terrain-analysis.md` | Float elevation from hoydedata.no, the endpoint's quirks, the visualizations | `src/terrain/` |
-| `docs/render-sidecar.md` | The server-side render service: the contract, the token trade, the queue's limits, the RVT and ffmpeg recipes, the burnt-in legend, the failure modes | `rendersvc/`, `src/api/render.ts`, the `sunloop` and `rvt` arms in `src/evidence/` |
+| `docs/render-sidecar.md` | The caller's half of the server-side render service, which lives in the **tufteseid-render** repo: what is sent, the `meta.job` markers read back, the legend's wording, the pinned image, the four seams between the two repos | `src/api/render.ts`, the `sunloop` and `rvt` arms in `src/evidence/`, the `rendersvc` service |
 | `docs/identity.md` | PocketBase password auth, the three modes of the sign-in box, the three fields on `users` nobody may set themselves, what a feature gates, and the `MAXUSERS` cap with its `queued` role | `src/auth/`, `pocketbase/pb_hooks/identity.pb.js`, `pocketbase/pb_hooks/capacity.pb.js`, the `users` migrations |
 | `docs/votes.md` | The public-only gate, the `votes` and `stars` collections, the two views' shared quirks, and why a self-star is listed but not counted | `src/spots/spotScores.ts`, `src/spots/spotStars.ts`, `src/api/votes.ts`, `src/api/stars.ts`, the vote and star migrations |
 | `docs/closed-beta.md` | Who may register and what pays for it, the hook that enforces it, the SQL for opening places and granting invites, the mail route's settings, what the gate does not cover | `pocketbase/pb_hooks/`, `src/invites/`, `src/api/invites.ts`, the sign-in box |
@@ -143,6 +143,12 @@ alongside the cVAT and MapProxy store directories (`README.md`,
   hiding it behind `serviceOn(…)` in the same change. No evidence row goes
   dark for want of a service: what goes is the control that would ask for
   another one.
+- **`rendersvc` is a pinned image, not a build.** It lives in the
+  **tufteseid-render** repo and is published to `ghcr.io/buzh/tufteseid-render`,
+  so `docker compose build` does not touch it and `up -d` pulls whatever tag
+  `docker-compose.yml` names. A render change is live in two steps and two
+  repos: tag a release there, bump the tag here
+  (`docs/render-sidecar.md`).
 - **`COMPOSE_PROFILES=enabled-true` must be in `.env` too**, and `git pull`
   never puts it there — an installation whose `.env` predates the opt-in keys
   has to gain that line by hand. Without it neither `enabled-true` nor
@@ -175,7 +181,7 @@ alongside the cVAT and MapProxy store directories (`README.md`,
 | `tufteseid` | `node:24-alpine` builds the SPA, `caddy:2.10.0-alpine` serves `/var/www`, plus the GoAccess report at `/stats/` out of a read-only mount. `config.js` bind-mounted at runtime; `services.js` written beside it by `docker-entrypoint.sh`. |
 | `pocketbase` | Backend for accounts and spots, pinned to 0.40.2. Serves `/pb/*`. SQLite on the `pbdata` volume, migrations and hooks bind-mounted read-only from the repo. |
 | `nib-proxy` | **Opt-in (`ENABLE_FLYFOTO`).** Token-injecting sidecar for Norge i bilder ortofoto. Reachable only from wmscache and mapproxy. |
-| `rendersvc` | **Opt-in (`ENABLE_RENDER`).** `python:3.11-slim` (rvt-py 2.2.3 caps at `<3.12`) + ffmpeg + RVT-py. Serves `/render/*`: renders an evidence row server-side and PATCHes the file back with the caller's own token. One worker, a queue of 8, CPU and memory capped. |
+| `rendersvc` | **Opt-in (`ENABLE_RENDER`).** A pinned image from the **tufteseid-render** repo, not a build: `ghcr.io/buzh/tufteseid-render`. Serves `/render/*`: renders an evidence row server-side and PATCHes the file back with the caller's own token. One worker, a queue of 8, CPU and memory capped. |
 | `cvat-tiles` | **Opt-in (`ENABLE_CVAT`).** `node:24-alpine`, zero deps. Serves `/cvat/*` out of one MBTiles database per LiDAR acquisition in the bind-mounted store. Built out of band by `vat-cache/`. |
 | `mapproxy` | `mapproxy:7.0.0-alpine-nginx`. Serves `/cache/*`: the six upstream layers whose parameters never change, meta-tiled onto the app's own grid and held in MBTiles. Config in `mapproxy/`, store bind-mounted. |
 | `wmscache` | `nginx:1.27-alpine` reverse proxy + 25 GB disk cache in front of every external WMS/WFS/ArcGIS service whose parameters are chosen at request time, plus Kulturminnesøk's record API. |

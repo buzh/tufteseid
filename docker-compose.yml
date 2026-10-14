@@ -49,9 +49,7 @@ services:
       - ./pocketbase/pb_hooks:/pb_hooks:ro
 
   rendersvc:
-    build:
-      context: .
-      dockerfile: rendersvc/Dockerfile
+    image: ghcr.io/buzh/tufteseid-render:0.1.0
     restart: unless-stopped
     profiles: ["enabled-${ENABLE_RENDER:-false}"]
     cpus: 2.0

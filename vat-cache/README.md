@@ -176,7 +176,7 @@ its own grid and the reach changes with zoom.
 | `vatcache.py` | Store front end: the queue, what is in it, the audit. Never writes |
 | `build_tiles.py` | Grid geometry, the MBTiles container, a level built into it, the read-back |
 | `cvat.py` | The combined VAT itself — presets, layer walk, `radii_for`. The only module that decides what a pixel is |
-| `fetch_dem.py` | `exportImage` against `Prosjekt_DTM` pinned to one `LAS_PROJECT_NAME`, plus a minimal tiled-float32 TIFF reader. **Also an input to `rendersvc`'s image**, which copies it in for `read_tiff_f32` — one reader, one set of quirks. `.dockerignore` excludes `vat-cache` and re-admits this one file; a rename or a signature change wants `docs/render-sidecar.md` read first |
+| `fetch_dem.py` | `exportImage` against `Prosjekt_DTM` pinned to one `LAS_PROJECT_NAME`, plus a minimal tiled-float32 TIFF reader. **`read_tiff_f32` has a second copy** in the render sidecar's `tiff.py` (the **tufteseid-render** repo), which used to copy this file into its image and now carries its own — one endpoint, one set of quirks, and a fix here is carried there by hand (`docs/render-sidecar.md`) |
 | `coverage.py` | Footprint union rasterisation, sample-site picker, tile fill |
 | `acquisitions.py` | Acquisition identity: queue, published cell sizes, the catalogue and WMS name sets |
 | `acquisitions.json` | The build queue, committed, in the order `vatcache.py -l` indexes |
