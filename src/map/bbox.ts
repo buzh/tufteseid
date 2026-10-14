@@ -21,17 +21,27 @@ export const bboxToMetric = (bbox: Bbox): Metric =>
 const carry = (extent: Metric): Bbox =>
   transformExtent(extent, 'EPSG:25833', 'EPSG:4326') as Bbox;
 
+const SOLVE_ROUNDS = 3;
+
 export const bboxFromMetric = (extent: Metric): Bbox => {
   const [minX, minY, maxX, maxY] = extent;
-  const back = bboxToMetric(carry(extent));
-  const gainX = (back[2] - back[0]) / (maxX - minX);
-  const gainY = (back[3] - back[1]) / (maxY - minY);
-  if (!(gainX > 0) || !(gainY > 0)) return carry(extent);
-  const halfX = (maxX - minX) / gainX / 2;
-  const halfY = (maxY - minY) / gainY / 2;
+  const width = maxX - minX;
+  const height = maxY - minY;
   const cx = (minX + maxX) / 2;
   const cy = (minY + maxY) / 2;
-  return carry([cx - halfX, cy - halfY, cx + halfX, cy + halfY]);
+  let current = extent;
+  for (let round = 0; round < SOLVE_ROUNDS; round += 1) {
+    const back = bboxToMetric(carry(current));
+    const gainX = (back[2] - back[0]) / width;
+    const gainY = (back[3] - back[1]) / height;
+    if (!(gainX > 0) || !(gainY > 0)) break;
+    const halfX = (current[2] - current[0]) / gainX / 2;
+    const halfY = (current[3] - current[1]) / gainY / 2;
+    const nx = (current[0] + current[2]) / 2 + cx - (back[0] + back[2]) / 2;
+    const ny = (current[1] + current[3]) / 2 + cy - (back[1] + back[3]) / 2;
+    current = [nx - halfX, ny - halfY, nx + halfX, ny + halfY];
+  }
+  return carry(current);
 };
 
 export const bboxWidthMetres = (bbox: Bbox): number => {
