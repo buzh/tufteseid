@@ -424,22 +424,30 @@ megabytes on every press.
   `bringBboxIntoView` then pans or zooms *out* until the rectangle is on screen,
   never in, so a reader who can already see it keeps the view they chose.
 - **Past the cap the rectangle is a boundary, tiled into render boxes.** A
-  spot-footprint drag may grow to `maxBoundaryMetres()` (`src/map/grid.ts`), and
-  on release anything over `MAX_SIDE_M` snaps to whole z15 tiles on the app's own
-  grid (`wmsTileGrid`). The snap counts an edge within half a metre of a grid
-  line as on it: a boundary is stored as lon/lat and read back through
-  `bboxFromMetric`, an approximate inverse, so a bare floor would push it out
-  another tile per axis on every release.
+  spot-footprint drag may grow to `maxBoundaryMetres()` (`src/map/grid.ts`),
+  six z15 tiles on the app's own grid (`wmsTileGrid`), and anything over
+  `MAX_SIDE_M` stands on whole tiles of that grid.
   `mosaicTiles(footprint)` then derives the render boxes:
   one free box within the cap — today's behaviour unchanged — or the covering
   tiles past it, each ≤ cap. The terrain window stays a single ≤cap box, the
   footprint itself where it fits on both axes and a square centred in the
   boundary where it does not (`readTerrainWindowAtom`).
+- **The snap runs on the drag, not on the release.** `useRectangleAdjust`
+  passes the dragged rectangle through `snap` on every frame, so what the
+  reader lets go of is what gets stored and a press that moves nothing changes
+  nothing. Each edge goes to the *nearest* grid line rather than out to the
+  enclosing one: rounding survives the lon/lat round trip through
+  `bboxFromMetric`, an approximate inverse that a floor would push out another
+  tile per axis every time, and it leaves a move a whole-tile translation that
+  keeps the boundary's size. A span that rounds away is floored at a tile
+  centred on where it was — one tile for the short axis, and for the long one
+  as many as it takes to clear `MAX_SIDE_M`, a boundary being by definition
+  what a single box cannot hold.
 - **The grid is shown while the rectangle is in hand, and only then.** The
   adjust layer draws the solid frame, its handles and the tile cells thin
-  inside it, the cells rebuilt from `mosaicTiles` on every drag frame so the
-  reader sees the render boxes the release will snap to (`map/rectAdjust.ts`,
-  `tiles`). A footprint nobody is holding — the card's, the reader's, a draft
+  inside it, the cells rebuilt from `mosaicTiles` on every drag frame, which
+  past the cap is the frame's own subdivision (`map/rectAdjust.ts`, `tiles`).
+  A footprint nobody is holding — the card's, the reader's, a draft
   resting — is a bare papaya outline at half opacity and nothing else
   (`spots/footprintLayer.ts`): the spot's own ground is what the surfaces are
   there to show, and a frame drawn over it with a casing and a grid is in the

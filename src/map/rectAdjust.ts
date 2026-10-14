@@ -252,12 +252,10 @@ export const useRectangleAdjust = ({
         const [nextMinY, nextMaxY] = spanned(minY, maxY, y, here[1], side);
         next = [nextMinX, nextMinY, nextMaxX, nextMaxY];
       }
-      store.set(rectAtom, bboxFromMetric(next));
+      store.set(rectAtom, bboxFromMetric(snap ? snap(next) : next));
     };
 
     const handleUpEvent = (): boolean => {
-      const extent = snap ? extentNow() : null;
-      if (extent && snap) store.set(rectAtom, bboxFromMetric(snap(extent)));
       drag = null;
       return false;
     };

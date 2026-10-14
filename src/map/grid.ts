@@ -33,26 +33,32 @@ export const tileSizeM = (): number | null => gridParams()?.size ?? null;
 
 export const maxBoundaryMetres = (): number => {
   const size = tileSizeM();
-  return size ? (MOSAIC_MAX_TILES_PER_SIDE - 1) * size : MAX_SIDE_M;
+  return size ? MOSAIC_MAX_TILES_PER_SIDE * size : MAX_SIDE_M;
 };
 
-const SNAP_TOLERANCE_M = 0.5;
-
 const snapExtent = (m: Metric, g: GridParams): Metric => {
-  const line = (v: number, origin: number, out: (k: number) => number) => {
-    const k = (v - origin) / g.size;
-    const on = Math.round(k);
-    const index = Math.abs(k - on) * g.size <= SNAP_TOLERANCE_M ? on : out(k);
-    return origin + index * g.size;
+  const line = (v: number, origin: number) =>
+    origin + Math.round((v - origin) / g.size) * g.size;
+  const cell = (v: number, origin: number) =>
+    origin + Math.floor((v - origin) / g.size) * g.size;
+  const span = (
+    low: number,
+    high: number,
+    origin: number,
+    least: number,
+  ): [number, number] => {
+    const from = line(low, origin);
+    const to = line(high, origin);
+    if (to - from >= least * g.size) return [from, to];
+    const reach = least * g.size;
+    const start = cell((low + high - reach) / 2, origin);
+    return [start, start + reach];
   };
-  const below = (v: number, origin: number) => line(v, origin, Math.floor);
-  const above = (v: number, origin: number) => line(v, origin, Math.ceil);
-  return [
-    below(m[0], g.ox),
-    below(m[1], g.oy),
-    above(m[2], g.ox),
-    above(m[3], g.oy),
-  ];
+  const leastTiles = (side: number) =>
+    side > MAX_SIDE_M ? Math.max(2, Math.ceil(MAX_SIDE_M / g.size)) : 1;
+  const [minX, maxX] = span(m[0], m[2], g.ox, leastTiles(m[2] - m[0]));
+  const [minY, maxY] = span(m[1], m[3], g.oy, leastTiles(m[3] - m[1]));
+  return [minX, minY, maxX, maxY];
 };
 
 export const snapBoundaryMetric = (m: Metric): Metric => {
