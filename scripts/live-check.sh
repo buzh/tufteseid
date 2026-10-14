@@ -2,7 +2,7 @@
 
 set -uo pipefail
 
-BASE=${1:-https://kart.scheen.no}
+BASE=${1:-https://tufteseid.no}
 CODE=${2:-}
 BASE=${BASE%/}
 TIMEOUT=${TIMEOUT:-60}
@@ -115,7 +115,6 @@ else
   fail entry-bundle 'index.html names no /assets/*.js'
 fi
 check short-link "$BASE/l/$SHORT_CODE" 302 '' 0 '' "location: /\?lok=$SHORT_CODE"
-check auth-callback "$BASE/auth/callback" 200 text/html 300 'id="root"'
 check unknown-path "$BASE/tufteseid-no-such-path" 404 '' 0
 
 section 'PocketBase'
@@ -183,9 +182,9 @@ check votes-hidden "$BASE/pb/api/collections/votes/records?perPage=1&fields=id" 
 section 'Identity'
 
 check auth-methods "$BASE/pb/api/collections/users/auth-methods" \
-  200 json 20 '"password":\{"enabled":true'
+  200 json 20 '"password":\{[^}]*"enabled":true'
 check auth-no-oauth2 "$BASE/pb/api/collections/users/auth-methods" \
-  200 json 20 '"providers":\[\]'
+  200 json 20 '"oauth2":\{[^}]*"providers":\[\][^}]*"enabled":false'
 
 check registration-gate "$BASE/pb/api/collections/registration/records?perPage=1" \
   200 json 20 '"openSlots"'

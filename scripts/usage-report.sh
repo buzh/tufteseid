@@ -54,7 +54,6 @@ read_caddy \
   | docker run --rm -i -v "$REPORT:/report" "$GOACCESS_IMAGE" - \
       --log-format=CADDY \
       --ignore-crawlers \
-      --anonymize-ip \
       --no-progress \
       --html-report-title='Tufteseid' \
       --output=/report/index.html
