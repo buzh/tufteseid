@@ -360,17 +360,24 @@ megabytes on every press.
   draft opens in.
 - **Every spot has a rectangle, and nobody is asked for one.** The first write
   that finds the record without one derives it (`derivedFootprint`,
-  `src/spots/footprint.ts`): the smallest square covering the drawing if there
-  is a drawing, otherwise `DEFAULT_FOOTPRINT_SIDE_M` — 50 m — around the pin.
-  `squareBboxCovering` clamps to `MIN_SIDE_M`…`MAX_SIDE_M` (50…500 m), so a
-  drawing outside that range gets a square that is not what was drawn and the
-  properties box says so. Old rows predate the rule and are still nullable in
-  `SpotRecord`; `SpotCard` repairs one on sight with a single write rather than
-  a migration, because deriving the square wants a projection PocketBase's JSVM
-  has not got.
+  `src/spots/footprint.ts`): the smallest rectangle covering the drawing if
+  there is a drawing, otherwise `DEFAULT_FOOTPRINT_SIDE_M` — 50 m — square
+  around the pin. `rectBboxCovering` clamps **each axis** to
+  `MIN_SIDE_M`…`MAX_SIDE_M` (50…500 m), so a drawing outside that range on
+  either axis gets a rectangle that is not what was drawn and the properties
+  box says so — the cut (`max`) is reported ahead of the stretch (`min`),
+  being the one that loses ground. Old rows predate the rule and are still
+  nullable in `SpotRecord`; `SpotCard` repairs one on sight with a single write
+  rather than a migration, because deriving the rectangle wants a projection
+  PocketBase's JSVM has not got.
+- **The footprint is free in both axes; the terrain window is not.** Both ride
+  `useRectangleAdjust`, which resizes width and height independently and carries
+  an edge handle per side as well as the four corners. `square: true` is the
+  terrain window's own option and locks the drag back to one reach for both
+  axes, four corners, no edges (`docs/terrain-analysis.md`).
 - **A rectangle being *changed* starts from what is there.** `seedFootprint`
   (`src/spots/atoms.ts`) only runs for a draft with no footprint in hand, and
-  `bringBboxIntoView` then pans or zooms *out* until the square is on screen,
+  `bringBboxIntoView` then pans or zooms *out* until the rectangle is on screen,
   never in, so a reader who can already see it keeps the view they chose.
 - **Past the cap the rectangle is a boundary, tiled into render boxes.** A
   spot-footprint drag may grow to `maxBoundaryMetres()` (`src/map/grid.ts`), and
@@ -381,9 +388,18 @@ megabytes on every press.
   another tile per axis on every release.
   `mosaicTiles(footprint)` then derives the render boxes:
   one free box within the cap — today's behaviour unchanged — or the covering
-  tiles past it, each ≤ cap. The boundary frame is solid, the tile cells drawn
-  thin inside it (`spots/footprintLayer.ts`). The terrain window stays a single
-  ≤cap box centred in the boundary (`readTerrainWindowAtom`).
+  tiles past it, each ≤ cap. The terrain window stays a single ≤cap box, the
+  footprint itself where it fits on both axes and a square centred in the
+  boundary where it does not (`readTerrainWindowAtom`).
+- **The grid is shown while the rectangle is in hand, and only then.** The
+  adjust layer draws the solid frame, its handles and the tile cells thin
+  inside it, the cells rebuilt from `mosaicTiles` on every drag frame so the
+  reader sees the render boxes the release will snap to (`map/rectAdjust.ts`,
+  `tiles`). A footprint nobody is holding — the card's, the reader's, a draft
+  resting — is a bare papaya outline at half opacity and nothing else
+  (`spots/footprintLayer.ts`): the spot's own ground is what the surfaces are
+  there to show, and a frame drawn over it with a casing and a grid is in the
+  way of that.
 - **The card can take the map without becoming the properties box.**
   `adjustSpotDraftAtom` opens a draft on the open record straight into its
   `footprint` or `sketch` stage with `box: 'card'`, and `SpotSurface` keeps

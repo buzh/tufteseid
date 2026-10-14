@@ -3,8 +3,8 @@ import {
   bboxToMetric,
   MAX_SIDE_M,
   MIN_SIDE_M,
+  rectBboxCovering,
   squareBboxAround,
-  squareBboxCovering,
   type Bbox,
 } from '../map/bbox';
 import { sketchBbox } from '../sketch/bounds';
@@ -31,9 +31,11 @@ export const derivedFootprint = (
   }
 
   const [minX, minY, maxX, maxY] = bboxToMetric(bounds);
-  const span = Math.max(maxX - minX, maxY - minY);
+  const widest = Math.max(maxX - minX, maxY - minY);
+  const narrowest = Math.min(maxX - minX, maxY - minY);
   return {
-    bbox: squareBboxCovering(bounds),
-    clamped: span < MIN_SIDE_M ? 'min' : span > MAX_SIDE_M ? 'max' : null,
+    bbox: rectBboxCovering(bounds),
+    clamped:
+      widest > MAX_SIDE_M ? 'max' : narrowest < MIN_SIDE_M ? 'min' : null,
   };
 };

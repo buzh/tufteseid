@@ -528,14 +528,14 @@
       "filterPlaceholder": "Søk i navn og beskrivelse",
       "noMatch": "Ingen treff på «{{query}}»"
     },
-    "footprintHint": "Dra rektangelet, hjørnene endrer størrelsen",
-    "footprintSide": "{{metres}} m",
-    "footprintTiles": "{{metres}} m · {{tiles}} ruter",
+    "footprintHint": "Dra rektangelet, hjørnene og kantene endrer størrelsen",
+    "footprintSide": "{{width}} × {{height}} m",
+    "footprintTiles": "{{width}} × {{height}} m · {{tiles}} ruter",
     "footprintPending": "(automatisk)",
     "footprintChange": "Endre utsnittet",
     "footprintClamped": {
-      "min": "Tegningen var mindre enn 50 m på tvers, så utsnittet er satt til 50 m. Endre det om du vil ha mer med.",
-      "max": "Tegningen var større enn 500 m på tvers, så utsnittet er satt til 500 m og dekker ikke alt du tegnet."
+      "min": "Tegningen var smalere enn 50 m, så utsnittet er utvidet til 50 m den veien. Endre det om du vil ha mer med.",
+      "max": "Tegningen var større enn 500 m på tvers, så utsnittet er kuttet til 500 m den veien og dekker ikke alt du tegnet."
     },
     "linkNeedsAccount": "Lenken peker til en lokalitet du må være innlogget for å se — eller som ikke finnes.",
     "penTools": "Tegneverktøy",

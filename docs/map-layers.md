@@ -279,9 +279,9 @@ layer taken off a map loses everything it had loaded.
 | 1.9 | every other spot's chosen drawing at once, off until asked for (`a`) | `src/sketch/allSketches.ts` |
 | 2 | an open spot's drawing, hidden and faded from the box that opened it (`t`) | `src/sketch/overlay.ts` |
 | 3 | LiDAR footprint outlines | `src/map/lidarFootprintsLayer.ts` |
-| 4 | a rectangle in hand — the terrain window or a spot's footprint | `src/map/rectAdjust.ts` |
+| 4 | a rectangle in hand — the terrain window or a spot's footprint, with its handles and, past the cap, the tile cells it will be rendered in | `src/map/rectAdjust.ts` |
 | 4 | terrain-analysis window frame, standing | `src/terrain/windowLayer.ts` |
-| 5 | a spot's footprint frame, standing | `src/spots/footprintLayer.ts` (`PIN_Z_INDEX - 1`) |
+| 5 | a spot's footprint outline, standing — one papaya stroke at half opacity, no casing and no cells | `src/spots/footprintLayer.ts` (`PIN_Z_INDEX - 1`) |
 | 6 | a spot's pin, its name plate out to zoom 10, or the disc counting the pins too close together to draw apart — never the spot whose card or reader is open, and never one whose drawing is standing on the shared layer | `src/spots/pinStyle.ts` (`PIN_Z_INDEX`) |
 | 10 | Kulturminner theme layers | set by the caller in `src/map/layers/atoms.ts`, not by `themeWMS.ts` |
 

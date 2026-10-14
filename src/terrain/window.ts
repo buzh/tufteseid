@@ -2,6 +2,7 @@ import { atom } from 'jotai';
 import { mapAtom } from '../map/atoms';
 import {
   bboxEquals,
+  bboxHeightMetres,
   bboxOverlaps,
   bboxWidthMetres,
   bringBboxIntoView,
@@ -25,7 +26,9 @@ export const openTerrainWindowAtom = atom(null, (get, set): boolean => {
 
 export const readTerrainWindowAtom = atom(null, (get, set, bbox: Bbox) => {
   const window =
-    bboxWidthMetres(bbox) > MAX_SIDE_M ? squareBboxWithin(bbox) : bbox;
+    Math.max(bboxWidthMetres(bbox), bboxHeightMetres(bbox)) > MAX_SIDE_M
+      ? squareBboxWithin(bbox)
+      : bbox;
   const current = get(terrainWindowAtom);
   if (!current || !bboxEquals(current, window)) set(terrainWindowAtom, window);
   set(terrainAdjustingAtom, false);

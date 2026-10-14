@@ -24,12 +24,13 @@ Read-only: nothing here is written or persisted. Internal name `terreng`.
 Precomputed VAT served as tiles (`/cvat/*`) is a separate path: `vat-cache/`
 and `vat-cache/README.md`, registered in `docs/map-layers.md`.
 
-The window is a single ≤`MAX_SIDE_M` box, never the whole spot. Reading terrain
-on a spot whose footprint is a larger boundary seeds the window with
-`squareBboxWithin` (`readTerrainWindowAtom`) — a cap-sized square centred in the
-boundary that the reader drags to the part of the site they want — so the
-elevation endpoint is never asked for more than a capped rectangle at once
-(`docs/architecture.md`, the boundary-and-tiles note).
+The window is a single ≤`MAX_SIDE_M` box, never the whole spot. A spot's
+footprint is read whole where it fits the cap on **both** axes, square or not;
+past it on either axis `readTerrainWindowAtom` seeds the window with
+`squareBboxWithin` — a cap-sized square centred in the boundary that the reader
+drags to the part of the site they want — so the elevation endpoint is never
+asked for more than a capped rectangle at once (`docs/architecture.md`, the
+boundary-and-tiles note).
 
 Two other readers of the same endpoint carry their own copies of the quirks
 below, because neither runs in the browser: `vat-cache/fetch_dem.py` and
@@ -290,16 +291,20 @@ button — is a write to one of them.
   when the rectangle no longer overlaps it (`bboxOverlaps`).
 - `readTerrainWindowAtom` takes a rectangle that was settled elsewhere — the
   spot card's elevation button hands it the spot's footprint — and clears
-  adjusting, so the reading starts without a square to place. The rectangle is
+  adjusting, so the reading starts without a square to place. A footprint
+  within the cap on both axes is kept as it stands, which is the one way the
+  window is not square; the next drag squares it again. The rectangle is
   written only if it differs by value (`bboxEquals`), because writing an equal
   one keys the fetch effect afresh and refetches the grid; the view is then
   brought onto it, out only, the same as everywhere else.
 - `closeTerrainWindowAtom` drops both.
 - The analysis does **not** follow the map — the grid is held, not refetched on
   pan.
-- The drag (`map/rectAdjust.ts`) stays square in EPSG:25833, clamps to
-  `MIN_SIDE_M`…`MAX_SIDE_M`, fixes the resize direction when a corner is
-  grabbed, and writes the atom on every frame; the fetch is held off by
+- The drag (`map/rectAdjust.ts`) stays square in EPSG:25833 — the window passes
+  `square: true`, which the spot footprint does not, so only here does one reach
+  set both axes and only here are the four corners the whole set of handles. It
+  clamps to `MIN_SIDE_M`…`MAX_SIDE_M`, fixes the resize direction when a corner
+  is grabbed, and writes the atom on every frame; the fetch is held off by
   `terrainAdjustingAtom`, which is a **key** on the fetch effect, not a guard
   inside it, so `Start` begins a fetch without the rectangle changing. The
   Kulturminner hover stands down while it is up.

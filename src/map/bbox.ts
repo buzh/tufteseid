@@ -39,6 +39,11 @@ export const bboxWidthMetres = (bbox: Bbox): number => {
   return maxX - minX;
 };
 
+export const bboxHeightMetres = (bbox: Bbox): number => {
+  const [, minY, , maxY] = bboxToMetric(bbox);
+  return maxY - minY;
+};
+
 export const bboxEquals = (a: Bbox, b: Bbox): boolean =>
   a.every((value, index) => value === b[index]);
 
@@ -58,9 +63,18 @@ export const squareBboxWithin = (bbox: Bbox): Bbox => {
   ]);
 };
 
-const metricSquare = (cx: number, cy: number, sideMetres: number): Bbox => {
-  const half = Math.min(Math.max(sideMetres, MIN_SIDE_M), MAX_SIDE_M) / 2;
-  return bboxFromMetric([cx - half, cy - half, cx + half, cy + half]);
+const clampSideMetres = (metres: number): number =>
+  Math.min(Math.max(metres, MIN_SIDE_M), MAX_SIDE_M);
+
+const metricRect = (
+  cx: number,
+  cy: number,
+  widthMetres: number,
+  heightMetres: number,
+): Bbox => {
+  const halfX = clampSideMetres(widthMetres) / 2;
+  const halfY = clampSideMetres(heightMetres) / 2;
+  return bboxFromMetric([cx - halfX, cy - halfY, cx + halfX, cy + halfY]);
 };
 
 export const squareBboxAround = (
@@ -68,15 +82,16 @@ export const squareBboxAround = (
   sideMetres: number,
 ): Bbox => {
   const [cx, cy] = transform(point, 'EPSG:4326', 'EPSG:25833');
-  return metricSquare(cx, cy, sideMetres);
+  return metricRect(cx, cy, sideMetres, sideMetres);
 };
 
-export const squareBboxCovering = (bbox: Bbox): Bbox => {
+export const rectBboxCovering = (bbox: Bbox): Bbox => {
   const [minX, minY, maxX, maxY] = bboxToMetric(bbox);
-  return metricSquare(
+  return metricRect(
     (minX + maxX) / 2,
     (minY + maxY) / 2,
-    Math.max(maxX - minX, maxY - minY),
+    maxX - minX,
+    maxY - minY,
   );
 };
 
@@ -92,11 +107,8 @@ export const middleCellSquare = (map: Map): Bbox | null => {
     'EPSG:4326',
   ) as Bbox;
   const [minX, minY, maxX, maxY] = bboxToMetric(extent);
-  return metricSquare(
-    (minX + maxX) / 2,
-    (minY + maxY) / 2,
-    Math.min(maxX - minX, maxY - minY) / VIEW_CELLS,
-  );
+  const side = Math.min(maxX - minX, maxY - minY) / VIEW_CELLS;
+  return metricRect((minX + maxX) / 2, (minY + maxY) / 2, side, side);
 };
 
 const INSET_FRACTION = 0.08;

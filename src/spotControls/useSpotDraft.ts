@@ -10,7 +10,7 @@ import {
   type SpotRecord,
 } from '../api/spots';
 import { currentUserAtom } from '../auth/atoms';
-import { bboxWidthMetres } from '../map/bbox';
+import { bboxHeightMetres, bboxWidthMetres } from '../map/bbox';
 import { mosaicTiles } from '../map/grid';
 import { suggestPlaceName } from '../search/placeNames';
 import { drawHoldAtom } from '../shared/uiContext';
@@ -52,7 +52,7 @@ export type SpotDraftController = {
   revertText: () => void;
   stage: SpotDraft['stage'];
   setStage: (stage: SpotDraft['stage']) => void;
-  footprintSideMetres: number | null;
+  footprintSidesMetres: [width: number, height: number] | null;
   footprintTiles: number;
   footprintClamped: 'min' | 'max' | null;
   hasSketch: boolean;
@@ -395,8 +395,11 @@ export const useSpotDraft = (
     revertText,
     stage: draft.stage,
     setStage,
-    footprintSideMetres: footprint
-      ? Math.round(bboxWidthMetres(footprint))
+    footprintSidesMetres: footprint
+      ? [
+          Math.round(bboxWidthMetres(footprint)),
+          Math.round(bboxHeightMetres(footprint)),
+        ]
       : null,
     footprintTiles: footprint ? mosaicTiles(footprint).length : 1,
     footprintClamped,

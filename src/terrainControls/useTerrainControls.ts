@@ -1,7 +1,7 @@
 import { useAtomValue, useSetAtom } from 'jotai';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { terrainOfferAtom } from '../evidence/offer';
-import { bboxWidthMetres, type Bbox } from '../map/bbox';
+import { bboxHeightMetres, bboxWidthMetres, type Bbox } from '../map/bbox';
 import { fetchDem, type Dem, type DemModel } from '../terrain/dem';
 import {
   clampRadius,
@@ -35,6 +35,12 @@ type DemResult = {
   error: 'failed' | 'empty' | null;
 };
 
+const sidesLabel = (widthMetres: number, heightMetres: number): string => {
+  const width = Math.round(widthMetres);
+  const height = Math.round(heightMetres);
+  return width === height ? `${width}` : `${width} × ${height}`;
+};
+
 export const useTerrainControls = () => {
   const bbox = useAtomValue(terrainWindowAtom);
   const adjusting = useAtomValue(terrainAdjustingAtom);
@@ -48,6 +54,7 @@ export const useTerrainControls = () => {
     rectAtom: terrainWindowAtom,
     activeAtom: terrainAdjustingAtom,
     layerId: 'terrainAdjustLayer',
+    square: true,
   });
 
   const [model, setModel] = useState<DemModel>('dtm');
@@ -170,10 +177,13 @@ export const useTerrainControls = () => {
       adjustWindow();
     }, [releaseFootprint, adjustWindow]),
     close: closeWindow,
-    sideMetres: dem
-      ? Math.round(dem.bbox25833[2] - dem.bbox25833[0])
+    sideLabel: dem
+      ? sidesLabel(
+          dem.bbox25833[2] - dem.bbox25833[0],
+          dem.bbox25833[3] - dem.bbox25833[1],
+        )
       : bbox
-        ? Math.round(bboxWidthMetres(bbox))
+        ? sidesLabel(bboxWidthMetres(bbox), bboxHeightMetres(bbox))
         : null,
     vis,
     setVis,

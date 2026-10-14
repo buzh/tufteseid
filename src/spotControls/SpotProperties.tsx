@@ -14,7 +14,7 @@ export const SpotProperties = ({ spot }: { spot: SpotDraftController }) => {
   const { t } = useTranslation();
   const placing = spot.stage === 'pin';
   const framing = spot.stage === 'footprint';
-  const sided = spot.footprintSideMetres != null;
+  const sides = spot.footprintSidesMetres;
 
   const remove = useConfirm(spot.remove);
 
@@ -127,13 +127,17 @@ export const SpotProperties = ({ spot }: { spot: SpotDraftController }) => {
         <span className={styles.unitText}>
           {framing
             ? t('spots.footprintHint')
-            : sided
+            : sides
               ? spot.footprintTiles > 1
                 ? t('spots.footprintTiles', {
-                    metres: spot.footprintSideMetres,
+                    width: sides[0],
+                    height: sides[1],
                     tiles: spot.footprintTiles,
                   })
-                : t('spots.footprintSide', { metres: spot.footprintSideMetres })
+                : t('spots.footprintSide', {
+                    width: sides[0],
+                    height: sides[1],
+                  })
               : t('spots.footprintPending')}
         </span>
         <Button

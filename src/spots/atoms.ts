@@ -7,8 +7,8 @@ import {
   bboxOverlaps,
   bringBboxIntoView,
   middleCellSquare,
+  rectBboxCovering,
   squareBboxAround,
-  squareBboxCovering,
   viewportBbox,
   type Bbox,
 } from '../map/bbox';
@@ -44,7 +44,7 @@ const seedFootprint = (
   const bounds = drawn ? sketchBbox(drawn) : null;
   const visible = viewportBbox(map);
   if (bounds && visible && bboxOverlaps(bounds, visible)) {
-    return squareBboxCovering(bounds);
+    return rectBboxCovering(bounds);
   }
   return (
     middleCellSquare(map) ?? squareBboxAround(point, DEFAULT_FOOTPRINT_SIDE_M)

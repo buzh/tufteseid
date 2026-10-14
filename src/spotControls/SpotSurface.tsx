@@ -7,7 +7,11 @@ import {
   useEvidenceLoopOverlay,
   useEvidenceOverlay,
 } from '../evidence/evidenceOverlay';
-import { maxBoundaryMetres, snapBoundaryMetric } from '../map/grid';
+import {
+  maxBoundaryMetres,
+  mosaicTiles,
+  snapBoundaryMetric,
+} from '../map/grid';
 import { useRectangleAdjust } from '../map/rectAdjust';
 import { uiContextAtom } from '../shared/uiContext';
 import { useAllSketchesLayer } from '../sketch/allSketches';
@@ -98,6 +102,7 @@ export const SpotSurface = () => {
     layerId: 'spotFootprintAdjustLayer',
     maxSideM: maxBoundaryMetres(),
     snap: snapBoundaryMetric,
+    tiles: mosaicTiles,
   });
   useSketchSession(draft?.stage === 'sketch');
   useSketchOverlay(shown);

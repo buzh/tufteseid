@@ -37,14 +37,14 @@ export const TerrainPanel = ({ terrain }: { terrain: TerrainControls }) => {
     dem,
     loading,
     error,
-    sideMetres,
+    sideLabel,
     radiusLimits,
     opacity,
     setOpacity,
   } = terrain;
 
   const status = adjusting
-    ? t('terrainControls.placing', { side: sideMetres })
+    ? t('terrainControls.placing', { side: sideLabel })
     : loading
       ? t('terrainControls.loading')
       : error
@@ -55,7 +55,7 @@ export const TerrainPanel = ({ terrain }: { terrain: TerrainControls }) => {
                 ? 'terrainControls.resolutionCapped'
                 : 'terrainControls.resolution',
               {
-                side: sideMetres,
+                side: sideLabel,
                 m: dem.metresPerPx.toFixed(2),
                 src: dem.nativeMetresPerPx.toFixed(2),
               },

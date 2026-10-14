@@ -8,7 +8,7 @@ import { fromExtent as polygonFromExtent } from 'ol/geom/Polygon';
 import PointerInteraction from 'ol/interaction/Pointer';
 import VectorLayer from 'ol/layer/Vector';
 import type MapBrowserEvent from 'ol/MapBrowserEvent';
-import { transform } from 'ol/proj';
+import { transform, transformExtent } from 'ol/proj';
 import VectorSource from 'ol/source/Vector';
 import { Circle as CircleStyle, Fill, Stroke, Style } from 'ol/style';
 import { useEffect } from 'react';
@@ -30,14 +30,20 @@ const CASING = 'rgba(255, 255, 255, 0.55)';
 
 const adjustStyle = [
   new Style({
+    zIndex: 1,
     stroke: new Stroke({ color: CASING, width: 4 }),
     fill: new Fill({ color: 'rgba(255, 106, 0, 0.06)' }),
   }),
-  new Style({ stroke: new Stroke({ color: FRAME, width: 2 }) }),
+  new Style({ zIndex: 1, stroke: new Stroke({ color: FRAME, width: 2 }) }),
+];
+
+const cellStyle = [
+  new Style({ zIndex: 0, stroke: new Stroke({ color: FRAME, width: 0.5 }) }),
 ];
 
 const handleStyle = [
   new Style({
+    zIndex: 2,
     image: new CircleStyle({
       radius: 6,
       fill: new Fill({ color: FRAME }),
@@ -46,23 +52,39 @@ const handleStyle = [
   }),
 ];
 
-const cornersOf = (e: Metric): Coordinate[] => [
-  [e[0], e[1]],
-  [e[2], e[1]],
-  [e[2], e[3]],
-  [e[0], e[3]],
+type Grip = { x: -1 | 0 | 1; y: -1 | 0 | 1 };
+
+const CORNERS: Grip[] = [
+  { x: -1, y: -1 },
+  { x: 1, y: -1 },
+  { x: 1, y: 1 },
+  { x: -1, y: 1 },
 ];
 
-const RESIZE_CURSORS = [
-  'nesw-resize',
-  'nwse-resize',
-  'nesw-resize',
-  'nwse-resize',
+const EDGES: Grip[] = [
+  { x: 0, y: -1 },
+  { x: 1, y: 0 },
+  { x: 0, y: 1 },
+  { x: -1, y: 0 },
 ];
+
+const gripAt = (e: Metric, grip: Grip): Coordinate => [
+  grip.x === 0 ? (e[0] + e[2]) / 2 : grip.x < 0 ? e[0] : e[2],
+  grip.y === 0 ? (e[1] + e[3]) / 2 : grip.y < 0 ? e[1] : e[3],
+];
+
+const cursorFor = (grip: Grip): string =>
+  grip.x === 0
+    ? 'ns-resize'
+    : grip.y === 0
+      ? 'ew-resize'
+      : grip.x === grip.y
+        ? 'nesw-resize'
+        : 'nwse-resize';
 
 type Drag =
   | { kind: 'move'; from: Coordinate; start: Metric }
-  | { kind: 'resize'; anchor: Coordinate; sx: number; sy: number };
+  | { kind: 'resize'; grip: Grip; start: Metric };
 
 type RectAdjustOptions = {
   rectAtom: PrimitiveAtom<Bbox | null>;
@@ -70,6 +92,8 @@ type RectAdjustOptions = {
   layerId: string;
   maxSideM?: number;
   snap?: (extent: Metric) => Metric;
+  tiles?: (bbox: Bbox) => Bbox[];
+  square?: boolean;
 };
 
 export const useRectangleAdjust = ({
@@ -78,6 +102,8 @@ export const useRectangleAdjust = ({
   layerId,
   maxSideM = MAX_SIDE_M,
   snap,
+  tiles,
+  square = false,
 }: RectAdjustOptions) => {
   const map = useAtomValue(mapAtom);
   const adjusting = useAtomValue(activeAtom);
@@ -98,38 +124,66 @@ export const useRectangleAdjust = ({
       return bbox ? bboxToMetric(bbox) : null;
     };
 
+    const grips = square ? CORNERS : [...CORNERS, ...EDGES];
+
     const frame = new Feature();
-    const handles = [0, 1, 2, 3].map(() => new Feature());
+    const knobs = grips.map(() => new Feature());
     const source = new VectorSource({
       wrapX: false,
-      features: [frame, ...handles],
+      features: [frame, ...knobs],
     });
     const layer = new VectorLayer({
       zIndex: 4,
       source,
       style: (feature: FeatureLike): Style[] =>
-        feature === frame ? adjustStyle : handleStyle,
+        feature === frame
+          ? adjustStyle
+          : feature.get('cell')
+            ? cellStyle
+            : handleStyle,
       properties: { id: layerId },
     });
 
+    let cells: Feature[] = [];
+
+    const recell = (bbox: Bbox) => {
+      cells.forEach((cell) => source.removeFeature(cell));
+      const boxes = tiles?.(bbox) ?? [];
+      cells =
+        boxes.length > 1
+          ? boxes.map((box) => {
+              const cell = new Feature({
+                geometry: polygonFromExtent(
+                  transformExtent(box, 'EPSG:4326', view),
+                ),
+              });
+              cell.set('cell', true);
+              return cell;
+            })
+          : [];
+      source.addFeatures(cells);
+    };
+
     const redraw = () => {
-      const extent = extentNow();
-      if (!extent) return;
+      const bbox = store.get(rectAtom);
+      if (!bbox) return;
+      const extent = bboxToMetric(bbox);
       const ring = polygonFromExtent(extent);
       ring.transform('EPSG:25833', view);
       frame.setGeometry(ring);
-      cornersOf(extent).forEach((corner, i) =>
-        handles[i].setGeometry(new Point(toView(corner))),
+      grips.forEach((grip, i) =>
+        knobs[i].setGeometry(new Point(toView(gripAt(extent, grip)))),
       );
+      recell(bbox);
     };
 
-    const cornerUnder = (event: MapBrowserEvent): number => {
+    const gripUnder = (event: MapBrowserEvent): Grip | null => {
       const extent = extentNow();
-      if (!extent) return -1;
+      if (!extent) return null;
       let nearest = -1;
       let best = HANDLE_HIT_PX;
-      cornersOf(extent).forEach((corner, i) => {
-        const pixel = map.getPixelFromCoordinate(toView(corner));
+      grips.forEach((grip, i) => {
+        const pixel = map.getPixelFromCoordinate(toView(gripAt(extent, grip)));
         if (!pixel) return;
         const distance = Math.hypot(
           pixel[0] - event.pixel[0],
@@ -140,7 +194,7 @@ export const useRectangleAdjust = ({
           nearest = i;
         }
       });
-      return nearest;
+      return nearest < 0 ? null : grips[nearest];
     };
 
     let drag: Drag | null = null;
@@ -148,16 +202,9 @@ export const useRectangleAdjust = ({
     const handleDownEvent = (event: MapBrowserEvent): boolean => {
       const extent = extentNow();
       if (!extent) return false;
-      const corner = cornerUnder(event);
-      if (corner >= 0) {
-        const [ax, ay] = cornersOf(extent)[(corner + 2) % 4];
-        const [cx, cy] = cornersOf(extent)[corner];
-        drag = {
-          kind: 'resize',
-          anchor: [ax, ay],
-          sx: Math.sign(cx - ax),
-          sy: Math.sign(cy - ay),
-        };
+      const grip = gripUnder(event);
+      if (grip) {
+        drag = { kind: 'resize', grip, start: extent };
         return true;
       }
       const here = toMetric(event.coordinate);
@@ -166,27 +213,44 @@ export const useRectangleAdjust = ({
       return true;
     };
 
+    const clampSide = (metres: number) =>
+      Math.min(Math.max(metres, MIN_SIDE_M), maxSideM);
+
+    const spanned = (
+      low: number,
+      high: number,
+      grip: number,
+      to: number,
+      side: number | null,
+    ): [number, number] => {
+      if (grip === 0) return [low, high];
+      const anchor = grip < 0 ? high : low;
+      const other = anchor + grip * (side ?? clampSide(Math.abs(to - anchor)));
+      return [Math.min(anchor, other), Math.max(anchor, other)];
+    };
+
     const handleDragEvent = (event: MapBrowserEvent) => {
       if (!drag) return;
       const here = toMetric(event.coordinate);
+      const [minX, minY, maxX, maxY] = drag.start;
       let next: Metric;
       if (drag.kind === 'move') {
         const dx = here[0] - drag.from[0];
         const dy = here[1] - drag.from[1];
-        const [minX, minY, maxX, maxY] = drag.start;
         next = [minX + dx, minY + dy, maxX + dx, maxY + dy];
       } else {
-        const [ax, ay] = drag.anchor;
-        const reach = Math.max(Math.abs(here[0] - ax), Math.abs(here[1] - ay));
-        const side = Math.min(Math.max(reach, MIN_SIDE_M), maxSideM);
-        const bx = ax + drag.sx * side;
-        const by = ay + drag.sy * side;
-        next = [
-          Math.min(ax, bx),
-          Math.min(ay, by),
-          Math.max(ax, bx),
-          Math.max(ay, by),
-        ];
+        const { x, y } = drag.grip;
+        const side = square
+          ? clampSide(
+              Math.max(
+                Math.abs(here[0] - (x < 0 ? maxX : minX)),
+                Math.abs(here[1] - (y < 0 ? maxY : minY)),
+              ),
+            )
+          : null;
+        const [nextMinX, nextMaxX] = spanned(minX, maxX, x, here[0], side);
+        const [nextMinY, nextMaxY] = spanned(minY, maxY, y, here[1], side);
+        next = [nextMinX, nextMinY, nextMaxX, nextMaxY];
       }
       store.set(rectAtom, bboxFromMetric(next));
     };
@@ -199,12 +263,12 @@ export const useRectangleAdjust = ({
     };
 
     const handleMoveEvent = (event: MapBrowserEvent) => {
-      const corner = cornerUnder(event);
+      const grip = gripUnder(event);
       const extent = extentNow();
       const here = toMetric(event.coordinate);
       cursor.set(
-        corner >= 0
-          ? RESIZE_CURSORS[corner]
+        grip
+          ? cursorFor(grip)
           : extent && containsXY(extent, here[0], here[1])
             ? 'move'
             : null,
@@ -230,5 +294,5 @@ export const useRectangleAdjust = ({
       source.dispose();
       cursor.release();
     };
-  }, [map, adjusting, store, rectAtom, layerId, maxSideM, snap]);
+  }, [map, adjusting, store, rectAtom, layerId, maxSideM, snap, tiles, square]);
 };
