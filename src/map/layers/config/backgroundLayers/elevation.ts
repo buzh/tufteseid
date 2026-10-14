@@ -22,29 +22,41 @@ const NATIONAL_HELD_URL: Record<LidarModel, string> = {
 
 export const NATIONAL_CACHE_MAX_ZOOM = 16;
 
+const NATIONAL_COVERAGE: CoverageExtent = {
+  extent: LIDAR_COVERAGE_EXTENT_25833,
+  crs: 'EPSG:25833',
+};
+
+const nationalCacheConfig = (
+  url: string,
+  heldUrl?: string,
+): XYZBackgroundLayer => ({
+  type: 'XYZ',
+  layerName: 'lidarHillshade',
+  url,
+  ...(heldUrl ? { heldUrl } : {}),
+  projection: 'EPSG:25833',
+  minZoom: 0,
+  maxZoom: NATIONAL_CACHE_MAX_ZOOM,
+  interpolate: false,
+  preload: 0,
+  sparse: false,
+  coverageExtent: NATIONAL_COVERAGE,
+});
+
+export const buildHeldNationalLidarConfig = (
+  model: LidarModel,
+): XYZBackgroundLayer => nationalCacheConfig(NATIONAL_HELD_URL[model]);
+
 export const buildNationalLidarConfig = (
   style: string,
   model: LidarModel,
 ): WMSBackgroundLayer | XYZBackgroundLayer => {
-  const coverageExtent: CoverageExtent = {
-    extent: LIDAR_COVERAGE_EXTENT_25833,
-    crs: 'EPSG:25833',
-  };
-
   if (style === DEFAULT_LIDAR_PROJECT_STYLE) {
-    return {
-      type: 'XYZ',
-      layerName: 'lidarHillshade',
-      url: NATIONAL_CACHE_URL[model],
-      heldUrl: NATIONAL_HELD_URL[model],
-      projection: 'EPSG:25833',
-      minZoom: 0,
-      maxZoom: NATIONAL_CACHE_MAX_ZOOM,
-      interpolate: false,
-      preload: 0,
-      sparse: false,
-      coverageExtent,
-    };
+    return nationalCacheConfig(
+      NATIONAL_CACHE_URL[model],
+      NATIONAL_HELD_URL[model],
+    );
   }
 
   return {
@@ -57,6 +69,6 @@ export const buildNationalLidarConfig = (
     },
     maxZoom: NATIONAL_CACHE_MAX_ZOOM,
     interpolate: false,
-    coverageExtent,
+    coverageExtent: NATIONAL_COVERAGE,
   };
 };

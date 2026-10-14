@@ -60,7 +60,7 @@ change. A name MapProxy does not publish 404s from MapProxy.
 |---|---|---|---|
 | `lidar-dtm` | palette PNG | `[2,2]` / 0 | `wms.geonorge.no/skwms1/wms.hoyde-dtm-nhm-25833` |
 | `lidar-dom` | palette PNG | `[2,2]` / 0 | `wms.geonorge.no/skwms1/wms.hoyde-dom-nhm-25833` |
-| `lidar-dtm-held`, `lidar-dom-held` | palette PNG, transparent | — | none (`sources: []`) |
+| `lidar-dtm-held`, `lidar-dom-held` | palette PNG | — | none (`sources: []`) |
 | `topo-ref`, `topo-ref-contours` | palette PNG, transparent | `[4,4]` / 80 | `wms.geonorge.no/skwms1/wms.topo` |
 | `amtskart` | RGBA PNG | `[4,4]` / 80 | `wms.geonorge.no/skwms1/wms.historiskekart` (`amt1`) |
 | `flyfoto` | JPEG | `[2,2]` / 0 | nib-proxy → `services.norgeibilder.no/wms/ortofoto` |
@@ -70,18 +70,32 @@ change. A name MapProxy does not publish 404s from MapProxy.
   the RA themes, the LiDAR extract's arbitrary bboxes, the float DEM, the
   per-acquisition ortofoto `mosaicRule`.
 - **`-held` siblings**: the same two MBTiles files with no source behind them.
-  Never seeded, never written, only reached while the `hoyde` breaker is open
-  (see below). A miss answers a transparent tile.
+  Never seeded, never written. A miss answers a transparent tile, which is the
+  whole point: they answer in milliseconds whether or not they hold the tile,
+  because nothing behind them can be slow. Two callers reach them — the
+  breaker's `heldUrl` redirect while `hoyde` is open, and the seamless fallback
+  under a per-project LiDAR dataset, which only shows through the gaps and has
+  no business blocking on Kartverket (`docs/map-layers.md`).
 - **Grid** `tufteseid25833`: EPSG:25833, bbox `-2500000, 3500000, 3045984,
   9045984`, `min_res: 21664.0`, `res_factor: 2`, 512 px tiles, `origin: nw`,
   `num_levels: 21`. Mirrors `src/map/layers/wmsTileGrid.ts` level for level
   (z12 = 5.289 m/px, z16 = 0.331), so no reprojection and no resampling. Same
   grid describes the cVAT store.
 - **Sources**: `supported_srs: ['EPSG:25833']`, `concurrent_requests: 4`,
-  `http.client_timeout: 60`, a `coverage` bbox matching the layer config's
-  `coverageExtent`. **No `on_error` anywhere** — a shed or non-image response
-  must surface as a 500 so `src/upstream/` trips, rather than being stored as a
-  blank tile.
+  `http.client_timeout`, a `coverage` bbox matching the layer config's
+  `coverageExtent`. A shed or non-image response surfaces as a 500 so
+  `src/upstream/` trips, rather than being stored as a blank tile.
+- **One exception, the two national hillshades.** `wms.hoyde-dtm-nhm-25833`
+  and its DOM sibling render a cold metatile slower than Kartverket's own
+  gateway will wait: it sheds the request with a **504 at 30 s**, and the same
+  bbox then answers in 0.14 s because their backend finished and warmed it.
+  That is not an outage — the service is up — so the two carry
+  `on_error: {504: {response: transparent, cache: false}}` and a
+  `client_timeout` of **35**, set deliberately *above* their 30 s so the 504
+  arrives to be caught rather than being pre-empted by our own timeout. The
+  reader gets a transparent tile, nothing is cached, and the breaker does not
+  trip — which matters because `hoyde` also covers hoydedata.no's ArcGIS
+  endpoint and the per-project WMS, both healthy throughout.
 - **No `max_size`**: it never evicts. The store grows until somebody prunes it.
   Watch `du`.
 - **`X-Cache-Status` means nothing for these six layers** — they do not pass
@@ -511,7 +525,8 @@ origin claims).
 - A tile the breaker *refused* is not retried and not counted; it comes back via
   `refresh()` on recovery.
 - `heldUrl` redirects a refused tile to a source-less store instead — the two
-  national mosaics only.
+  national mosaics only. The fallback copy of the mosaic is on that store from
+  the start and never carries `heldUrl`, having nothing to fall back from.
 - `sparse: true` opts out of the retry: the cVAT ground only. A 404 inside its
   extent is the coverage mask, and an `<img>` error carries no status, so the
   retry cannot tell a mask hole from a dropped request. `/cache/` needs no such
@@ -573,7 +588,8 @@ Constants (`health.ts`):
 
 1. `mapproxy/mapproxy.yaml`: a `sources` entry (url, layers,
    `supported_srs: ['EPSG:25833']`, `concurrent_requests`,
-   `http.client_timeout`, a `coverage` from its GetCapabilities, no `on_error`);
+   `http.client_timeout`, a `coverage` from its GetCapabilities, and no
+   `on_error` unless the upstream sheds the way the national hillshades do);
    a `caches` entry on `tufteseid25833` with a `meta_size` and an mbtiles
    filename; a `layers` entry whose `name` is the `/cache/<name>/` segment.
 2. Nothing in `Caddyfile` — the one `@tileCache` regexp already routes it.

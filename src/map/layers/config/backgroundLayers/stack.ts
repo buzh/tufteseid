@@ -3,7 +3,11 @@ import type OlMap from 'ol/Map';
 import { BackgroundLayerName } from '../../backgroundLayers';
 import { getWMSTileGrid } from '../../wmsTileGrid';
 import { buildCvatGroundConfig, type CvatAcquisition } from './cvatGround';
-import { buildNationalLidarConfig, NATIONAL_CACHE_MAX_ZOOM } from './elevation';
+import {
+  buildHeldNationalLidarConfig,
+  buildNationalLidarConfig,
+  NATIONAL_CACHE_MAX_ZOOM,
+} from './elevation';
 import {
   buildFlyfotoProjectConfig,
   FLYFOTO_MOSAIC_CONFIG,
@@ -12,7 +16,6 @@ import type { FlyfotoProject } from './flyfotoProjects';
 import { AMTSKART_CONFIG } from './kartVariants';
 import { KvCacheBackgroundLayers } from './kvCache';
 import {
-  DEFAULT_LIDAR_PROJECT_STYLE,
   LidarModel,
   LidarProject,
   LIDAR_PROJECT_WMS_URL,
@@ -172,9 +175,9 @@ export const resolveStack = (
 
   const fallback =
     layerName === 'lidarProject'
-      ? buildNationalLidarConfig(DEFAULT_LIDAR_PROJECT_STYLE, opts.lidarModel)
+      ? buildHeldNationalLidarConfig(opts.lidarModel)
       : layerName === 'lidarCvat'
-        ? buildNationalLidarConfig(DEFAULT_LIDAR_PROJECT_STYLE, 'dtm')
+        ? buildHeldNationalLidarConfig('dtm')
         : layerName === 'flyfotoProject'
           ? FLYFOTO_MOSAIC_CONFIG
           : null;

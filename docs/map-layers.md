@@ -95,7 +95,7 @@ plus two read-only views.
 | --- | --- | --- |
 | `lidar-dtm` | `wms.geonorge.no/skwms1/wms.hoyde-dtm-nhm-25833` | `NHM_DTM_25833:skyggerelieff` |
 | `lidar-dom` | `wms.geonorge.no/skwms1/wms.hoyde-dom-nhm-25833` | `NHM_DOM_25833:skyggerelieff` |
-| `lidar-dtm-held`, `lidar-dom-held` | none (`sources: []`) — the same MBTiles files, so a miss is transparent rather than an upstream render | — |
+| `lidar-dtm-held`, `lidar-dom-held` | none (`sources: []`) — the same MBTiles files, so a miss is transparent rather than an upstream render, and an answer is always fast | — |
 | `topo-ref` | `wms.geonorge.no/skwms1/wms.topo` | `kd_veger,kd_jernbane,kd_stedsnavn,fkb_samferdsel,fkb_presentasjonsdata` |
 | `topo-ref-contours` | same | the five above plus `kd_hoydekurver,fkb_hoydekurver` |
 | `amtskart` | `wms.geonorge.no/skwms1/wms.historiskekart` | `amt1` |
@@ -220,6 +220,16 @@ bottom-first:
    the national mosaic under `lidarProject` and `lidarCvat`, the ortofoto mosaic
    under `flyfotoProject`. Always `skyggerelieff`, and always DTM under
    `lidarCvat`, which has no model toggle to undo a held DOM.
+
+   The mosaic here is the **`-held` store**, `buildHeldNationalLidarConfig`
+   rather than `buildNationalLidarConfig` — a layer that only shows through the
+   gaps of the ground above it may not stall that ground. The live
+   `/cache/lidar-dtm/` goes to Kartverket on a miss and waits up to 35 s for a
+   tile the reader cannot see; the `-held` sibling answers in milliseconds with
+   whatever the mosaic already holds, transparent where it holds nothing
+   (`docs/wms-proxy-and-tiles.md`). The cost is that a gap in a flight shows
+   bare topo until the national mosaic has been seeded there, rather than
+   rendering it on demand.
 3. The featured dataset.
 4. The topo overlay in hybrid, at `HYBRID_OVERLAY_Z` (0.75) — the only background
    layer off z-index 0. `LIDAR_LAYERS` (`lidarProject`, `lidarHillshade`,

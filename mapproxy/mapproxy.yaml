@@ -38,7 +38,7 @@ caches:
   lidar-dtm-held:
     grids: [tufteseid25833]
     sources: []
-    format: relief_png_held
+    format: relief_png
     cache:
       type: mbtiles
       filename: /mapproxy/config/cache_data/lidar-dtm.mbtiles
@@ -46,7 +46,7 @@ caches:
   lidar-dom-held:
     grids: [tufteseid25833]
     sources: []
-    format: relief_png_held
+    format: relief_png
     cache:
       type: mbtiles
       filename: /mapproxy/config/cache_data/lidar-dom.mbtiles
@@ -100,7 +100,11 @@ sources:
     supported_srs: ['EPSG:25833']
     concurrent_requests: 4
     http:
-      client_timeout: 60
+      client_timeout: 35
+    on_error:
+      504:
+        response: transparent
+        cache: false
     coverage:
       bbox: [-100275, 6399725, 1150255, 8000275]
       srs: 'EPSG:25833'
@@ -113,7 +117,11 @@ sources:
     supported_srs: ['EPSG:25833']
     concurrent_requests: 4
     http:
-      client_timeout: 60
+      client_timeout: 35
+    on_error:
+      504:
+        response: transparent
+        cache: false
     coverage:
       bbox: [-100275, 6399725, 1150255, 8000275]
       srs: 'EPSG:25833'
@@ -206,12 +214,6 @@ globals:
   image:
     formats:
       relief_png:
-        format: image/png
-        mode: P
-        colors: 256
-        encoding_options:
-          quantizer: fastoctree
-      relief_png_held:
         format: image/png
         mode: P
         colors: 256
