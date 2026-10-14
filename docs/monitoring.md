@@ -25,17 +25,43 @@ empty (`(no lines — restart wmscache…)`) while everything else works.
 
 ## Client IPs
 
-`trusted_proxies static private_ranges` in the Caddyfile global block makes
-Caddy take `client_ip` from `X-Forwarded-For`. Safe only while nothing but a
-private-address proxy reaches `:3000`, which is why `docker-compose.yml`
-publishes it on `127.0.0.1`.
+Every line carries two addresses and they are not the same question.
+`request.remote_ip` is the last hop — the host's TLS terminator across the
+Docker bridge, so a private `172.` address on every line is correct and says
+nothing about the visitor. `request.client_ip` is the visitor, and it is the
+only one anything reads: `usage-report.sh` and GoAccess's `CADDY` format both
+take it.
+
+`trusted_proxies static private_ranges` in the Caddyfile global block is what
+makes Caddy derive `client_ip` from `X-Forwarded-For` at all. Safe only while
+nothing but a private-address proxy reaches `:3000`, which is why
+`docker-compose.yml` publishes it on `127.0.0.1`.
+
+`trusted_proxies_strict` is the other half. Without it Caddy reads the header
+left to right and takes the first untrusted address, which is whatever the
+visitor typed: Cloudflare *appends* the connecting address rather than
+replacing the header, so `X-Forwarded-For: 203.0.113.9` from a browser arrives
+as `203.0.113.9, <real>` and the log records the spoof. Private spoofs are
+skipped — `private_ranges` is trusted — so the symptom is a plausible public
+address, not an obvious one. Strict reads right to left instead and stops at
+the first untrusted hop, which is the address Cloudflare appended.
+
+Strict assumes every hop between the visitor and Caddy is either trusted or
+absent from the header. It holds because the terminator replaces
+`X-Forwarded-For` with the single address Cloudflare reports rather than
+appending to it; a terminator that appends would put a Cloudflare edge address
+in the log instead. The header is kept in the access log so that stays
+checkable.
 
 ```sh
-tail -1 /site/tufteseid/data/logs/access.log | grep -o '"client_ip":"[^"]*"'
+grep -o '"client_ip":"[^"]*"' /site/tufteseid/data/logs/access.log \
+  | sort | uniq -c | sort -rn | head
 ```
 
-A public address means the header arrives. A `172.` address means it does not,
-and every visitor is counted as one; fix it in the TLS terminator.
+A `172.` address means `X-Forwarded-For` did not arrive, or carried nothing but
+private hops, and those requests are all counted as one visitor; fix it in the
+TLS terminator. A handful of them is ordinary — anything on the host that calls
+`127.0.0.1:3030` direct.
 
 ## usage-report.sh
 
@@ -138,6 +164,15 @@ version bump drifts it, substitute this for the `--log-format` line in
 | mapproxy log | 3 × 20 MB | `docker-compose.yml`, `logging:` |
 | rendersvc log | 3 × 20 MB | `docker-compose.yml`, `logging:` |
 | GoAccess report | rebuilt from the whole log set every run | — |
+
+How long `roll_keep` generations last is a function of line size, and a Caddy
+JSON line is mostly headers. The `format filter` block drops `resp_headers`,
+which is the same constant set on every line — the whole Content-Security-Policy
+among them — and was 1.0 kB of a 2.3 kB line. Request headers are kept: they
+are what `--ignore-crawlers` and the browser panel read, and they are where
+`X-Forwarded-For` stays checkable. Caddy redacts `Cookie`, `Set-Cookie`,
+`Authorization` and `Proxy-Authorization` to `REDACTED` by default, so no
+credential reaches the log and `log_credentials` is left off.
 
 Docker's json-file driver keeps every line forever unless capped, hence the
 `logging:` blocks on the noisy services. rendersvc is capped for a different

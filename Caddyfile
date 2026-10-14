@@ -3,6 +3,7 @@
                 metrics
 
                 trusted_proxies static private_ranges
+                trusted_proxies_strict
         }
 
         admin localhost:2019
@@ -15,7 +16,12 @@ log {
                 roll_size 20mb
                 roll_keep 10
         }
-        format json
+        format filter {
+                wrap json
+                fields {
+                        resp_headers delete
+                }
+        }
 }
 
 route {
