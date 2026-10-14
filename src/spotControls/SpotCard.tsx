@@ -80,6 +80,9 @@ const SpotUnits = ({
         <div className={cx(styles.unit, styles.unitStep)}>
           <Icon icon="crop_free" size={14} />
           <span className={styles.unitText}>{t('spots.footprintHint')}</span>
+          <Button size="compact-xs" variant="default" onClick={hold.abort}>
+            {t('spots.abort')}
+          </Button>
           <Button size="compact-xs" onClick={hold.finish}>
             {t('spots.done')}
           </Button>

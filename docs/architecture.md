@@ -459,8 +459,29 @@ megabytes on every press.
   (`SpotUnitsHeld`) rather than around it, so the picture list and the traced
   ground survive the draft — remounting them would take the traced picture off
   the map exactly when the reader opens the pen to draw on it. A card draft has
-  no resting state: the stage's own Ferdig or Avbryt writes and closes it in one
-  act, which is why the controller carries `finish`/`abort` alongside `close`.
+  no resting state: the stage's own Ferdig or Avbryt ends it in one act, which
+  is the controller's `finish` and `abort` — one commits what is in hand, the
+  other drops it, and both close the draft and land back on the card. The
+  footprint stage carries the pair in its own unit, the pen's in the draw band.
+- **Every way out of a draft is one of those two**, including the ones that are
+  not a button on it: the properties box's Ferdig and its X are `finish`, its
+  Avbryt is `abort`, and the ribbon's spot chip, `releaseSpotFootprintAtom` and
+  the leaving effect are `finish` by another name. Nothing discards silently.
+  Pressing Avbryt does not undo a stage already left — this editor writes as it
+  goes, and what it means is *don't take what I am holding*.
+- **No draft outlives the box that drives it.** The controller's leaving effect
+  is the catch, and it reads the atoms to tell the cases apart. An exit already
+  ran, or the draft atom holds somebody else's draft: it does nothing. The
+  draft was closed first: it commits and publishes the saved record, which is
+  what brings the card back. Its own card draft is *still* open and the spot it
+  stands on is no longer the open one: the card went out from under it — its X
+  while a stage has the map — so it commits and closes the draft, leaving the
+  open spot alone because the reader has just chosen what that should be.
+  Without that last case the rectangle's interaction or the pen's canvas would
+  be left on the map with nothing on screen to end them. The spot is tested
+  rather than the mounting, because React's development double-invoke tears an
+  effect down and sets it straight back up, and a draft that closed itself on
+  sight would be the worse bug.
 - **A misplaced pin is a real record**, so the properties box carries its own
   Slett, behind a two-press confirm. It is not on the card: a destructive button
   on a surface pressed constantly buys nothing.

@@ -24,7 +24,7 @@ export const SpotProperties = ({ spot }: { spot: SpotDraftController }) => {
       icon="add_location"
       title={spot.isNew ? t('spots.newTitle') : t('spots.editTitle')}
       status={spot.busy ? t('spots.saving') : undefined}
-      onClose={spot.close}
+      onClose={spot.finish}
       unsaved={spot.textDirty}
       footer={
         <>
@@ -38,7 +38,15 @@ export const SpotProperties = ({ spot }: { spot: SpotDraftController }) => {
           >
             {remove.armed ? t('spots.deleteConfirm') : t('spots.delete')}
           </Button>
-          <Button size="xs" disabled={spot.deleting} onClick={spot.close}>
+          <Button
+            size="xs"
+            variant="default"
+            disabled={spot.deleting}
+            onClick={spot.abort}
+          >
+            {t('spots.abort')}
+          </Button>
+          <Button size="xs" disabled={spot.deleting} onClick={spot.finish}>
             {t('spots.done')}
           </Button>
         </>

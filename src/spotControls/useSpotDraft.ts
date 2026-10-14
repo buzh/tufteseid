@@ -61,8 +61,8 @@ export type SpotDraftController = {
   error: SpotWriteError;
   sketchTooBig: boolean;
   remove: () => void;
-  close: () => void;
   finish: () => void;
+  abort: () => void;
 };
 
 const warn = (what: string, err: unknown) =>
@@ -319,11 +319,13 @@ export const useSpotDraft = (
     setError(null);
     chain.current = chain.current.then(async (current) => {
       if (!current) {
+        left.current = true;
         closeDraft();
         return null;
       }
       try {
         await deleteSpot(current.id);
+        left.current = true;
         setActive(null);
         closeDraft();
         return null;
@@ -338,11 +340,19 @@ export const useSpotDraft = (
 
   useEffect(
     () => () => {
-      if (left.current || store.get(spotDraftAtom)) return;
+      if (left.current) return;
+      const open = store.get(spotDraftAtom);
+      if (!open) {
+        commit();
+        void chain.current.then(setActive);
+        return;
+      }
+      if (open.id !== draft.id || open.box !== 'card') return;
+      if (store.get(activeSpotAtom)?.id === open.recordId) return;
       commit();
-      void chain.current.then(setActive);
+      closeDraft();
     },
-    [commit, store, setActive],
+    [commit, store, setActive, closeDraft, draft.id],
   );
 
   const drawing = draft.stage === 'sketch';
@@ -409,7 +419,7 @@ export const useSpotDraft = (
     error,
     sketchTooBig,
     remove,
-    close: closeDraft,
     finish,
+    abort,
   };
 };
