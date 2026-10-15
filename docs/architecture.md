@@ -39,7 +39,7 @@ One row per directory under `src/`.
 | `types/` | Search response types. |
 | `ui/` | The kit: `ControlChip`, `ControlButton`, `ControlUnit`, `Panel`, `Hint`, `Icon`, the Mantine theme, `useConfirm`, the size preference. |
 | `upstream/` | Per-origin circuit breaker, the origin registry, and the tile guard that reports to it. |
-| `viewControls/` | The view-mode control: one ground, the curtain, or the split. |
+| `viewControls/` | The view-mode control: one ground, the curtain, the blend, or the split. |
 
 ## State (Jotai atoms)
 
@@ -49,9 +49,10 @@ A `Halves` suffix means a pair (see below). Each pair's `live*` sibling is
 | Atom | Module | Is |
 | --- | --- | --- |
 | `mapAtom` | `map/atoms.ts` | The main OpenLayers `Map`, built on first read. |
-| `viewModeAtom` | `map/compare/halves.ts` | `single`, `curtain` or `split`. `compareOnAtom` is the derived "not `single`". |
+| `viewModeAtom` | `map/compare/halves.ts` | `single`, `curtain`, `blend` or `split`. `compareOnAtom` is the derived "not `single`". |
 | `selectViewModeAtom` | `map/compare/atoms.ts` | Write-only: changes the view mode and seeds B on the way out of `single`. |
 | `compareSplitAtom` | same | Where the curtain's edge sits, as a fraction of map width. |
+| `compareBlendAtom` | same | How solid B stands over A in the blend, as a fraction. |
 | `restoreCompareFromUrlAtom` | same | Write-only, spent on its first run: reopens the two-ground view a link described. |
 | `compareUrlAtomEffect` | same | Puts the view mode and B's ground back on the address bar. |
 | `backgroundLayerHalves` (+ `liveBackgroundLayersAtom`) | `…/backgroundLayers/atoms.ts` | Which ground that half is drawing. |
@@ -177,7 +178,17 @@ ground alone is not enough:
 | --- | --- |
 | `single` | One ground over the whole map. |
 | `curtain` | Two grounds in one viewport, B clipped to the right of a draggable edge. |
+| `blend` | Two grounds in one viewport, B whole and over A at the slider's opacity. |
 | `split` | Two viewports side by side on one shared `View`, so the centre of each half is the same point. |
+
+The curtain and the blend differ in one line of the install: the curtain clips B
+to a rectangle and leaves its opacities alone, the blend multiplies every
+opacity in B's stack by `compareBlendAtom` and clips nothing. Each layer's own
+opacity is kept as `cmpBaseOpacity`, so moving the slider is a walk over the
+installed layers rather than a rebuild — B's held national mosaic stays the
+fainter of the two however far the slider goes. The slider itself is
+`CompareBlend`, a pill under the band, mounted only in that mode the way the
+curtain's handle is.
 
 The split is two OpenLayers maps sharing one `View` **object**, not two views
 kept in step. The second map is `compare/splitMap.ts`, a lazy module singleton;
@@ -679,8 +690,8 @@ moved is a second picture, over ground of its own. A row kept before the stamp
 existed falls back to the rectangle it covers.
 
 - The overlay is at z 1.25: over the terrain render, **under the B half**, so a
-  curtain reads a kept render against a live ground. The transparency slider
-  does the same against A.
+  curtain or a blend reads a kept render against a live ground. The
+  transparency slider does the same against A.
 - The outgoing picture comes off only once the incoming one has pixels. A blink
   between two readings of the same ground would make the comparison worthless.
   Only the tiles *on screen* are waited for: `ImageStatic` requests nothing for
@@ -1043,8 +1054,9 @@ link made elsewhere would seat a pane that can never draw.
 
 `UrlParameter`, `src/shared/utils/urlUtils.ts`: `lok`, `invite`, `projection`,
 `backgroundLayer`, `hybrid`, `contours`, `lidarModel`, `lidarRender`,
-`viewMode`, `backgroundLayerB`, `curtain`, `themeLayers`, `heritageDetails`,
-`heritageRender`, `heritageOpacity`, `sketches`, `lat`, `lon`, `zoom`.
+`viewMode`, `backgroundLayerB`, `curtain`, `blend`, `themeLayers`,
+`heritageDetails`, `heritageRender`, `heritageOpacity`, `sketches`, `lat`,
+`lon`, `zoom`.
 
 Two of them are on with nothing on the address bar, so what gets written is the
 reader turning them *off*. `themeLayers` absent is the heritage register
@@ -1075,11 +1087,12 @@ at import and then taken off the address bar:
   written back — it belongs to the visit that arrived carrying it, not to a
   link the reader copies afterwards.
 
-**The comparison is on the URL, the B half's settings are not.** Three
+**The comparison is on the URL, the B half's settings are not.** Four
 parameters carry it, all written by `src/map/compare/`: `viewMode`
-(`curtain` or `split`, absent while one ground is up), `backgroundLayerB` (the
-ground in the second pane) and `curtain` (the seam as a whole percent, absent
-at the 50 default and in the split, where there is no seam). Everything else
+(`curtain`, `blend` or `split`, absent while one ground is up),
+`backgroundLayerB` (the ground in the second pane), `curtain` (the seam as a
+whole percent) and `blend` (B's opacity as a whole percent). The last two are
+each absent at their 50 default and in every mode but their own. Everything else
 about B — its render, DTM or DOM, the hybrid overlay, the flight or
 acquisition it was pinned to — is session state, so a link reopens the
 *comparison* rather than the half.
@@ -1095,8 +1108,10 @@ flight degrades to the national mosaic and an ortofoto acquisition to the
 mosaic, on the way out as much as on the way in, and a value outside the
 vocabulary altogether is dropped, which leaves the contrast rule to place B.
 
-`curtain` is written by `CompareCurtain` on a 400 ms debounce, because a drag
-moves the seam on every pointer event and `replaceState` is rate-limited.
+`curtain` and `blend` are written by their own control on a 400 ms debounce
+(`useLinkedPercent`), because a drag moves the value on every pointer event and
+`replaceState` is rate-limited. The control unmounting with the mode is what
+cancels a write the reader has already left behind.
 
 ## Ribbon and the UI kit
 
@@ -1112,12 +1127,12 @@ nothing in the band may change the ground under strokes already registered to
 it (*The context in front*).
 
 The second ground section mounts only while two grounds are up. `ViewSection`
-carries two units: `ViewControlGroup`, the one/curtain/split switch, and beside
-it `ShowControlGroup` — Kulturminner and the drawing, what is laid over the
-ground whichever ground is up. `ToolSection` holds the rest of the controls that
-apply to the reading — the search field, terrain, the spot `+` and its index,
-the share link, the account — with `UpstreamStatus` last, because it comes and
-goes on its own.
+carries two units: `ViewControlGroup`, the one/curtain/blend/split switch, and
+beside it `ShowControlGroup` — Kulturminner and the drawing, what is laid over
+the ground whichever ground is up. `ToolSection` holds the rest of the controls
+that apply to the reading — the search field, terrain, the spot `+` and its
+index, the share link, the account — with `UpstreamStatus` last, because it
+comes and goes on its own.
 
 `SearchChip` is a magnifier that widens into a field on focus and folds back on
 a blur, which is also what clears it. What it finds is a coordinate parsed out

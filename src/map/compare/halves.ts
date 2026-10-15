@@ -4,7 +4,7 @@ export type CompareHalf = 'a' | 'b';
 
 const BOTH_HALVES = ['a', 'b'] as const;
 
-export const VIEW_MODES = ['single', 'curtain', 'split'] as const;
+export const VIEW_MODES = ['single', 'curtain', 'blend', 'split'] as const;
 
 export type ViewMode = (typeof VIEW_MODES)[number];
 

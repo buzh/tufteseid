@@ -37,11 +37,14 @@ import {
   clearCompareLayersExcept,
   compareHostFor,
   installCompareLayers,
+  setCompareBlend,
   setCurtainSplit,
 } from './compareLayers';
 import { seedHalfB, type ViewMode, viewModeAtom } from './halves';
 
 export const compareSplitAtom = atom(0.5);
+
+export const compareBlendAtom = atom(0.5);
 
 export const MIN_SPLIT = 0.05;
 export const MAX_SPLIT = 0.95;
@@ -49,7 +52,12 @@ export const MAX_SPLIT = 0.95;
 export const clampSplit = (fraction: number): number =>
   Math.min(MAX_SPLIT, Math.max(MIN_SPLIT, fraction));
 
+const clampBlend = (fraction: number): number =>
+  Math.min(1, Math.max(0, fraction));
+
 export const DEFAULT_SPLIT_PERCENT = 50;
+
+export const DEFAULT_BLEND_PERCENT = 50;
 
 const contrastingGround = (a: BackgroundLayerName): 'kart' | 'lidar' =>
   isKartVariant(a) ? 'lidar' : 'kart';
@@ -110,21 +118,22 @@ const enterNamedGroundB = (
 
 const readLinkedViewMode = (): ViewMode | null => {
   const raw = getUrlParameter('viewMode');
-  return raw === 'curtain' || raw === 'split' ? raw : null;
+  return raw === 'curtain' || raw === 'blend' || raw === 'split' ? raw : null;
 };
 
-const readLinkedSplit = (): number | null => {
-  const raw = getUrlParameter('curtain');
+const readLinkedPercent = (name: 'curtain' | 'blend'): number | null => {
+  const raw = getUrlParameter(name);
   if (!raw) return null;
   const percent = Number(raw);
-  return Number.isFinite(percent) ? clampSplit(percent / 100) : null;
+  return Number.isFinite(percent) ? percent / 100 : null;
 };
 
 const linkedViewMode = readLinkedViewMode();
 const linkedGroundB = linkableGroundB(
   getUrlParameter('backgroundLayerB') ?? '',
 );
-const linkedSplit = readLinkedSplit();
+const linkedSplit = readLinkedPercent('curtain');
+const linkedBlend = readLinkedPercent('blend');
 
 let compareRestored = false;
 
@@ -134,8 +143,14 @@ export const restoreCompareFromUrlAtom = atom(null, (get, set) => {
   if (!linkedViewMode) return;
 
   if (linkedSplit != null) {
-    setCurtainSplit(linkedSplit);
-    set(compareSplitAtom, linkedSplit);
+    const fraction = clampSplit(linkedSplit);
+    setCurtainSplit(fraction);
+    set(compareSplitAtom, fraction);
+  }
+  if (linkedBlend != null) {
+    const fraction = clampBlend(linkedBlend);
+    setCompareBlend(fraction);
+    set(compareBlendAtom, fraction);
   }
   set(selectViewModeAtom, linkedViewMode);
   if (linkedGroundB) enterNamedGroundB(linkedGroundB, get, set);
@@ -149,13 +164,15 @@ export const compareUrlAtomEffect = atomEffect((get) => {
     removeUrlParameter('viewMode');
     removeUrlParameter('backgroundLayerB');
     removeUrlParameter('curtain');
+    removeUrlParameter('blend');
     return;
   }
 
   setUrlParameter('viewMode', mode);
   if (ground) setUrlParameter('backgroundLayerB', ground);
   else removeUrlParameter('backgroundLayerB');
-  if (mode === 'split') removeUrlParameter('curtain');
+  if (mode !== 'curtain') removeUrlParameter('curtain');
+  if (mode !== 'blend') removeUrlParameter('blend');
 });
 
 let compareGeneration = 0;
@@ -181,6 +198,7 @@ export const compareLayerAtomEffect = atomEffect((get) => {
   const host = compareHostFor(mode);
   clearCompareLayersExcept(host);
   const clip = mode === 'curtain';
+  const faded = mode === 'blend';
 
   const stack = resolveStack(layerName, {
     lidarProject,
@@ -204,14 +222,7 @@ export const compareLayerAtomEffect = atomEffect((get) => {
       if (generation !== compareGeneration) return;
       if (!built) return;
 
-      for (const { layer, opacity } of [...built.under, ...built.over]) {
-        layer.setOpacity(opacity);
-      }
-      installCompareLayers(
-        built.under.map((e) => e.layer),
-        built.over.map((e) => e.layer),
-        { host, clip },
-      );
+      installCompareLayers(built.under, built.over, { host, clip, faded });
     } catch (error) {
       console.error('[compare] failed to build the B stack', error);
     }

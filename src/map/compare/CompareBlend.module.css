@@ -1,0 +1,28 @@
+.bar {
+  position: absolute;
+  top: var(--mantine-spacing-xs);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: var(--mantine-spacing-xs);
+  width: min(
+    calc(16rem * var(--ui-scale)),
+    calc(100% - 2 * var(--mantine-spacing-xs))
+  );
+  padding: calc(4px * var(--ui-scale)) var(--mantine-spacing-sm);
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: var(--mantine-radius-sm);
+  background: var(--mantine-color-body);
+  box-shadow: var(--mantine-shadow-md);
+}
+
+.icon {
+  display: flex;
+  color: var(--mantine-color-dimmed);
+}
+
+.slider {
+  flex: 1;
+  min-width: 0;
+}

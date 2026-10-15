@@ -448,7 +448,9 @@
     "groundSection": {
       "only": "Kartlag",
       "left": "Kartlag, venstre halvdel",
-      "right": "Kartlag, høyre halvdel"
+      "right": "Kartlag, høyre halvdel",
+      "under": "Kartlag, nederste",
+      "over": "Kartlag, øverste"
     },
     "shareSpot": "Kopier lenke til lokaliteten",
     "shareView": "Kopier lenke til visningen"
@@ -682,14 +684,17 @@
   "viewControls": {
     "tooltip": "{{view}} — {{hint}}",
     "divider": "Flytt skillelinjen",
+    "fade": "Gjennomsikt i det øverste underlaget",
     "mode": {
       "single": "Ett underlag",
       "curtain": "Gardin",
+      "blend": "Overtoning",
       "split": "Delt skjerm"
     },
     "meta": {
       "single": "normal modus: ett vindu",
       "curtain": "to visninger med flyttbar skillelinje",
+      "blend": "to underlag oppå hverandre, med gjennomsikt",
       "split": "side om side, sentrert på samme punkt"
     }
   }

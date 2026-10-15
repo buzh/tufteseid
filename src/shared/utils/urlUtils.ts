@@ -38,6 +38,7 @@ export type UrlParameter =
   | 'viewMode'
   | 'backgroundLayerB'
   | 'curtain'
+  | 'blend'
   | 'themeLayers'
   | 'heritageDetails'
   | 'heritageRender'

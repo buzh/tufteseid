@@ -1,10 +1,6 @@
 import { useAtom } from 'jotai';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  removeUrlParameter,
-  setUrlParameter,
-} from '../../shared/utils/urlUtils';
 import {
   clampSplit,
   compareSplitAtom,
@@ -14,10 +10,9 @@ import {
 } from './atoms';
 import styles from './CompareCurtain.module.css';
 import { setCurtainSplit } from './compareLayers';
+import { useLinkedPercent } from './linkedPercent';
 
 const KEY_STEP = 0.02;
-
-const URL_DEBOUNCE_MS = 400;
 
 export const CompareCurtain = () => {
   const { t } = useTranslation();
@@ -31,14 +26,7 @@ export const CompareCurtain = () => {
     setSplit(next);
   };
 
-  useEffect(() => {
-    const percent = Math.round(split * 100);
-    const timer = window.setTimeout(() => {
-      if (percent === DEFAULT_SPLIT_PERCENT) removeUrlParameter('curtain');
-      else setUrlParameter('curtain', percent);
-    }, URL_DEBOUNCE_MS);
-    return () => window.clearTimeout(timer);
-  }, [split]);
+  useLinkedPercent('curtain', split, DEFAULT_SPLIT_PERCENT);
 
   const moveTo = (clientX: number) => {
     const rect = rootRef.current?.getBoundingClientRect();

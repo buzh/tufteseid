@@ -6,6 +6,7 @@ import type OlMap from 'ol/Map';
 import { getRenderPixel } from 'ol/render';
 import type RenderEvent from 'ol/render/Event';
 import { mapAtom } from '../atoms';
+import type { BuiltLayer } from '../layers/config/backgroundLayers/stack';
 import {
   OUTGOING_OPACITY,
   SWAP_TIMEOUT_MS,
@@ -19,6 +20,10 @@ const COMPARE_Z = 1.5;
 const CMP_PREFIX = 'cmp.';
 
 let split = 0.5;
+
+let blend = 0.5;
+
+let blending = false;
 
 const isCompareLayer = (layer: BaseLayer): boolean =>
   String(layer.get('id') ?? '').startsWith(CMP_PREFIX);
@@ -132,18 +137,32 @@ const setClip = (layer: TileLayer, on: boolean) => {
   }
 };
 
+const BASE_OPACITY = 'cmpBaseOpacity';
+
+const applyBlendOpacities = () => {
+  for (const layer of getMainMap().getLayers().getArray()) {
+    if (!isCompareLayer(layer)) continue;
+    const base = layer.get(BASE_OPACITY);
+    if (typeof base !== 'number') continue;
+    (layer as TileLayer).setOpacity(base * blend);
+  }
+};
+
 let cancelPendingRetire: (() => void) | null = null;
 
 export const installCompareLayers = (
-  under: TileLayer[],
-  over: TileLayer[],
-  { host, clip }: { host: OlMap; clip: boolean },
+  under: BuiltLayer[],
+  over: BuiltLayer[],
+  { host, clip, faded }: { host: OlMap; clip: boolean; faded: boolean },
 ) => {
   const collection = host.getLayers();
-  const layers = [...under, ...over];
-  if (layers.length === 0) return;
+  const entries = [...under, ...over];
+  if (entries.length === 0) return;
+  const layers = entries.map((e) => e.layer);
 
   cancelPendingRetire?.();
+
+  blending = faded;
 
   const outgoing = collection
     .getArray()
@@ -151,23 +170,26 @@ export const installCompareLayers = (
       (l) => isCompareLayer(l) && !layers.includes(l as TileLayer),
     ) as TileLayer[];
 
-  under.forEach((layer, i) => {
+  const place = ({ layer, opacity }: BuiltLayer, at: number | null) => {
+    layer.set(BASE_OPACITY, opacity);
+    layer.setOpacity(faded ? opacity * blend : opacity);
     setClip(layer, clip);
     layer.setZIndex(COMPARE_Z);
     collection.remove(layer);
-    collection.insertAt(i, layer);
-  });
-  for (const layer of over) {
-    setClip(layer, clip);
-    layer.setZIndex(COMPARE_Z);
-    collection.remove(layer);
-    collection.push(layer);
-  }
+    if (at == null) collection.push(layer);
+    else collection.insertAt(at, layer);
+  };
+
+  under.forEach((entry, i) => place(entry, i));
+  for (const entry of over) place(entry, null);
 
   trackCurtain(clip);
   if (clip) applyCurtainExtents();
 
-  for (const layer of outgoing) layer.setOpacity(OUTGOING_OPACITY);
+  for (const layer of outgoing) {
+    layer.set(BASE_OPACITY, undefined);
+    layer.setOpacity(OUTGOING_OPACITY);
+  }
 
   const retire = () => {
     cancelPendingRetire?.();
@@ -185,6 +207,7 @@ export const installCompareLayers = (
 export const clearCompareLayers = () => {
   cancelPendingRetire?.();
   trackCurtain(false);
+  blending = false;
   clearFrom(getMainMap());
   const pane = peekSplitMap();
   if (pane) clearFrom(pane);
@@ -201,4 +224,9 @@ export const setCurtainSplit = (fraction: number) => {
   split = fraction;
   applyCurtainExtents();
   getMainMap().render();
+};
+
+export const setCompareBlend = (fraction: number) => {
+  blend = fraction;
+  if (blending) applyBlendOpacities();
 };

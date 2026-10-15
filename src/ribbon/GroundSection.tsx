@@ -5,15 +5,26 @@ import { FlyfotoControlGroup, useFlyfotoControls } from '../flyfotoControls';
 import { GroundSwitch, useGroundControls } from '../grounds';
 import { KartControlGroup, useKartControls } from '../kartControls';
 import { LidarControlGroup, useLidarControls } from '../lidarControls';
-import { type CompareHalf, compareOnAtom } from '../map/compare/halves';
+import {
+  type CompareHalf,
+  type ViewMode,
+  viewModeAtom,
+} from '../map/compare/halves';
 import styles from './Ribbon.module.css';
+
+const sectionKey = (
+  mode: ViewMode,
+  half: CompareHalf,
+): 'only' | 'under' | 'over' | 'left' | 'right' => {
+  if (mode === 'single') return 'only';
+  if (mode === 'blend') return half === 'a' ? 'under' : 'over';
+  return half === 'a' ? 'left' : 'right';
+};
 
 export const GroundSection = ({ half }: { half: CompareHalf }) => {
   const { t } = useTranslation();
-  const twoGrounds = useAtomValue(compareOnAtom);
-  const sectionLabel = twoGrounds
-    ? t(`ribbon.groundSection.${half === 'a' ? 'left' : 'right'}`)
-    : t('ribbon.groundSection.only');
+  const mode = useAtomValue(viewModeAtom);
+  const sectionLabel = t(`ribbon.groundSection.${sectionKey(mode, half)}`);
 
   const lidar = useLidarControls(half);
   const kart = useKartControls(half);

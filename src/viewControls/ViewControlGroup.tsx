@@ -9,6 +9,7 @@ import type { ViewControls } from './useViewControls';
 const VIEW_ICON: Record<ViewMode, MaterialSymbol> = {
   single: 'crop_square',
   curtain: 'compare',
+  blend: 'layers',
   split: 'vertical_split',
 };
 

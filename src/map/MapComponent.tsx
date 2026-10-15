@@ -15,6 +15,7 @@ import {
   compareUrlAtomEffect,
   restoreCompareFromUrlAtom,
 } from './compare/atoms.ts';
+import { CompareBlend } from './compare/CompareBlend.tsx';
 import { CompareCurtain } from './compare/CompareCurtain.tsx';
 import { viewModeAtom } from './compare/halves.ts';
 import { SplitPane } from './compare/SplitPane.tsx';
@@ -63,6 +64,7 @@ export const MapComponent = () => {
           {viewMode === 'split' && <SplitPane />}
         </div>
         {viewMode === 'curtain' && <CompareCurtain />}
+        {viewMode === 'blend' && <CompareBlend />}
       </ErrorBoundary>
       <ErrorBoundary fallback={null} name="kulturminner">
         <HeritageInfo />
