@@ -1,6 +1,5 @@
 import { atom, getDefaultStore } from 'jotai';
 import { atomEffect } from 'jotai-effect';
-import { featureHeldNow } from '../../../../auth/features';
 import { serviceOn } from '../../../../services';
 import {
   getUrlParameter,
@@ -34,9 +33,9 @@ const VALID_STARTUP_LAYERS = new Set<BackgroundLayerName>([
   'empty',
 ]);
 
-const availableToReader = (name: BackgroundLayerName): boolean => {
+const servedHere = (name: BackgroundLayerName): boolean => {
   if (name === 'flyfoto' || name === 'flyfotoProject') {
-    return featureHeldNow('flyfoto');
+    return serviceOn('flyfoto');
   }
   if (name === 'lidarCvat') return serviceOn('cvat');
   return true;
@@ -49,7 +48,7 @@ const getDefaultBackgroundLayer = (): BackgroundLayerName => {
   if (
     layerNameFromUrl &&
     VALID_STARTUP_LAYERS.has(layerNameFromUrl) &&
-    availableToReader(layerNameFromUrl)
+    servedHere(layerNameFromUrl)
   ) {
     return layerNameFromUrl;
   }

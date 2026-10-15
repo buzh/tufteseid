@@ -238,26 +238,13 @@ check kms-record "$BASE/kms/api/v2/search/$KMS_ID" 200 json 500 '"name":"[^"]'
 if ! on flyfoto; then
   skip nib-proxy 'ENABLE_FLYFOTO is off'
 else
-  check nib-anon-refused \
+  check nib-ortofoto \
     "$BASE/wms/nib/ortofoto?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=ortofoto&STYLES=&CRS=EPSG:25833&BBOX=$BBOX&WIDTH=256&HEIGHT=256&FORMAT=image/png" \
-    401 '' 0
+    200 image/png 10000
 
-  check nib-cache-anon-refused "$BASE/cache/flyfoto/14/8802/4703.jpeg" 401 '' 0
-
-  if [ -z "${NIB_TOKEN:-}" ]; then
-    skip nib-ortofoto 'set NIB_TOKEN to a token held by a flyfoto account'
-    skip nib-prosjekter 'set NIB_TOKEN to a token held by a flyfoto account'
-  else
-    OPTS=(-s -H "Cookie: nib_auth=$NIB_TOKEN")
-    check nib-ortofoto \
-      "$BASE/wms/nib/ortofoto?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=ortofoto&STYLES=&CRS=EPSG:25833&BBOX=$BBOX&WIDTH=256&HEIGHT=256&FORMAT=image/png" \
-      200 image/png 10000
-
-    OPTS=(-s -H "Cookie: nib_auth=$NIB_TOKEN")
-    check nib-prosjekter \
-      "$BASE/arcgis/nib/prosjekter/MapServer/4/query?f=json&where=1%3D1&geometry=$BBOX&geometryType=esriGeometryEnvelope&inSR=25833&spatialRel=esriSpatialRelIntersects&outFields=prosjektnavn,aar,fotodato_date,ortofototype,pixelstorrelse,x_min,y_min,x_max,y_max&returnGeometry=false" \
-      200 json 500 '"prosjektnavn":"[^"]'
-  fi
+  check nib-prosjekter \
+    "$BASE/arcgis/nib/prosjekter/MapServer/4/query?f=json&where=1%3D1&geometry=$BBOX&geometryType=esriGeometryEnvelope&inSR=25833&spatialRel=esriSpatialRelIntersects&outFields=prosjektnavn,aar,fotodato_date,ortofototype,pixelstorrelse,x_min,y_min,x_max,y_max&returnGeometry=false" \
+    200 json 500 '"prosjektnavn":"[^"]'
 fi
 
 check hoydedata-dem \
