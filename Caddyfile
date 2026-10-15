@@ -54,6 +54,8 @@ route {
         @shortLink path_regexp shortLink ^/l/([0-9A-Za-z]+)$
         redir @shortLink /?lok={re.shortLink.1}
 
+        request_header X-Client-IP {client_ip}
+
         handle_path /wms/geonorge/* {
                 rewrite * /skwms1{http.request.uri.path}
                 reverse_proxy http://wmscache
@@ -92,11 +94,12 @@ route {
         @tileCache path_regexp tileCache ^/cache/([a-z0-9-]+)/(\d{1,2}/\d{1,7}/\d{1,7}\.(?:png|jpeg))$
         handle @tileCache {
                 rewrite * /mapproxy/tiles/{re.tileCache.1}/tufteseid25833/{re.tileCache.2}
-                reverse_proxy http://mapproxy:80
+                reverse_proxy http://wmscache
         }
 
         handle_path /cvat/* {
-                reverse_proxy http://cvat-tiles:8080
+                rewrite * /cvat-tiles{http.request.uri.path}
+                reverse_proxy http://wmscache
         }
 
         handle_path /pb/* {

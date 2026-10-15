@@ -3,6 +3,7 @@ import { atomEffect } from 'jotai-effect';
 
 import { pb, Role, SiteUser } from '../api/pocketbase';
 import { bootInviteCode } from '../invites/inviteLink';
+import { syncNibCookie } from './nibCookie';
 
 export const currentUserAtom = atom<SiteUser | null>(
   (pb.authStore.record as SiteUser | null) ?? null,
@@ -11,7 +12,10 @@ export const currentUserAtom = atom<SiteUser | null>(
 export const pbAuthSyncEffect = atomEffect((_get, set) => {
   const unsubscribe = pb.authStore.onChange(() => {
     set(currentUserAtom, (pb.authStore.record as SiteUser | null) ?? null);
+    syncNibCookie();
   });
+
+  syncNibCookie();
 
   if (!pb.authStore.isValid) {
     pb.authStore.clear();

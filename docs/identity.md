@@ -103,14 +103,25 @@ The SPA hides what would only meet that 403: the card's `fx` button with the
 two render lines behind it, and the gallery's retry on a row that renders on
 the server. A courtesy, not a gate.
 
-**`flyfoto` has no such end, and is the courtesy alone.** The ortofoto tiles
-carry the installation's own Norge i bilder token rather than the reader's, so
-nothing upstream can tell two accounts apart. What the feature decides is what
-the ground switch does: without it the Flyfoto button opens norgeibilder.no in
-a new tab over the view on screen instead of entering the ground, the pictures
-being that site's to give away (`src/grounds/norgeIBilder.ts`). A hand-written
-`?backgroundLayer=flyfoto` still seats the ground, and the archive walk over a
-spot's footprint is the *service's* to offer, not the feature's.
+**`flyfoto` is enforced at the proxy, because the cost is the upstream quota.**
+The ortofoto tiles carry the installation's own Norge i bilder token rather
+than the reader's, so nothing upstream can tell two accounts apart and the
+metering has to happen on our side of it. wmscache puts `auth_request` in
+front of all three NiB paths; the subrequest reaches
+`/api/flyfoto-gate` in `pb_hooks/features.pb.js`, which answers 200 for an
+admin or a holder of the feature and 401 for everyone else
+(`docs/wms-proxy-and-tiles.md`). The token travels as the `nib_auth` cookie,
+written by `src/auth/nibCookie.ts` and scoped by `Path` to those three
+prefixes, because a tile request is a plain browser `GET` with nowhere to put
+an Authorization header.
+
+The client half is then genuinely a courtesy: without the feature the Flyfoto
+button opens norgeibilder.no in a new tab over the view on screen instead of
+entering the ground, the pictures being that site's to give away
+(`src/grounds/norgeIBilder.ts`), and a hand-written `?backgroundLayer=flyfoto`
+falls back to the LiDAR hillshade rather than seating a ground that would 401
+every tile. The archive walk over a spot's footprint is still the *service's*
+to offer, but every call it makes now meets the gate.
 
 **An administrator holds every feature.** `src/auth/features.ts` and the
 sidecar's `server.py` both say so, so that a `features` entry nobody
@@ -120,7 +131,8 @@ remembered to grant cannot lock an installation out of its own renders.
 guests included: a feature decides what may be *asked for*, never what a spot
 already carries. Flyfoto bends that — browsing an archive is reading, and it is
 gated because every pan is another call on the quota — but no evidence row goes
-dark for want of a feature.
+dark for want of a feature, because a kept flyfoto picture is a file on the
+`evidence` row and never a live NiB call.
 
 ### `name` is what gets the credit
 

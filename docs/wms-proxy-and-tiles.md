@@ -11,12 +11,16 @@ container, `:3000`; host `127.0.0.1:3030`):
 
 - `Browser → Caddy → wmscache → upstream` — every WMS/WFS/ArcGIS service whose
   parameters are chosen at request time, plus the Kulturminnesøk record API.
-- `Browser → Caddy → mapproxy → upstream` — the six layers whose request never
-  varies, meta-tiled onto the app's grid and held in MBTiles. wmscache is not
-  in this path.
-- `Browser → Caddy → cvat-tiles` — our own MBTiles, read off disk.
+- `Browser → Caddy → wmscache → mapproxy → upstream` — the six layers whose
+  request never varies, meta-tiled onto the app's grid and held in MBTiles.
+  wmscache adds no cache of its own here; it is in the path because it is
+  where the rate limits and the flyfoto gate live (below).
+- `Browser → Caddy → wmscache → cvat-tiles` — our own MBTiles, read off disk,
+  through wmscache for the same reason.
 - `nib-proxy` — token-injecting sidecar for Norge i bilder, reached only from
-  wmscache and mapproxy on the compose network. Never exposed.
+  wmscache and mapproxy on the compose network. Never exposed. MapProxy
+  reaches it directly, so a cached ortofoto tile is served without the gate
+  being asked a second time.
 - `Browser → Caddy → rendersvc → hoydedata.no` — the one path that leaves the
   stack *without* wmscache in front of it, on purpose (below).
 
@@ -44,10 +48,19 @@ so namespaces cannot collide inside nginx (WFS would want the WMS host's
 | `/wms/nib/ortofoto` | `/nib-wms/` | nib-proxy → `services.norgeibilder.no/wms/ortofoto` |
 | `/arcgis/nib/*` | `/nib-arcgis/` | nib-proxy → `services.norgeibilder.no/arcgis/rest/services/*` |
 | `/arcgis/hoydedata/*` | `/hoydedata-arcgis/` | `hoydedata.no/arcgis/rest/services/*` |
+| `/cache/<layer>/<z>/<x>/<y>` | `/mapproxy/tiles/<layer>/tufteseid25833/…` | mapproxy |
+| `/cvat/<z>/<x>/<y>.webp` | `/cvat-tiles/` | cvat-tiles |
 
-Non-map routes: `/pb/*` → `pocketbase:8090`; `/cvat/*` → `cvat-tiles:8080`;
-`/render/*` → `rendersvc:8080`; `/l/<code>` → `redir /?lok=<code>`.
-`file_server` has no SPA fallback, so any other unknown path 404s.
+Non-map routes: `/pb/*` → `pocketbase:8090`; `/render/*` → `rendersvc:8080`;
+`/l/<code>` → `redir /?lok=<code>`. `file_server` has no SPA fallback, so any
+other unknown path 404s.
+
+Caddy sets `X-Client-IP` to `{client_ip}` on every proxied request — a *set*,
+so a client cannot forge one — and that is what wmscache keys its rate limits
+on. Without it nginx would see Caddy's container address for every visitor and
+meter the whole site as one client. Caddy resolves `{client_ip}` through its
+own `trusted_proxies static private_ranges`, so the value is the real caller
+even behind the host's TLS terminator.
 
 ## MapProxy (`/cache/*`)
 
@@ -150,6 +163,9 @@ defaults.
 | `/nib-arcgis/prosjekter/` | 7d | 15s | spelled out; **no `proxy_next_upstream`** |
 | `/nib-arcgis/` | 180d | 30s | shared include |
 | `/nib-wms/` | 180d | 30s | shared include |
+| `/mapproxy/tiles/flyfoto/` | not cached | 40s | gated; mapproxy holds the tiles |
+| `/mapproxy/` | not cached | 40s | mapproxy holds the tiles |
+| `/cvat-tiles/` | not cached | 20s | cvat-tiles reads MBTiles off disk |
 
 Longest prefix wins, so the carve-outs take precedence whatever the file order.
 They spell their directives out rather than `include` the common file because
@@ -162,6 +178,82 @@ nginx rejects a duplicate `proxy_cache_valid`, `proxy_read_timeout` or
 max_size=25g inactive=180d use_temp_path=off` — one 25 GB LRU shared by every
 location. The key is the default (the request URI), whose internal prefix keeps
 upstreams apart.
+
+A second, much smaller zone — `authz`, 64 MB, container-local rather than on
+the `wmscache` volume — holds nothing but flyfoto gate decisions, which are
+worthless after a minute and must not compete with tiles for the 25 GB.
+
+### Rate limits
+
+Every path a client can reach without an account is metered per
+`X-Client-IP`, in two zones:
+
+| Zone | Rate | Burst | Locations |
+|---|---|---|---|
+| `tiles` | 20 r/s | 200, `nodelay` | `/skwms1/`, `/wms/`, both `/nib-*`, `/mapproxy/*`, `/cvat-tiles/` |
+| `meta` | 3 r/s | 30, `nodelay` | both `/wfs-skwms1/*`, `/kms-api/`, `/hoydedata-arcgis/` |
+
+Over budget is a **429**, which OpenLayers marks `ERROR` on the tile and does
+not retry — the same end as Kartverket's own shed response.
+
+The burst is sized by the client, not by the upstream: `maxTilesLoading` is 48
+per map and split view runs two, so one pan can legitimately ask for ~96 tiles
+at once, and `nodelay` lets all of them through. 200 leaves room for a pan on
+top of a pan. `meta` is small because nothing there is bursty — DEM tiles go
+out three at a time (`MAX_CONCURRENT` in `src/terrain/dem.ts`) and a
+Kulturminnesøk lookup is one click.
+
+These numbers bound a sweep; they do not bound the *shared* upstream budget,
+which is metered on our egress address and is still what the client-side
+settings below exist for. A single caller at 20 r/s on `/skwms1/` would blow
+Kartverket's window alone — tighten `tiles` before reaching for anything else
+if that starts happening.
+
+`limit_req` runs in the preaccess phase, ahead of `auth_request`, so a refused
+flyfoto request is metered too and cannot be used to hammer the gate.
+
+### The flyfoto gate
+
+Norge i bilder is the one upstream that costs somebody money, so the three
+paths that carry it — `/nib-wms/`, `/nib-arcgis/`, and the cached mosaic at
+`/mapproxy/tiles/flyfoto/` — carry `auth_request /flyfoto-gate`.
+
+The gate is an internal location that forwards the `nib_auth` cookie as an
+`Authorization` header to PocketBase's `/api/flyfoto-gate`
+(`pb_hooks/features.pb.js`), which answers 200 for an admin or an account
+holding the `flyfoto` feature and 401/403 for anyone else. The decision is
+cached in `authz` under the token for 60 s (30 s for a refusal), so a pan
+costs one subrequest, not one per tile.
+
+A tile request is a plain browser `GET` with no Authorization header, which is
+why the token travels as a cookie. `src/auth/nibCookie.ts` writes `nib_auth`
+on every `authStore` change, `SameSite=Lax`, `Secure` off localhost, and —
+this is the point — scoped with `Path` to the three NiB prefixes
+(`NIB_PREFIXES` in `src/upstream/origins.ts`) rather than `/`. The token is
+already in localStorage, so the cookie exposes nothing new, but a `Path=/`
+cookie would ride on every tile and every static asset for no reason.
+
+MapProxy fetches from nib-proxy directly, so the gate sits in front of the
+*client's* read of a cached tile, never in front of MapProxy's fill of it.
+
+**`proxy_set_header Cookie ""` is load-bearing**, in
+`wms-proxy-common.conf` and in every location that spells its directives out
+instead. nginx forwards the request's `Cookie` header upstream by default, and
+the gated paths are exactly the ones that now carry an account token — without
+the strip, `nib_auth` would travel to norgeibilder.no on every tile. No
+upstream in this stack has ever wanted a cookie from us, so the strip is
+unconditional rather than scoped to the NiB locations.
+
+Two consequences worth keeping in mind:
+
+- **The gate fails closed.** If PocketBase is unreachable the subrequest is a
+  502 and `auth_request` turns that into a 500, so ortofoto goes dark while
+  the rest of the map keeps working.
+- **`?backgroundLayer=flyfoto` is a feature check, not a service check.**
+  `availableToReader` in `src/map/layers/config/backgroundLayers/atoms.ts` calls
+  `featureHeldNow('flyfoto')`, so a reader without the feature who opens that
+  URL lands on `lidarHillshade` instead of on a ground that would 401 every
+  tile.
 
 ### Upstream groups
 
@@ -336,9 +428,10 @@ paths the app has stopped asking for (`docs/architecture.md`).
 
 ## cvat-tiles
 
-`/cvat/<acquisition>/<z>/<x>/<y>.webp` → `cvat-tiles:8080`, one indexed `SELECT`
-against `<acquisition>.mbtiles` in `/site/tufteseid/data/cvat`. Never leaves the
-stack: no wmscache entry, no CSP host.
+`/cvat/<acquisition>/<z>/<x>/<y>.webp` → `/cvat-tiles/` in wmscache →
+`cvat-tiles:8080`, one indexed `SELECT` against `<acquisition>.mbtiles` in
+`/site/tufteseid/data/cvat`. Never leaves the stack: no CSP host, and wmscache
+caches none of it — the hop buys the `tiles` rate limit and nothing else.
 
 - **A 404 on a missing tile is load-bearing** — it is the coverage mask
   (`docs/map-layers.md`). The sidecar answers a missing row with a 404, not a
@@ -631,6 +724,22 @@ docker compose exec mapproxy mapproxy-util grids -f /mapproxy/config/mapproxy.ya
 curl -s "http://localhost:3030/cache/lidar-dtm/13/<x>/<y>.png" -o a.png
 sudo du -sh /site/tufteseid/data/mapproxy
 ```
+
+Rate limits and the gate:
+
+```
+curl -s -o /dev/null -w '%{http_code}\n' "http://localhost:3030/cache/flyfoto/14/8802/4703.jpeg"
+curl -s -o /dev/null -w '%{http_code}\n' -H "Cookie: nib_auth=$TOKEN" \
+  "http://localhost:3030/cache/flyfoto/14/8802/4703.jpeg"
+
+seq 1 400 | xargs -P 20 -I{} curl -s -o /dev/null -w '%{http_code}\n' \
+  "http://localhost:3030/cache/lidar-dtm/13/4400/2350.png" | sort | uniq -c
+```
+
+The first is 401, the second 200 with a token from an account holding
+`flyfoto`. The burst run should print a few hundred 200s and then 429s;
+`NIB_TOKEN=<token> scripts/live-check.sh https://<host>` covers the same two
+cases without the flood.
 
 `nginx -T` prints what nginx loaded, not what the file says. The `curl -sI` is
 MISS then HIT, both `max-age=604800`. The grid dump printing 0.331 m/px at z16
