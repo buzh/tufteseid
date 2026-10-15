@@ -24,6 +24,12 @@ type Origin = {
   prefixes: string[];
 };
 
+export const NIB_PREFIXES = [
+  '/wms/nib/',
+  '/arcgis/nib/',
+  '/cache/flyfoto',
+] as const;
+
 export const ORIGINS: Record<OriginId, Origin> = {
   hoyde: {
     probeUrl: wmsProbe(
@@ -61,7 +67,7 @@ export const ORIGINS: Record<OriginId, Origin> = {
   },
   nib: {
     probeUrl: wmsProbe('/wms/nib/ortofoto', 'ortofoto', 'image/jpeg'),
-    prefixes: ['/wms/nib/', '/arcgis/nib/', '/cache/flyfoto'],
+    prefixes: [...NIB_PREFIXES],
   },
 };
 

@@ -103,14 +103,25 @@ The SPA hides what would only meet that 403: the card's `fx` button with the
 two render lines behind it, and the gallery's retry on a row that renders on
 the server. A courtesy, not a gate.
 
-**`flyfoto` has no such end, and is the courtesy alone.** The ortofoto tiles
-carry the installation's own Norge i bilder token rather than the reader's, so
-nothing upstream can tell two accounts apart. What the feature decides is what
-the ground switch does: without it the Flyfoto button opens norgeibilder.no in
-a new tab over the view on screen instead of entering the ground, the pictures
-being that site's to give away (`src/grounds/norgeIBilder.ts`). A hand-written
-`?backgroundLayer=flyfoto` still seats the ground, and the archive walk over a
-spot's footprint is the *service's* to offer, not the feature's.
+**`flyfoto` is enforced at the proxy, because the cost is the upstream quota.**
+The ortofoto tiles carry the installation's own Norge i bilder token rather
+than the reader's, so nothing upstream can tell two accounts apart and the
+metering has to happen on our side of it. wmscache puts `auth_request` in
+front of all three NiB paths; the subrequest reaches
+`/api/flyfoto-gate` in `pb_hooks/features.pb.js`, which answers 200 for an
+admin or a holder of the feature and 401 for everyone else
+(`docs/wms-proxy-and-tiles.md`). The token travels as the `nib_auth` cookie,
+written by `src/auth/nibCookie.ts` and scoped by `Path` to those three
+prefixes, because a tile request is a plain browser `GET` with nowhere to put
+an Authorization header.
+
+The client half is then genuinely a courtesy: without the feature the Flyfoto
+button opens norgeibilder.no in a new tab over the view on screen instead of
+entering the ground, the pictures being that site's to give away
+(`src/grounds/norgeIBilder.ts`), and a hand-written `?backgroundLayer=flyfoto`
+falls back to the LiDAR hillshade rather than seating a ground that would 401
+every tile. The archive walk over a spot's footprint is still the *service's*
+to offer, but every call it makes now meets the gate.
 
 **An administrator holds every feature.** `src/auth/features.ts` and the
 sidecar's `server.py` both say so, so that a `features` entry nobody
@@ -120,7 +131,8 @@ remembered to grant cannot lock an installation out of its own renders.
 guests included: a feature decides what may be *asked for*, never what a spot
 already carries. Flyfoto bends that — browsing an archive is reading, and it is
 gated because every pan is another call on the quota — but no evidence row goes
-dark for want of a feature.
+dark for want of a feature, because a kept flyfoto picture is a file on the
+`evidence` row and never a live NiB call.
 
 ### `name` is what gets the credit
 
@@ -181,6 +193,64 @@ PocketBase refreshes the record's token key, so the token in hand dies with
 the old password. `changePassword` signs straight back in with the new one;
 when that does not land, the dialog closes and the sign-in box opens, because
 the account is fine and the session is not.
+
+## Rate limits on the API
+
+PocketBase's own limiter is on, and it is **settings in the admin UI, not a
+migration** — the one place this repo deliberately leaves PocketBase
+configuration unversioned. A migration that writes app settings takes the
+whole backend down when it is wrong: settings are applied during bootstrap,
+before anything listens, so a failure there is not a bad route or a 400, it
+is a server that never starts and a `/pb/*` that answers 502 to everything.
+A rule typed into the UI is a runtime change that can be undone in the UI.
+
+*Settings → Application → Trusted proxy* comes first, because the limiter
+keys on `RealIP()` and `RealIP()` is only as good as that:
+
+| Field | Value |
+|---|---|
+| Headers | `X-Forwarded-For` |
+| Use leftmost IP | on |
+
+Caddy **appends** its immediate peer to the incoming `X-Forwarded-For`, so
+PocketBase sees `<visitor>, <terminator>` and the *rightmost* address is the
+host's TLS terminator. Taking it would meter every account on the
+installation as one client. Leftmost is the visitor, and it is trustworthy
+only because the terminator replaces the header rather than appending to it —
+the same property that makes Caddy's `trusted_proxies_strict` correct
+(`docs/monitoring.md`). Changing terminators means rechecking this: the
+symptom of getting it wrong is an admin-UI *Logs* entry whose IP is a `172.`
+or `127.` address instead of a public one.
+
+*Settings → Application → Rate limiting*, in this order — `FindRateLimitRule`
+returns the **first** match, and among path rules it iterates in array order
+rather than by longest prefix:
+
+| Label | Max | Seconds | Audience |
+|---|---|---|---|
+| `*:auth` | 10 | 60 | all |
+| `users:requestPasswordReset` | 3 | 3600 | all |
+| `users:create` | 5 | 3600 | all |
+| `spots:create` | 30 | 60 | all |
+| `evidence:create` | 120 | 60 | all |
+| `*:create` | 20 | 5 | all |
+| `/api/batch` | 3 | 1 | all |
+| `/api/` | 100 | 10 | `@guest` |
+| `/api/` | 300 | 10 | all |
+
+- **`authRefresh` does not carry the `auth` tag**, only `authWithPassword`,
+  `authWithOAuth2` and `authWithOTP` do. So `*:auth` can be strict without
+  touching the refresh that `pbAuthSyncEffect` fires on every page load.
+- **The two `/api/` rows both apply** because the middleware looks a rule up
+  with `["", "@guest"]` for a guest and `["", "@auth"]` for an account, so the
+  guest tier is reached only by guests and an account falls through to the row
+  below it.
+- **`evidence:create` is high on purpose.** Keeping a boundary writes one row
+  per tile in quick succession, and a low cap would break the mosaic rather
+  than slow it.
+
+These cover `/pb/*` alone. Every tile path is metered in nginx instead, which
+is also where the flyfoto gate lives (`docs/wms-proxy-and-tiles.md`).
 
 ## Adding an OAuth2 provider later
 

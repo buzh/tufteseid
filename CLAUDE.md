@@ -29,7 +29,7 @@ Each owns its subject; this file keeps only what is true across all of them.
 | --- | --- | --- |
 | `docs/architecture.md` | Module map, the Jotai atoms, the two-ground `halves` mechanism, the opt-in services, URL parameters, the ribbon's contracts, known gaps | anything under `src/`, especially before building a surface |
 | `docs/map-layers.md` | Background grounds, theme layers, and the recipes for adding another | `src/map/layers/`, any new map source |
-| `docs/wms-proxy-and-tiles.md` | Caddy → wmscache → upstream and Caddy → mapproxy → upstream, nib-proxy, cache rules, CSP hosts, tile-loading limits | `Caddyfile`, `nginx/`, `mapproxy/`, `nib-proxy/`, tile grids, anything that multiplies request counts |
+| `docs/wms-proxy-and-tiles.md` | Caddy → wmscache → upstream, mapproxy or cvat-tiles, nib-proxy, cache rules, the per-IP rate limits, the flyfoto gate, CSP hosts, tile-loading limits | `Caddyfile`, `nginx/`, `mapproxy/`, `nib-proxy/`, tile grids, anything that multiplies request counts |
 | `docs/terrain-analysis.md` | Float elevation from hoydedata.no, the endpoint's quirks, the visualizations | `src/terrain/` |
 | `docs/render-sidecar.md` | The caller's half of the server-side render service, which lives in the **tufteseid-render** repo: what is sent, the `meta.job` markers read back, the legend's wording, the pinned image, the four seams between the two repos | `src/api/render.ts`, the `sunloop` and `rvt` arms in `src/evidence/`, the `rendersvc` service |
 | `docs/identity.md` | PocketBase password auth, the three modes of the sign-in box, the three fields on `users` nobody may set themselves, what a feature gates, and the `MAXUSERS` cap with its `queued` role | `src/auth/`, `pocketbase/pb_hooks/identity.pb.js`, `pocketbase/pb_hooks/capacity.pb.js`, the `users` migrations |
@@ -184,19 +184,21 @@ alongside the cVAT and MapProxy store directories (`README.md`,
 | `rendersvc` | **Opt-in (`ENABLE_RENDER`).** A pinned image from the **tufteseid-render** repo, not a build: `ghcr.io/buzh/tufteseid-render`. Serves `/render/*`: renders an evidence row server-side and PATCHes the file back with the caller's own token. One worker, a queue of 8, CPU and memory capped. |
 | `cvat-tiles` | **Opt-in (`ENABLE_CVAT`).** `node:24-alpine`, zero deps. Serves `/cvat/*` out of one MBTiles database per LiDAR acquisition in the bind-mounted store. Built out of band by `vat-cache/`. |
 | `mapproxy` | `mapproxy:7.0.0-alpine-nginx`. Serves `/cache/*`: the six upstream layers whose parameters never change, meta-tiled onto the app's own grid and held in MBTiles. Config in `mapproxy/`, store bind-mounted. |
-| `wmscache` | `nginx:1.27-alpine` reverse proxy + 25 GB disk cache in front of every external WMS/WFS/ArcGIS service whose parameters are chosen at request time, plus Kulturminnesøk's record API. |
+| `wmscache` | `nginx:1.27-alpine` reverse proxy + 25 GB disk cache in front of every external WMS/WFS/ArcGIS service whose parameters are chosen at request time, plus Kulturminnesøk's record API. Also the one gate every unauthenticated path passes through: `/cache/*` and `/cvat/*` are routed here too, for the per-IP `limit_req` zones and the `auth_request` that gates Norge i bilder. |
 
 ## PocketBase
 
 Migrations are versioned in `pocketbase/pb_migrations/` and use the ≥0.23
 App-based JSVM API (`$app.findCollectionByNameOrId` / `app.save`, flattened
 field classes), **not** the 0.22 `Dao` API. `pocketbase/pb_hooks/` holds JS
-hooks in the same runtime, for the three things a collection rule cannot say:
+hooks in the same runtime, for the four things a collection rule cannot say:
 the closed-beta gate counts rows and spends a counter (`docs/closed-beta.md`),
 `identity.pb.js` pins the three fields on a `users` row that are not the
-reader's to choose, a rule being unable to name a field, and `profile.pb.js`
+reader's to choose, a rule being unable to name a field, `profile.pb.js`
 moves an account's address, which PocketBase refuses on a self-PATCH
-(`docs/identity.md`).
+(`docs/identity.md`), and `features.pb.js` answers the `auth_request` that
+wmscache puts in front of Norge i bilder, a tile being nobody's record at all
+(`docs/wms-proxy-and-tiles.md`).
 
 - **A hook handler cannot see its own file's scope.** PocketBase serializes
   each handler and runs it in a runtime of its own, so a constant or helper
@@ -214,6 +216,12 @@ moves an account's address, which PocketBase refuses on a self-PATCH
   bootstrap and only then registers the JS ones, whatever the timestamps say. A
   JS migration can never run before a core one; anything that must precede a
   core migration happens out of band against a stopped database.
+- **App settings are the exception to versioning them.** The rate limiter and
+  the trusted-proxy header are typed into the admin UI, not written by a
+  migration. Settings are applied during bootstrap, so a migration that gets
+  one wrong does not fail a request — it stops PocketBase from ever listening
+  and every `/pb/*` answers 502 (`docs/identity.md`). Collection shape stays
+  in migrations; `$app.settings()` does not go there.
 - **Sign-in is PocketBase's own password auth**, versioned in
   `1700002500_password_auth.js` rather than left to the admin UI, and
   `oauth2` is switched off with its `providers` cleared — a config left
@@ -323,9 +331,12 @@ already carries. A gated capability is a name on `users.features` — `render`
 and `flyfoto` so far — kept out of the collection rules and enforced where the
 cost is: `rendersvc` reads the caller's own row and refuses, so
 `src/auth/features.ts` only hides the control that would meet that 403.
-`flyfoto` has no server end at all and is the hiding alone — an ungranted
-reader's Flyfoto button opens norgeibilder.no instead of the ground
-(`docs/identity.md`). An admin holds every feature, and nobody holds one whose
+`flyfoto` is enforced in wmscache, which puts `auth_request` in front of all
+three NiB paths and asks `pb_hooks/features.pb.js`; the token gets there as
+the `nib_auth` cookie, because a tile request has nowhere to put a header. The
+client half is the courtesy — an ungranted reader's Flyfoto button opens
+norgeibilder.no instead of the ground (`docs/identity.md`). An admin holds
+every feature, and nobody holds one whose
 service is off. Granting one is an admin-UI edit with no code change; adding a
 *feature* is a string on both ends.
 

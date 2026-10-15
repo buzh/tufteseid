@@ -58,6 +58,17 @@ grep -o '"client_ip":"[^"]*"' /site/tufteseid/data/logs/access.log \
   | sort | uniq -c | sort -rn | head
 ```
 
+The same value is what Caddy writes into the `X-Client-IP` request header on
+every proxied call, and what wmscache keys its rate limits on and records as
+`ip=` in its own log (`docs/wms-proxy-and-tiles.md`). So a visitor appears in
+two places with two retentions: Caddy's rolled files on disk, and wmscache's
+container log. Counting who is being metered:
+
+```sh
+docker compose logs --no-log-prefix wmscache \
+  | awk '$2 == 429 { sub(/^ip=/, "", $6); print $6 }' | sort | uniq -c | sort -rn | head
+```
+
 A `172.` address means `X-Forwarded-For` did not arrive, or carried nothing but
 private hops, and those requests are all counted as one visitor; fix it in the
 TLS terminator. A handful of them is ordinary — anything on the host that calls
