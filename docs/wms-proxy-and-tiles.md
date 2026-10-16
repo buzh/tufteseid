@@ -186,28 +186,44 @@ worthless after a minute and must not compete with tiles for the 25 GB.
 ### Rate limits
 
 Every path a client can reach without an account is metered per
-`X-Client-IP`, in two zones:
+`X-Client-IP`, in three zones:
 
 | Zone | Rate | Burst | Locations |
 |---|---|---|---|
-| `tiles` | 20 r/s | 200, `nodelay` | `/skwms1/`, `/wms/`, both `/nib-*`, `/mapproxy/*`, `/cvat-tiles/` |
+| `tiles` | 40 r/s | 200, `nodelay` | `/skwms1/`, `/wms/`, both `/nib-*`, the cached flyfoto mosaic |
+| `store` | 60 r/s | 300, `nodelay` | `/mapproxy/`, `/cvat-tiles/` |
 | `meta` | 3 r/s | 30, `nodelay` | both `/wfs-skwms1/*`, `/kms-api/`, `/hoydedata-arcgis/` |
 
 Over budget is a **429**, which OpenLayers marks `ERROR` on the tile and does
 not retry — the same end as Kartverket's own shed response.
 
-The burst is sized by the client, not by the upstream: `maxTilesLoading` is 48
-per map and split view runs two, so one pan can legitimately ask for ~96 tiles
-at once, and `nodelay` lets all of them through. 200 leaves room for a pan on
-top of a pan. `meta` is small because nothing there is bursty — DEM tiles go
-out three at a time (`MAX_CONCURRENT` in `src/terrain/dem.ts`) and a
-Kulturminnesøk lookup is one click.
+**The rate is sized above what one reader draws, not at it.** A continuous pan
+at z16 with the hybrid ground asks for three rasters per map tile and sustains
+around 34 r/s on a 1440×900 window — some 25 of them off our own store, 9 live
+WMS — and a larger window or the split view's second map multiplies that. The
+burst only buys time against a steady rate set too low: at 20 r/s a reader who
+keeps panning is shed after about twenty seconds. Rate is what has to clear the
+draw; `nodelay` and a burst of 200 are there so a pan on top of a pan still
+goes out at once (`maxTilesLoading` is 48 per map).
+
+**A shed tile reads as an outage to the client.** An `<img>` error carries no
+status, so `src/upstream/tileGuard.ts` cannot tell a 429 from a dead upstream,
+and three inside a minute trip that origin's breaker in
+`src/upstream/health.ts`: the layer goes dark for 20 s, longer each repeat.
+Shedding a reader is therefore not a slow map but a blank one, which is why the
+local store — disk and nothing else — is metered apart from the upstreams that
+cost something.
+
+`meta` is small because nothing there is bursty — DEM tiles go out three at a
+time (`MAX_CONCURRENT` in `src/terrain/dem.ts`), a project boundary is fetched
+once per project and cached, and a Kulturminnesøk lookup is one click.
 
 These numbers bound a sweep; they do not bound the *shared* upstream budget,
 which is metered on our egress address and is still what the client-side
-settings below exist for. A single caller at 20 r/s on `/skwms1/` would blow
+settings below exist for. A single caller at 40 r/s on `/skwms1/` would blow
 Kartverket's window alone — tighten `tiles` before reaching for anything else
-if that starts happening.
+if that starts happening, and read what the paragraph above says about the
+price of tightening it too far.
 
 `limit_req` runs in the preaccess phase, ahead of `auth_request`, so a refused
 flyfoto request is metered too and cannot be used to hammer the gate.
@@ -436,7 +452,7 @@ paths the app has stopped asking for (`docs/architecture.md`).
 `/cvat/<acquisition>/<z>/<x>/<y>.webp` → `/cvat-tiles/` in wmscache →
 `cvat-tiles:8080`, one indexed `SELECT` against `<acquisition>.mbtiles` in
 `/site/tufteseid/data/cvat`. Never leaves the stack: no CSP host, and wmscache
-caches none of it — the hop buys the `tiles` rate limit and nothing else.
+caches none of it — the hop buys the `store` rate limit and nothing else.
 
 - **A 404 on a missing tile is load-bearing** — it is the coverage mask
   (`docs/map-layers.md`). The sidecar answers a missing row with a 404, not a
