@@ -448,6 +448,13 @@ caches none of it — the hop buys the `tiles` rate limit and nothing else.
   nothing edited, imported or restarted; an empty store answers an empty list.
 - One database per acquisition; the path segment names it. Overlapping flights
   are separate rows and may not share a `<z>/<x>/<y>`.
+- **The acquisition reaches the sidecar still percent-encoded.** Many of the
+  slugs carry `ø` or `å`. nginx hands a `proxy_pass` built out of variables to
+  the upstream verbatim and `$uri` is the *decoded* path, so the remainder is
+  taken off `$request_uri` — the client's own escaping — through the `$cvat_uri`
+  map. Raw UTF-8 in a request line is a bare 400 out of Node's parser, before
+  the sidecar sees the request at all, and the browser reports it as a failed
+  tile with no body to explain it.
 - `tile_row` is the MBTiles spec's, counted from the south, but the grid under
   it is the app's EPSG:25833 one — a generic MBTiles reader would place these
   tiles in the Atlantic.
