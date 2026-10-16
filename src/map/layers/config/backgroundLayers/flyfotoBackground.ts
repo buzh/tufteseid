@@ -18,7 +18,6 @@ export const FLYFOTO_MOSAIC_CONFIG: XYZBackgroundLayer = {
   minZoom: 0,
   maxZoom: VIEW_MAX_ZOOM,
   preload: 0,
-  sparse: false,
   coverageExtent: {
     extent: FLYFOTO_COVERAGE_EXTENT_25833,
     crs: 'EPSG:25833',

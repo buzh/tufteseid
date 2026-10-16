@@ -40,7 +40,6 @@ const nationalCacheConfig = (
   maxZoom: NATIONAL_CACHE_MAX_ZOOM,
   interpolate: false,
   preload: 0,
-  sparse: false,
   coverageExtent: NATIONAL_COVERAGE,
 });
 

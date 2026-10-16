@@ -21,6 +21,5 @@ export const buildTopoOverlayConfig = (
   minZoom: 0,
   maxZoom: VIEW_MAX_ZOOM,
   preload: 0,
-  sparse: false,
   coverageExtent: TOPO_COVERAGE_EXTENT_25833,
 });

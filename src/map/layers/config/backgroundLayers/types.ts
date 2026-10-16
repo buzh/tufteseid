@@ -57,7 +57,6 @@ export type XYZBackgroundLayer = BackgroundLayerBase & {
   minZoom: number;
   maxZoom: number;
   preload: 0 | 2;
-  sparse: boolean;
   heldUrl?: string;
   interpolate?: boolean;
   coverageExtent?: CoverageExtent;

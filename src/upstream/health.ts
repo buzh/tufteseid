@@ -1,6 +1,8 @@
 import { atom, getDefaultStore } from 'jotai';
 import { ORIGIN_IDS, ORIGINS, type OriginId } from './origins';
 
+export const SHED_STATUS = 429;
+
 const FAIL_THRESHOLD = 3;
 const FAIL_WINDOW_MS = 60_000;
 const PROBE_TIMEOUT_MS = 8_000;
@@ -161,6 +163,7 @@ export const reportSuccess = (id: OriginId) => {
 };
 
 export const reportStatus = (id: OriginId, status: number) => {
+  if (status === SHED_STATUS) return;
   if (status >= 500) reportFailure(id);
   else reportSuccess(id);
 };
@@ -180,7 +183,7 @@ const probe = async (id: OriginId) => {
     const res = await fetch(probeUrl(id), { signal, cache: 'no-store' });
     await res.arrayBuffer();
     l.probing = false;
-    if (res.status < 500) {
+    if (res.status < 500 && res.status !== SHED_STATUS) {
       recover(id);
       return;
     }

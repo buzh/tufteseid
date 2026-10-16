@@ -138,9 +138,10 @@ manifest envelope (year and density parsed out of the name, no WMS styles). The
 store's envelope is inclusive tile indices at `ENVELOPE_FLOOR_Z = 12`
 (`cvat-tiles/server.mjs`), or the coarsest level held.
 
-`lidarCvat` sets `sparse: true`: a tile the store does not hold 404s, OL leaves
-it transparent, and that transparency is what draws the edge — so the retry in
-`tileGuard.ts` is off. `preload: 2`, since a miss is a `SELECT` against a
+A tile the store does not hold 404s, OL leaves it transparent, and that
+transparency is what draws the edge. `tileGuard.ts` reads the status and so
+neither retries a hole nor counts it against the breaker; the layer carries no
+flag of its own for this. `preload: 2`, since a miss is a `SELECT` against a
 bind-mounted database. `getXYZLayer` sets `maxResolution` one step coarser than
 the store's coarsest level, or OL clamps there and asks for four screenfuls to
 upscale.
@@ -438,7 +439,7 @@ Whether a feature's `linkkulturminnesok` URL resolves is asked separately
    spread it into `allConfiguredBackgroundLayers` in `stack.ts`.
    `coverageExtent` is mandatory for anything that can reach an upstream, XYZ
    over `/cache/` included; `XYZBackgroundLayer` also requires `projection`,
-   `minZoom`, `maxZoom`, `preload` (0 or 2) and `sparse`. If the source is a
+   `minZoom`, `maxZoom` and `preload` (0 or 2). If the source is a
    fixed layer+style, it should be a MapProxy cache rather than a `TileWMS` —
    that recipe is in `docs/wms-proxy-and-tiles.md`.
 3. A layer whose concrete source is a runtime choice gets a branch in

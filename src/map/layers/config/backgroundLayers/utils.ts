@@ -176,10 +176,7 @@ export const getXYZLayer = (
     );
   }
 
-  guardTileSource(source, layerConfig.url, {
-    retry: !layerConfig.sparse,
-    heldUrl: layerConfig.heldUrl,
-  });
+  guardTileSource(source, layerConfig.url, { heldUrl: layerConfig.heldUrl });
 
   const extent = toViewExtent(layerConfig.coverageExtent, viewProjection);
   return new TileLayer({

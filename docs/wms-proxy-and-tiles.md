@@ -194,8 +194,9 @@ Every path a client can reach without an account is metered per
 | `store` | 60 r/s | 300, `nodelay` | `/mapproxy/`, `/cvat-tiles/` |
 | `meta` | 3 r/s | 30, `nodelay` | both `/wfs-skwms1/*`, `/kms-api/`, `/hoydedata-arcgis/` |
 
-Over budget is a **429**, which OpenLayers marks `ERROR` on the tile and does
-not retry — the same end as Kartverket's own shed response.
+Over budget is a **429**, which `src/upstream/tileGuard.ts` reads off the
+response and retries on a schedule of its own — the same end as Kartverket's own
+shed response.
 
 **The rate is sized above what one reader draws, not at it.** A continuous pan
 at z16 with the hybrid ground asks for three rasters per map tile and sustains
@@ -206,13 +207,14 @@ keeps panning is shed after about twenty seconds. Rate is what has to clear the
 draw; `nodelay` and a burst of 200 are there so a pan on top of a pan still
 goes out at once (`maxTilesLoading` is 48 per map).
 
-**A shed tile reads as an outage to the client.** An `<img>` error carries no
-status, so `src/upstream/tileGuard.ts` cannot tell a 429 from a dead upstream,
-and three inside a minute trip that origin's breaker in
-`src/upstream/health.ts`: the layer goes dark for 20 s, longer each repeat.
-Shedding a reader is therefore not a slow map but a blank one, which is why the
-local store — disk and nothing else — is metered apart from the upstreams that
-cost something.
+**A shed tile is slow, not dark.** `tileGuard` fetches the tile rather than
+assigning `img.src`, so it has the status and counts a 429 as neither a success
+nor a failure: the breaker in `src/upstream/health.ts` does not move, and the
+tile comes back on the wider jittered schedule below. The zones are therefore
+sized for throughput alone — what a reader actually draws — and not to keep the
+breaker from tripping. The local store is still metered apart from the upstreams
+because disk and somebody else's WMS are worth different rates, not because a
+shed there would blank the map.
 
 `meta` is small because nothing there is bursty — DEM tiles go out three at a
 time (`MAX_CONCURRENT` in `src/terrain/dem.ts`), a project boundary is fetched
@@ -363,7 +365,7 @@ proxy_set_header Accept-Encoding "";   # gzipping a PNG buys nothing;
                                        # does NOT restore Content-Length
 proxy_cache_valid 200 180d;
 proxy_cache_valid 404 10m;             # negative caching: without it only 200s
-proxy_cache_valid 400 403 1m;          # are stored and tileGuard retries ×3
+proxy_cache_valid 400 403 1m;          # are stored and every repeat is a round trip
 proxy_cache_lock on;
 proxy_cache_lock_timeout 30s;
 proxy_cache_lock_age 30s;              # the 5s default breaks the lock mid-render
@@ -635,23 +637,50 @@ ceiling and its own bounded retry.
 ### `guardTileSource` (`src/upstream/tileGuard.ts`)
 
 Wraps a tile source in admission control (for origins the breaker knows) plus a
-bounded retry (for every source that reaches an upstream, including those no
-origin claims).
+classified retry (for every source that reaches an upstream, including those no
+origin claims). The tile is loaded with `fetch` and handed to the image as a
+blob URL, so the guard has the status before anything is drawn.
 
-- Two retries at 400 ms and 900 ms, plus up to 300 ms jitter, then the tile is
-  left `ERROR`. Without it the ~1-in-200 upstream 502 is a hole that lasts until
-  reload, and only at the zoom level it happened on.
-- Every failed try reports to the breaker, so an outage trips it in fewer tiles,
-  not more.
-- A tile the breaker *refused* is not retried and not counted; it comes back via
-  `refresh()` on recovery.
+| Status | Breaker | Retry |
+|---|---|---|
+| 2xx | success | — |
+| 400, 401, 403, 404, 410 | success: the origin answered | none |
+| 429 | neither | 1500, 3500, 7000 ms, each ×`1 + random()` |
+| 408, 5xx, thrown | failure | 400 and 900 ms, plus up to 300 ms jitter |
+
+- A 4xx is the origin working: a coverage hole on the cVAT ground, the flyfoto
+  gate refusing an ungranted reader, a tile outside the WMTS matrix. Retrying it
+  changes nothing and counting it blanks the layer, so it does neither. No
+  layer declares itself holey: a mask hole is legible as a 404. `/cache/` has
+  none to declare either — MapProxy culls to a coverage polygon and answers a
+  blank 200 inside it.
+- A 429 must not heal an origin that is genuinely down, so it reports nothing at
+  all rather than reporting a success. The shed schedule is wider and multiplied
+  by `1 + random()` because a shed arrives for every tile in the viewport at
+  once, and retrying them in lockstep re-floods the same bucket. There is no
+  `Retry-After` to read: nginx's `limit_req` does not send one.
+- The failure retry is what the ~1-in-200 upstream 502 needs: without it that
+  hole lasts until reload, and only at the zoom level it happened on. Every
+  failed try reports to the breaker, so an outage trips it in fewer tiles, not
+  more.
+- A tile the breaker *refused* never reaches the fetch; it is not retried and
+  not counted, and comes back via `refresh()` on recovery.
 - `heldUrl` redirects a refused tile to a source-less store instead — the two
   national mosaics only. The fallback copy of the mosaic is on that store from
   the start and never carries `heldUrl`, having nothing to fall back from.
-- `sparse: true` opts out of the retry: the cVAT ground only. A 404 inside its
-  extent is the coverage mask, and an `<img>` error carries no status, so the
-  retry cannot tell a mask hole from a dropped request. `/cache/` needs no such
-  flag — MapProxy culls to a coverage polygon and answers a blank 200 inside it.
+- `fetch` needs CORS where `<img>` did not. Only `cache.kartverket.no` is
+  cross-origin, and it answers `access-control-allow-origin: *` on a tile and on
+  its 4xx alike; the CSP lists it under `connect-src` and allows `blob:` under
+  `img-src`. A source that failed that check would keep `img.src` rather than
+  lose the layer.
+- There is no cancellation. `setTileLoadFunction` has no abort hook, so an
+  in-flight fetch for a tile the view has moved past runs to completion and the
+  result is dropped on a `getState()` check. That check is also what keeps
+  `setState` off a tile the cache has already released — `EMPTY` back to `ERROR`
+  is a transition OpenLayers throws on.
+- Decoding moved to the main thread. OpenLayers takes the off-thread
+  `img.decode()` path only when `src` is already set by the time it attaches its
+  own listeners, which an async load function cannot manage.
 
 ## Circuit breaker (`src/upstream/`)
 

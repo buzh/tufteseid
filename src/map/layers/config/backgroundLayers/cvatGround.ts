@@ -213,7 +213,6 @@ export const buildCvatGroundConfig = (
   minZoom: acquisition.minZoom,
   maxZoom: acquisition.maxZoom,
   preload: 2,
-  sparse: true,
   interpolate: false,
   coverageExtent: acquisition.extent25833
     ? { extent: acquisition.extent25833, crs: CVAT_CRS }
